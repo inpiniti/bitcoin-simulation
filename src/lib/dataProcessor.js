@@ -14,6 +14,13 @@ export const INTERVALS = {
     '1w': 10080,
 };
 
+// 수수료 및 슬리피지 설정
+export const TRADING_COSTS = {
+    buyFee: 0.0005,      // 매수 수수료 0.05%
+    sellFee: 0.0005,     // 매도 수수료 0.05%
+    slippage: 0.001,     // 슬리피지 0.1%
+};
+
 /**
  * 1분봉 데이터를 특정 간격으로 변환
  * @param {Array} data1min - 1분봉 데이터 배열
@@ -123,40 +130,92 @@ export function generateTrades(dataWithSlope) {
 }
 
 /**
- * 시뮬레이션 결과 계산 (수량 고정)
+ * 수수료와 슬리피지를 적용한 실제 거래 비용 계산
+ * @param {number} price - 현재 가격
+ * @param {number} quantity - 투자금 (KRW)
+ * @param {string} type - 'buy' 또는 'sell'
+ * @param {Object} costs - 수수료/슬리피지 설정
+ * @returns {Object} { actualPrice, fee, totalCost }
+ */
+function applyTradingCosts(price, quantity, type, costs = TRADING_COSTS) {
+    if (type === 'buy') {
+        // 매수: 가격이 슬리피지만큼 불리하게 적용
+        const actualPrice = price * (1 + costs.slippage);
+        const fee = quantity * costs.buyFee;
+        const totalCost = quantity + fee;
+        const btcAmount = quantity / actualPrice;
+
+        return { actualPrice, fee, totalCost, btcAmount };
+    } else {
+        // 매도: 가격이 슬리피지만큼 불리하게 적용
+        const actualPrice = price * (1 - costs.slippage);
+        const grossRevenue = quantity * actualPrice; // quantity = btcAmount
+        const fee = grossRevenue * costs.sellFee;
+        const netRevenue = grossRevenue - fee;
+
+        return { actualPrice, fee, netRevenue };
+    }
+}
+
+/**
+ * 시뮬레이션 결과 계산 (수량 고정) - 수수료/슬리피지 반영
  * @param {Array} trades - 매매 기록
  * @param {number} quantity - 기본 수량 (KRW)
+ * @param {Object} costs - 수수료/슬리피지 설정
  * @returns {Object} 시뮬레이션 결과
  */
-export function calculateFixedQuantityResult(trades, quantity = 100000) {
+export function calculateFixedQuantityResult(trades, quantity = 100000, costs = TRADING_COSTS) {
     let totalProfit = 0;
+    let totalFees = 0;
     let wins = 0;
     let losses = 0;
 
     const tradeDetails = trades.map(trade => {
-        const btcAmount = quantity / trade.buy.price;
-        const sellValue = btcAmount * trade.sell.price;
-        const profit = sellValue - quantity;
-        const profitRate = (profit / quantity) * 100;
+        // 매수 계산 (수수료 + 슬리피지 적용)
+        const buyResult = applyTradingCosts(trade.buy.price, quantity, 'buy', costs);
+        const btcAmount = buyResult.btcAmount;
+        const buyCost = buyResult.totalCost;
+        const buyFee = buyResult.fee;
+        const actualBuyPrice = buyResult.actualPrice;
 
-        if (profit > 0) wins++;
+        // 매도 계산 (수수료 + 슬리피지 적용)
+        const sellResult = applyTradingCosts(trade.sell.price, btcAmount, 'sell', costs);
+        const sellRevenue = sellResult.netRevenue;
+        const sellFee = sellResult.fee;
+        const actualSellPrice = sellResult.actualPrice;
+
+        // 실질 손익
+        const realProfit = sellRevenue - buyCost;
+        const realProfitRate = (realProfit / buyCost) * 100;
+
+        if (realProfit > 0) wins++;
         else losses++;
 
-        totalProfit += profit;
+        totalProfit += realProfit;
+        totalFees += buyFee + sellFee;
 
         return {
             ...trade,
             quantity,
             btcAmount,
-            sellValue,
-            realProfit: profit,
-            realProfitRate: profitRate,
+            actualBuyPrice,
+            actualSellPrice,
+            buyCost,
+            sellRevenue,
+            buyFee,
+            sellFee,
+            totalFee: buyFee + sellFee,
+            realProfit,
+            realProfitRate,
+            // 기존 호환성을 위해 유지
+            sellValue: sellRevenue,
         };
     });
 
     const totalCycles = trades.length;
     const winRate = totalCycles > 0 ? (wins / totalCycles) * 100 : 0;
-    const totalProfitRate = (totalProfit / (quantity * totalCycles)) * 100;
+    const totalInvested = quantity * totalCycles;
+    const totalProfitRate = totalInvested > 0 ? (totalProfit / totalInvested) * 100 : 0;
 
     return {
         trades: tradeDetails,
@@ -167,19 +226,23 @@ export function calculateFixedQuantityResult(trades, quantity = 100000) {
             winRate,
             totalProfit,
             totalProfitRate,
+            totalFees,
+            costs, // 사용된 수수료/슬리피지 설정 기록
         },
     };
 }
 
 /**
- * 마틴게일 전략 시뮬레이션
+ * 마틴게일 전략 시뮬레이션 - 수수료/슬리피지 반영
  * @param {Array} trades - 매매 기록
  * @param {number} baseQuantity - 기본 수량
  * @param {number} multiplier - 배율 (1.1, 1.2, ...)
+ * @param {Object} costs - 수수료/슬리피지 설정
  * @returns {Object} 시뮬레이션 결과
  */
-export function calculateMartingaleResult(trades, baseQuantity = 100000, multiplier = 1.5) {
+export function calculateMartingaleResult(trades, baseQuantity = 100000, multiplier = 1.5, costs = TRADING_COSTS) {
     let totalProfit = 0;
+    let totalFees = 0;
     let wins = 0;
     let losses = 0;
     let currentMultiplier = 1;
@@ -187,14 +250,27 @@ export function calculateMartingaleResult(trades, baseQuantity = 100000, multipl
 
     const tradeDetails = trades.map(trade => {
         const quantity = baseQuantity * currentMultiplier;
-        const btcAmount = quantity / trade.buy.price;
-        const sellValue = btcAmount * trade.sell.price;
-        const profit = sellValue - quantity;
-        const profitRate = (profit / quantity) * 100;
+
+        // 매수 계산 (수수료 + 슬리피지 적용)
+        const buyResult = applyTradingCosts(trade.buy.price, quantity, 'buy', costs);
+        const btcAmount = buyResult.btcAmount;
+        const buyCost = buyResult.totalCost;
+        const buyFee = buyResult.fee;
+        const actualBuyPrice = buyResult.actualPrice;
+
+        // 매도 계산 (수수료 + 슬리피지 적용)
+        const sellResult = applyTradingCosts(trade.sell.price, btcAmount, 'sell', costs);
+        const sellRevenue = sellResult.netRevenue;
+        const sellFee = sellResult.fee;
+        const actualSellPrice = sellResult.actualPrice;
+
+        // 실질 손익
+        const realProfit = sellRevenue - buyCost;
+        const realProfitRate = (realProfit / buyCost) * 100;
 
         const usedMultiplier = currentMultiplier;
 
-        if (profit > 0) {
+        if (realProfit > 0) {
             wins++;
             currentMultiplier = 1; // 승리 시 리셋
         } else {
@@ -203,16 +279,25 @@ export function calculateMartingaleResult(trades, baseQuantity = 100000, multipl
             if (currentMultiplier > maxMultiplier) maxMultiplier = currentMultiplier;
         }
 
-        totalProfit += profit;
+        totalProfit += realProfit;
+        totalFees += buyFee + sellFee;
 
         return {
             ...trade,
             quantity,
             multiplier: usedMultiplier,
             btcAmount,
-            sellValue,
-            realProfit: profit,
-            realProfitRate: profitRate,
+            actualBuyPrice,
+            actualSellPrice,
+            buyCost,
+            sellRevenue,
+            buyFee,
+            sellFee,
+            totalFee: buyFee + sellFee,
+            realProfit,
+            realProfitRate,
+            // 기존 호환성을 위해 유지
+            sellValue: sellRevenue,
         };
     });
 
@@ -228,6 +313,8 @@ export function calculateMartingaleResult(trades, baseQuantity = 100000, multipl
             winRate,
             totalProfit,
             maxMultiplier,
+            totalFees,
+            costs,
         },
     };
 }
