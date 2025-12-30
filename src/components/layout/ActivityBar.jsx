@@ -10,6 +10,10 @@ const INTERVALS = [
     { key: '2h', label: '2시간', icon: Clock2 },
     { key: '1d', label: '1일', icon: Calendar },
     { key: '2d', label: '2일', icon: CalendarDays },
+    { key: '3d', label: '3일', icon: CalendarDays },
+    { key: '4d', label: '4일', icon: CalendarDays },
+    { key: '5d', label: '5일', icon: CalendarDays },
+    { key: '6d', label: '6일', icon: CalendarDays },
     { key: '1w', label: '1주', icon: CalendarRange },
 ]
 
@@ -24,7 +28,7 @@ export function ActivityBar() {
     } = useStore()
 
     const handleClick = async (interval) => {
-        const hasData = hist[interval].length > 0
+        const hasData = (hist[interval]?.length || 0) > 0
 
         if (hasData) {
             setActiveInterval(interval)
@@ -44,7 +48,7 @@ export function ActivityBar() {
     return (
         <div className="w-12 bg-[#333333] flex flex-col items-center py-2 gap-1">
             {INTERVALS.map(({ key, label, icon: Icon }) => {
-                const hasData = hist[key].length > 0
+                const hasData = (hist[key]?.length || 0) > 0
                 const isLoading = loadingInterval[key]
                 const isActive = activeInterval === key
 

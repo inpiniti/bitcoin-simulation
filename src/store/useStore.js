@@ -31,6 +31,10 @@ export const useStore = create(
                     '2h': [],
                     '1d': [],
                     '2d': [],
+                    '3d': [],
+                    '4d': [],
+                    '5d': [],
+                    '6d': [],
                     '1w': [],
                 },
 
@@ -85,7 +89,7 @@ export const useStore = create(
                  */
                 loadHistInterval: async (interval) => {
                     const state = get();
-                    if (state.hist[interval].length > 0) return; // 이미 생성됨
+                    if (state.hist[interval] && state.hist[interval].length > 0) return; // 이미 생성됨
                     if (state.hist['1m'].length === 0) {
                         console.error('1분 데이터가 먼저 로드되어야 합니다.');
                         return;
@@ -166,6 +170,10 @@ export const useStore = create(
                         '2h': [],
                         '1d': [],
                         '2d': [],
+                        '3d': [],
+                        '4d': [],
+                        '5d': [],
+                        '6d': [],
                         '1w': [],
                     },
                     simul: {},
@@ -184,6 +192,19 @@ export const useStore = create(
                 }),
             }
         ),
-        { name: 'BitcoinSimulation' } // Redux DevTools에 표시될 이름
+        {
+            name: 'BitcoinSimulation', // Redux DevTools에 표시될 이름
+            enabled: import.meta.env.DEV, // 개발 환경에서만 DevTools 활성화
+            // 대용량 데이터는 DevTools에서 제외하여 64MB 제한 초과 방지
+            serialize: {
+                replacer: (key, value) => {
+                    // hist와 simul 데이터는 DevTools에서 제외
+                    if (key === 'hist' || key === 'simul') {
+                        return '[대용량 데이터 생략]';
+                    }
+                    return value;
+                }
+            }
+        }
     )
 )
