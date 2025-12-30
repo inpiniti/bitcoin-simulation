@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { devtools, persist, createJSONStorage } from 'zustand/middleware'
 import { get as idbGet, set as idbSet, del as idbDel } from 'idb-keyval'
-import { fetchOneYearData } from '@/lib/api'
+import { fetchOneYearData, fetchStockOneYearData } from '@/lib/api'
 import { aggregateToInterval, addSlopeData, generateTrades, calculateFixedQuantityResult, calculateMartingaleResult, INTERVALS } from '@/lib/dataProcessor'
 
 // IndexedDB 스토리지 어댑터
@@ -22,6 +22,10 @@ export const useStore = create(
     devtools(
         persist(
             (set, get) => ({
+                // Global Settings
+                mode: 'coin', // 'coin' | 'stock'
+                ticker: 'AAPL', // Stock ticker
+
                 // History data (with slope)
                 hist: {
                     '1m': [],
@@ -41,7 +45,7 @@ export const useStore = create(
                 // Simulation results
                 simul: {},
 
-                // Loading states (로딩 상태는 persist에서 제외)
+                // Loading states
                 loadingInterval: {},
                 loadingSimul: {},
 
@@ -57,11 +61,30 @@ export const useStore = create(
                 // Actions
                 setFetchProgress: (current, total) => set({ fetchProgress: { current, total } }),
 
+                setMode: (mode) => {
+                    const currentMode = get().mode;
+                    if (currentMode !== mode) {
+                        // 모드 변경 시 데이터 초기화
+                        get().clearAllData();
+                        set({ mode });
+                    }
+                },
+
+                setTicker: (ticker) => {
+                    const currentTicker = get().ticker;
+                    if (currentTicker !== ticker) {
+                        // 티커 변경 시 데이터 초기화
+                        get().clearAllData();
+                        set({ ticker });
+                    }
+                },
+
                 /**
-                 * 1분 데이터 로드 (API 호출)
+                 * 1분 데이터 로드 (API 호출) - Coin Mode Only
                  */
                 loadHist1m: async () => {
                     const state = get();
+                    if (state.mode !== 'coin') return; // Stock 모드에서는 1분 데이터 사용 불가 (현재 설계상)
                     if (state.hist['1m'].length > 0) return; // 이미 로드됨
 
                     set((s) => ({ loadingInterval: { ...s.loadingInterval, '1m': true } }));
@@ -85,28 +108,131 @@ export const useStore = create(
                 },
 
                 /**
-                 * 특정 간격 데이터 생성 (1분 데이터 기반)
+                 * 주식 데이터 로드 (Yahoo API) - Stock Mode Only
+                 * Stock은 1일 데이터가 기본(Base)임.
+                 */
+                loadStockData: async () => {
+                    const state = get();
+                    if (state.mode !== 'stock') return;
+                    // 기존 데이터가 5개 이하(최소한의 캔들)라면 잘못된 데이터(이전 버그로 인한 1개 뭉침 등)로 간주하고 다시 로드
+                    if (state.hist['1d'].length > 5) return;
+
+                    set((s) => ({ loadingInterval: { ...s.loadingInterval, 'STOCK_BASE': true } })); // Loading indicator for stock base
+
+                    try {
+                        let rawData = await fetchStockOneYearData(state.ticker);
+
+                        // 데이터가 너무 적으면 경고
+                        if (rawData.length <= 5) {
+                            console.warn(`[Warning] Fetched data count is too low (${rawData.length}). Parser might be filtering too much or API returned empty.`);
+                        }
+
+                        // 기울기 추가 (일봉 기준)
+                        const dataWithSlope = addSlopeData(rawData);
+
+                        set((s) => ({
+                            hist: { ...s.hist, '1d': dataWithSlope },
+                            loadingInterval: { ...s.loadingInterval, 'STOCK_BASE': false },
+                        }));
+                    } catch (error) {
+                        console.error(`Failed to load stock data for ${state.ticker}:`, error);
+                        set((s) => ({ loadingInterval: { ...s.loadingInterval, 'STOCK_BASE': false } }));
+                        alert(`데이터 로드 실패: ${error.message}`);
+                    }
+                },
+
+                /**
+                 * 특정 간격 데이터 생성
+                 * Coin Mode: 1분 데이터 기반
+                 * Stock Mode: 1일 데이터 기반 (1일보다 작은 단위는 생성 불가)
                  */
                 loadHistInterval: async (interval) => {
                     const state = get();
-                    if (state.hist[interval] && state.hist[interval].length > 0) return; // 이미 생성됨
-                    if (state.hist['1m'].length === 0) {
-                        console.error('1분 데이터가 먼저 로드되어야 합니다.');
-                        return;
-                    }
+                    // 이미 생성된 데이터가 있고, 데이터 개수가 정상 범위(>1)라면 재사용.
+                    // (이전 버그로 인해 1개만 생성된 경우를 필터링하기 위함)
+                    if (state.hist[interval] && state.hist[interval].length > 1) return;
 
                     set((s) => ({ loadingInterval: { ...s.loadingInterval, [interval]: true } }));
 
                     // 비동기 처리 시뮬레이션 (UI 블로킹 방지)
                     await new Promise(resolve => setTimeout(resolve, 100));
 
-                    const aggregated = aggregateToInterval(state.hist['1m'], INTERVALS[interval]);
-                    const dataWithSlope = addSlopeData(aggregated);
+                    try {
+                        let baseData = [];
 
-                    set((s) => ({
-                        hist: { ...s.hist, [interval]: dataWithSlope },
-                        loadingInterval: { ...s.loadingInterval, [interval]: false },
-                    }));
+                        if (state.mode === 'coin') {
+                            if (state.hist['1m'].length === 0) {
+                                console.error('1분 데이터가 먼저 로드되어야 합니다.');
+                                throw new Error('Base data not loaded');
+                            }
+                            baseData = state.hist['1m'];
+                        } else {
+                            // Stock Mode
+                            if (state.hist['1d'].length === 0) {
+                                // 1일 데이터가 없으면 먼저 로드 시도
+                                await state.loadStockData();
+                                // 로드 후 상태 갱신 확인
+                                const newState = get();
+                                if (newState.hist['1d'].length === 0) {
+                                    throw new Error('Failed to load base stock data');
+                                }
+                                baseData = newState.hist['1d'];
+                            } else {
+                                baseData = state.hist['1d'];
+                            }
+
+                            // Stock 모드에서 1일 미만 단위 요청 시 무시
+                            const minutes = INTERVALS[interval];
+                            if (minutes < 1440) { // 1440 = 24 * 60 (1일)
+                                console.warn('Stock mode does not support intervals less than 1 day');
+                                set((s) => ({ loadingInterval: { ...s.loadingInterval, [interval]: false } }));
+                                return;
+                            }
+                        }
+
+                        // Stock 모드일 때 1d 데이터를 또 1d로 변환하려 하면 비효율적이지만, aggregateToInterval이 잘 처리하는지 확인 필요.
+                        // aggregateToInterval은 분 단위로 계산함. Stock 하루는 1440분으로 가정되는가?
+                        // Stock 데이터는 시간 정보가 있지만, 갭이 큼. 
+                        // 단순 캔들 병합(N개 캔들을 하나로) 방식이 아니라, 시간 기반 병합(aggregateToInterval)이라면 타임스탬프가 중요.
+                        // Stock 일봉 데이터의 timestamp는 00:00:00 (UTC) or market open time.
+                        // INTERVALS['1d'] = 1440. 
+                        // Coin은 1분차트에 모든 분이 다 있음. Stock은 하루에 하나.
+                        // aggregate logic needs to handle this.
+                        // 현재 aggregate helper는 '분'을 가정하고 있음.
+                        // Stock 1일 데이터를 기반으로 2일, 1주 등을 만들 때는
+                        // "캔들 개수"로 묶거나 "날짜"로 묶어야 함.
+
+                        // 임시 방편: Stock 모드이고 Interval이 1d인 경우, 이미 loadStockData에서 처리됨 (위에서 return 안됐다면 로직 흐름상 여기 옴).
+                        // 만약 interval == '1d'이고 Stock 모드라면, loadStockData가 이미 채웠으므로 여기 올 일 없음 (맨 위 check).
+                        // 즉, 여기는 2d, 1w 등을 만들러 온 것.
+
+                        // Stock의 경우 Base가 '1d'인데 aggregateToInterval이 '1m'을 기대하면 안됨.
+                        // aggregateToInterval 함수 수정이 필요할 수 있음. 혹은 여기서 분기.
+
+                        let aggregated;
+                        if (state.mode === 'stock') {
+                            // Stock 모드는 기본 데이터가 1일봉(1440분)이므로,
+                            // Aggregation 시 "분 단위"가 아니라 "일 단위(캔들 개수)"로 계산해야 함.
+                            const intervalMinutes = INTERVALS[interval];
+                            const stride = intervalMinutes / 1440;
+
+                            aggregated = aggregateToInterval(baseData, Math.max(1, Math.floor(stride)));
+                        } else {
+                            // Coin 모드는 1분봉이므로 분 단위 그대로 Stride로 사용
+                            aggregated = aggregateToInterval(baseData, INTERVALS[interval]);
+                        }
+
+                        const dataWithSlope = addSlopeData(aggregated);
+
+                        set((s) => ({
+                            hist: { ...s.hist, [interval]: dataWithSlope },
+                            loadingInterval: { ...s.loadingInterval, [interval]: false },
+                        }));
+
+                    } catch (err) {
+                        console.error(err);
+                        set((s) => ({ loadingInterval: { ...s.loadingInterval, [interval]: false } }));
+                    }
                 },
 
                 /**
@@ -114,7 +240,7 @@ export const useStore = create(
                  */
                 runFixedSimulation: async (interval) => {
                     const state = get();
-                    const key = `${interval}_fixed`;
+                    const key = `${state.mode}_${state.ticker}_${interval}_fixed`;
 
                     if (state.simul[key]) return; // 이미 실행됨
 
@@ -123,7 +249,28 @@ export const useStore = create(
                     await new Promise(resolve => setTimeout(resolve, 100));
 
                     const data = state.hist[interval];
+                    if (!data || data.length === 0) {
+                        alert(`[Debug] Simulation failed: No data for interval ${interval}. Mode: ${state.mode}, Ticker: ${state.ticker}`);
+                        set((s) => ({ loadingSimul: { ...s.loadingSimul, [key]: false } }));
+                        return;
+                    }
+
                     const trades = generateTrades(data);
+
+                    if (trades.length === 0) {
+                        try {
+                            // 디버그용 샘플 데이터 확인
+                            const s1 = data[1] ? `Slope[1]: ${data[1].slope}` : 'No data[1]';
+                            const sLast = data[data.length - 1] ? `Slope[Last]: ${data[data.length - 1].slope}` : 'No last';
+                            const priceSample = data[0] ? `Price[0]: ${data[0].close} (${typeof data[0].close})` : 'No price';
+
+                            alert(`[Debug] 0 Trades generated.\nData Count: ${data.length}\n${priceSample}\n${s1}\n${sLast}\n\nPlease check if 'close' price is valid number.`);
+                        } catch (e) {
+                            alert(`[Debug] Error checking data: ${e.message}`);
+                        }
+                    }
+
+                    // Stock 수수료 등은 Config가 필요하지만, 현재 하드코딩된 값 사용. (추후 개선 포인트)
                     const result = calculateFixedQuantityResult(trades);
 
                     set((s) => ({
@@ -137,7 +284,7 @@ export const useStore = create(
                  */
                 runMartingaleSimulation: async (interval, multiplier) => {
                     const state = get();
-                    const key = `${interval}_martingale_${multiplier}`;
+                    const key = `${state.mode}_${state.ticker}_${interval}_martingale_${multiplier}`;
 
                     if (state.simul[key]) return;
 
@@ -160,25 +307,20 @@ export const useStore = create(
 
                 /**
                  * 스토어 초기화 (데이터 삭제)
+                 * Mode와 Ticker는 유지하고 데이터만 날릴 것인지?
+                 * -> 사용자 요청: "주식으로 바꾸거나 또는 종목을 바꾸거나 할때, store는 초기화 하는게 좋을것 같다."
+                 * -> 즉, 이 함수는 데이터 클리어 용도.
                  */
                 clearAllData: () => set({
                     hist: {
-                        '1m': [],
-                        '5m': [],
-                        '15m': [],
-                        '1h': [],
-                        '2h': [],
-                        '1d': [],
-                        '2d': [],
-                        '3d': [],
-                        '4d': [],
-                        '5d': [],
-                        '6d': [],
-                        '1w': [],
+                        '1m': [], '5m': [], '15m': [], '1h': [], '2h': [],
+                        '1d': [], '2d': [], '3d': [], '4d': [], '5d': [], '6d': [], '1w': [],
                     },
                     simul: {},
+                    // mode, ticker는 유지 (설정값이므로)
                     activeInterval: null,
                     selectedResult: null,
+                    fetchProgress: { current: 0, total: 0 },
                 }),
             }),
             {
@@ -186,8 +328,11 @@ export const useStore = create(
                 storage: createJSONStorage(() => indexedDBStorage),
                 // 로딩 상태 등은 persist에서 제외
                 partialize: (state) => ({
+                    mode: state.mode,
+                    ticker: state.ticker,
                     hist: state.hist,
                     simul: state.simul,
+                    // activeInterval, selectedResult는 UX상 유지하면 좋음
                     activeInterval: state.activeInterval,
                 }),
             }

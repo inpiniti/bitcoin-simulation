@@ -19,6 +19,7 @@ const INTERVALS = [
 
 export function ActivityBar() {
     const {
+        mode,
         hist,
         loadingInterval,
         activeInterval,
@@ -28,17 +29,25 @@ export function ActivityBar() {
     } = useStore()
 
     const handleClick = async (interval) => {
+        // Stock 모드에서 1일 미만 간격 클릭 차단
+        if (mode === 'stock' && ['1m', '5m', '15m', '1h', '2h'].includes(interval)) return;
+
         const hasData = (hist[interval]?.length || 0) > 0
 
         if (hasData) {
             setActiveInterval(interval)
         } else {
-            if (interval === '1m') {
-                await loadHist1m()
-            } else {
-                if (hist['1m'].length === 0) {
+            if (mode === 'coin') {
+                if (interval === '1m') {
                     await loadHist1m()
+                } else {
+                    if (hist['1m'].length === 0) {
+                        await loadHist1m()
+                    }
+                    await loadHistInterval(interval)
                 }
+            } else {
+                // Stock 모드: Store의 loadHistInterval이 1d 데이터 로드를 처리함
                 await loadHistInterval(interval)
             }
             setActiveInterval(interval)
@@ -46,25 +55,30 @@ export function ActivityBar() {
     }
 
     return (
-        <div className="w-12 bg-[#333333] flex flex-col items-center py-2 gap-1">
+        <div className="w-12 bg-[#333333] flex flex-col items-center py-2 gap-1 overflow-y-auto scrollbar-hide">
             {INTERVALS.map(({ key, label, icon: Icon }) => {
                 const hasData = (hist[key]?.length || 0) > 0
                 const isLoading = loadingInterval[key]
                 const isActive = activeInterval === key
 
+                // Stock 모드 시 비활성화 여부
+                const isStockDisabled = mode === 'stock' && ['1m', '5m', '15m', '1h', '2h'].includes(key);
+                const disabled = isLoading || isStockDisabled;
+
                 return (
                     <button
                         key={key}
                         onClick={() => handleClick(key)}
-                        disabled={isLoading}
-                        title={`${label} 간격`}
+                        disabled={disabled}
+                        title={isStockDisabled ? "주식 모드 미지원" : `${label} 간격`}
                         className={cn(
-                            "w-10 h-10 flex flex-col items-center justify-center rounded transition-all",
+                            "w-10 h-10 flex flex-col items-center justify-center rounded transition-all shrink-0",
                             "text-[10px] gap-0.5",
-                            isActive && "bg-[#1e1e1e] border-l-2 border-l-[#f7931a]",
-                            hasData && !isActive && "text-[#cccccc] hover:bg-[#2a2a2a]",
-                            !hasData && !isLoading && "text-[#5a5a5a] hover:bg-[#2a2a2a]",
-                            isLoading && "text-[#f7931a]"
+                            isActive && !isStockDisabled && "bg-[#1e1e1e] border-l-2 border-l-[#f7931a]",
+                            hasData && !isActive && !isStockDisabled && "text-[#cccccc] hover:bg-[#2a2a2a]",
+                            !hasData && !isLoading && !isStockDisabled && "text-[#5a5a5a] hover:bg-[#2a2a2a]",
+                            isLoading && "text-[#f7931a]",
+                            isStockDisabled && "opacity-20 cursor-not-allowed text-[#444]"
                         )}
                     >
                         {isLoading

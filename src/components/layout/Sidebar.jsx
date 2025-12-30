@@ -16,6 +16,8 @@ const STRATEGIES = [
 export function Sidebar() {
     const [isExpanded, setIsExpanded] = useState(true)
     const {
+        mode,
+        ticker,
         activeInterval,
         hist,
         simul,
@@ -27,13 +29,17 @@ export function Sidebar() {
 
     const isDisabled = !activeInterval || hist[activeInterval]?.length === 0
 
+    const getSimulKey = (strategy) => {
+        const suffix = strategy.multiplier
+            ? `martingale_${strategy.multiplier}`
+            : `fixed`
+        return `${mode}_${ticker}_${activeInterval}_${suffix}`
+    }
+
     const handleClick = async (strategy) => {
         if (isDisabled) return
 
-        const simulKey = strategy.multiplier
-            ? `${activeInterval}_martingale_${strategy.multiplier}`
-            : `${activeInterval}_fixed`
-
+        const simulKey = getSimulKey(strategy)
         const hasResult = simul[simulKey]
 
         if (hasResult) {
@@ -44,6 +50,7 @@ export function Sidebar() {
             } else {
                 await runFixedSimulation(activeInterval)
             }
+            // Store might have updated, need to read fresh state or rely on key consistency
             const result = useStore.getState().simul[simulKey]
             if (result) {
                 setSelectedResult({ key: simulKey, ...result })
@@ -71,12 +78,9 @@ export function Sidebar() {
                 {isExpanded && (
                     <div className="pl-4">
                         {STRATEGIES.map((strategy) => {
-                            const simulKey = strategy.multiplier
-                                ? `${activeInterval}_martingale_${strategy.multiplier}`
-                                : `${activeInterval}_fixed`
-
-                            const hasResult = simul[simulKey]
-                            const isLoading = loadingSimul[simulKey]
+                            const simulKey = activeInterval ? getSimulKey(strategy) : null
+                            const hasResult = simulKey ? simul[simulKey] : false
+                            const isLoading = simulKey ? loadingSimul[simulKey] : false
                             const Icon = strategy.icon
 
                             return (
