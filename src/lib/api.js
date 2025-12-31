@@ -60,14 +60,17 @@ export async function fetchOneYearData(onProgress) {
  * @returns {Promise<Array>} 정규화된 캔들 데이터
  */
 export async function fetchStockOneYearData(ticker) {
+    // Yahoo Finance 호환성을 위해 (.)을 (-)로 변환 (예: BRK.B -> BRK-B)
+    const formattedTicker = ticker.replace(/\./g, '-');
+
     // CORS 문제를 회피하기 위해 Vite Proxy(/api/yahoo)를 사용합니다.
     // Proxy 설정: vite.config.js
-    const url = `/api/yahoo/v8/finance/chart/${ticker}?interval=1d&range=365d`;
+    const url = `/api/yahoo/v8/finance/chart/${formattedTicker}?interval=1d&range=365d`;
     console.log(`Fetching stock data from: ${url}`);
 
     const response = await fetch(url);
     if (!response.ok) {
-        throw new Error(`Failed to fetch stock data for ${ticker}: ${response.statusText}`);
+        throw new Error(`Failed to fetch stock data for ${formattedTicker}: ${response.statusText}`);
     }
 
     const json = await response.json();
