@@ -53,22 +53,82 @@ export function aggregateToInterval(data1min, intervalMinutes) {
 }
 
 /**
- * 기울기(Slope) 데이터 추가
- * 첫 번째 로우는 이전 가격이 없으므로 undefined로 기록
+ * 데이터에 파생 지표(Median, Slope, Bollinger Bands) 추가
+ * 1. Median: (Open + Close) / 2
+ * 2. Slope: 현재 Median - 이전 Median
+ * 3. Bollinger Bands: Median 기준 20-period, 2-multiplier
+ * 
  * @param {Array} data - 캔들 데이터 배열
- * @returns {Array} 기울기가 추가된 데이터
+ * @returns {Array} 파생 지표가 추가된 데이터
  */
-export function addSlopeData(data) {
-    return data.map((item, index) => {
-        const currentPrice = item.close;
-        const prevPrice = index > 0 ? data[index - 1].close : undefined;
-        const slope = prevPrice !== undefined ? currentPrice - prevPrice : undefined;
+export function addDerivedData(data) {
+    // 1. Median & Slope 계산
+    const withMedianAndSlope = data.map((item, index) => {
+        const median = (item.open + item.close) / 2;
+        const prevMedian = index > 0 ? (data[index - 1].open + data[index - 1].close) / 2 : undefined;
+        const slope = prevMedian !== undefined ? median - prevMedian : undefined;
 
         return {
             ...item,
+            median,
             slope,
         };
     });
+
+    // 2. Bollinger Bands 계산 (Median 기준)
+    const period = 20;
+    const multiplier = 2;
+
+    return withMedianAndSlope.map((item, index, array) => {
+        if (index < period - 1) {
+            // 충분한 데이터가 없을 경우
+            return { ...item, bbStatus: 0, bbUpper: undefined, bbLower: undefined, bbMean: undefined };
+        }
+
+        // 지난 20개(현재 포함)의 Median 데이터 가져오기
+        const slice = array.slice(index - period + 1, index + 1).map(d => d.median);
+
+        // 평균 (SMA - Middle Band)
+        const mean = slice.reduce((sum, val) => sum + val, 0) / period;
+
+        // 표준편차 (Standard Deviation)
+        const squaredDiffs = slice.map(val => Math.pow(val - mean, 2));
+        const variance = squaredDiffs.reduce((sum, val) => sum + val, 0) / period;
+        const stdDev = Math.sqrt(variance);
+
+        // 상단/하단 밴드
+        const upperBand = mean + (multiplier * stdDev);
+        const lowerBand = mean - (multiplier * stdDev);
+
+        // 상태값(Status) 결정 (Median Price 기준)
+        // 2: 상단 밴드 이탈 (Price > Upper Band)
+        // 1: 상단 구간 (Mean < Price <= Upper Band)
+        // -1: 하단 구간 (Lower Band <= Price < Mean)
+        // -2: 하단 밴드 이탈 (Price < Lower Band)
+        let bbStatus = 0;
+        const price = item.median;
+
+        if (price > upperBand) bbStatus = 2;
+        else if (price > mean && price <= upperBand) bbStatus = 1;
+        else if (price >= lowerBand && price < mean) bbStatus = -1;
+        else if (price < lowerBand) bbStatus = -2;
+
+        return {
+            ...item,
+            bbUpper: upperBand,
+            bbLower: lowerBand,
+            bbMean: mean,
+            bbStatus,
+        };
+    });
+}
+
+/**
+ * 기울기(Slope) 데이터 추가 (Legacy 호환용 Wrapper)
+ * 내부적으로 addDerivedData를 호출하여 처리
+ */
+export function addSlopeData(data) {
+    return addDerivedData(data);
 }
 
 /**
@@ -99,7 +159,7 @@ export function generateTrades(dataWithSlope) {
             buyRecord = {
                 type: 'buy',
                 timestamp: curr.timestamp,
-                price: curr.close,
+                price: curr.close, // 매매는 여전히 실제 체결가(close) 기준
                 index: i,
             };
             currentPosition = 'long';
@@ -109,7 +169,7 @@ export function generateTrades(dataWithSlope) {
             const sellRecord = {
                 type: 'sell',
                 timestamp: curr.timestamp,
-                price: curr.close,
+                price: curr.close, // 매매는 여전히 실제 체결가(close) 기준
                 index: i,
             };
 

@@ -58,8 +58,13 @@ export const useStore = create(
                 // Currently selected simulation result to display
                 selectedResult: null,
 
+                // Data View Mode (Toggle)
+                dataViewMode: false,
+
                 // Actions
                 setFetchProgress: (current, total) => set({ fetchProgress: { current, total } }),
+
+                toggleDataViewMode: () => set((state) => ({ dataViewMode: !state.dataViewMode })),
 
                 setMode: (mode) => {
                     const currentMode = get().mode;
@@ -334,6 +339,7 @@ export const useStore = create(
                     simul: state.simul,
                     // activeInterval, selectedResult는 UX상 유지하면 좋음
                     activeInterval: state.activeInterval,
+                    dataViewMode: state.dataViewMode,
                 }),
             }
         ),

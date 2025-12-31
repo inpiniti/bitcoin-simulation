@@ -3,7 +3,7 @@ import { useStore } from "@/store/useStore"
 import { useState, useEffect } from "react"
 
 export function TitleBar() {
-    const { mode, ticker, setMode, setTicker } = useStore()
+    const { mode, ticker, setMode, setTicker, dataViewMode, toggleDataViewMode } = useStore()
     const [localTicker, setLocalTicker] = useState(ticker)
 
     useEffect(() => {
@@ -96,12 +96,30 @@ export function TitleBar() {
                 )}
             </div>
 
-            {/* Right: Window Controls (Mock) */}
-            <div className="flex items-center gap-4 text-[#7d7d7d]">
-                <button className="hover:text-[#cccccc] text-xs">−</button>
-                <button className="hover:text-[#cccccc] text-xs">□</button>
-                <button className="hover:text-[#cccccc] hover:bg-red-600 px-2 text-xs">×</button>
+
+
+            {/* Right: Controls */}
+            <div className="flex items-center gap-4">
+                {/* Data View Toggle */}
+                <button
+                    onClick={toggleDataViewMode}
+                    className={cn(
+                        "flex items-center gap-1.5 px-3 py-1 text-xs rounded-sm transition-colors border",
+                        dataViewMode
+                            ? "bg-[#2d2d2d] text-[#e1e1e1] border-[#555]"
+                            : "bg-transparent text-[#9d9d9d] border-transparent hover:text-[#e1e1e1] hover:bg-[#2d2d2d]"
+                    )}
+                >
+                    <span>{dataViewMode ? "👁️ Data View : ON" : "👁️ Data View : OFF"}</span>
+                </button>
+
+                {/* Window Controls (Mock) */}
+                <div className="flex items-center gap-4 text-[#7d7d7d]">
+                    <button className="hover:text-[#cccccc] text-xs">−</button>
+                    <button className="hover:text-[#cccccc] text-xs">□</button>
+                    <button className="hover:text-[#cccccc] hover:bg-red-600 px-2 text-xs">×</button>
+                </div>
             </div>
-        </div>
+        </div >
     )
 }
