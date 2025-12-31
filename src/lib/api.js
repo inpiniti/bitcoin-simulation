@@ -114,3 +114,29 @@ export async function fetchStockOneYearData(ticker) {
 }
 
 
+
+/**
+ * Dataroma 크롤링 API를 통해 추천 종목 리스트 조회 (자산가 10인 이상)
+ * @returns {Promise<Array>} { ticker, name, count } 배열
+ */
+export async function fetchRecommendedTickers() {
+    // Vercel Serverless Function 호출
+    // 개발 환경(Vite Proxy)에서는 /api/dataroma 로 호출하면 vite.config.js 설정이 필요할 수 있음.
+    // 하지만 현재 vite.config.js에는 /api/yahoo만 설정되어 있음.
+    // 로컬 테스트를 위해 vite.config.js에 추가하거나, 배포 환경을 가정하고 호출.
+    // 여기서는 상대 경로로 호출.
+
+    // 주의: 로컬 Vite 개발 서버에서 /api/dataroma를 호출하려면 
+    // vite.config.js proxy 설정이 필요하지 않음 (로컬 파일/함수가 아니므로).
+    // 만약 로컬에서 테스트하려면 별도 서버가 떠있거나, Mock이 필요함.
+    // Vercel dev를 쓰지 않는 한 로컬에서 api/dataroma.js는 동작하지 않음.
+    // -> 따라서 에러 처리 필수.
+
+    const response = await fetch('/api/dataroma');
+    if (!response.ok) {
+        throw new Error(`Failed to fetch recommendations: ${response.statusText}`);
+    }
+
+    const json = await response.json();
+    return json.stocks || [];
+}

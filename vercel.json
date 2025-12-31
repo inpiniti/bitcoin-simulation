@@ -3,6 +3,10 @@
         {
             "source": "/api/yahoo/:path*",
             "destination": "/api/yahoo"
+        },
+        {
+            "source": "/api/dataroma",
+            "destination": "/api/dataroma"
         }
     ]
 }

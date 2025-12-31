@@ -61,10 +61,34 @@ export const useStore = create(
                 // Data View Mode (Toggle)
                 dataViewMode: false,
 
+                // Recommended Stocks (DataRoma)
+                recommendedStocks: [],
+                loadingRecommendations: false,
+
                 // Actions
                 setFetchProgress: (current, total) => set({ fetchProgress: { current, total } }),
 
                 toggleDataViewMode: () => set((state) => ({ dataViewMode: !state.dataViewMode })),
+
+                /**
+                 * 추천 종목 로드
+                 */
+                loadRecommendedTickers: async () => {
+                    const state = get();
+                    // 이미 로드되었으면 스킵
+                    if (state.recommendedStocks.length > 0) return;
+
+                    set({ loadingRecommendations: true });
+                    try {
+                        const { fetchRecommendedTickers } = await import('@/lib/api');
+                        const stocks = await fetchRecommendedTickers();
+                        set({ recommendedStocks: stocks, loadingRecommendations: false });
+                    } catch (error) {
+                        console.error('Failed to load recommended tickers:', error);
+                        set({ loadingRecommendations: false });
+                        // 실패해도 에러를 띄우지 않고 빈 배열 유지 (Input 사용 가능하게)
+                    }
+                },
 
                 setMode: (mode) => {
                     const currentMode = get().mode;
@@ -340,6 +364,7 @@ export const useStore = create(
                     // activeInterval, selectedResult는 UX상 유지하면 좋음
                     activeInterval: state.activeInterval,
                     dataViewMode: state.dataViewMode,
+                    recommendedStocks: state.recommendedStocks,
                 }),
             }
         ),
