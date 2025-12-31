@@ -65,10 +65,15 @@ export const useStore = create(
                 recommendedStocks: [],
                 loadingRecommendations: false,
 
+                // Global Error State (for AlertDialog)
+                globalError: null,
+
                 // Actions
                 setFetchProgress: (current, total) => set({ fetchProgress: { current, total } }),
 
                 toggleDataViewMode: () => set((state) => ({ dataViewMode: !state.dataViewMode })),
+
+                setGlobalError: (error) => set({ globalError: error }),
 
                 /**
                  * 추천 종목 로드
@@ -166,7 +171,7 @@ export const useStore = create(
                     } catch (error) {
                         console.error(`Failed to load stock data for ${state.ticker}:`, error);
                         set((s) => ({ loadingInterval: { ...s.loadingInterval, 'STOCK_BASE': false } }));
-                        alert(`데이터 로드 실패: ${error.message}`);
+                        get().setGlobalError({ title: '데이터 로드 실패', description: error.message });
                     }
                 },
 
@@ -203,6 +208,10 @@ export const useStore = create(
                                 // 로드 후 상태 갱신 확인
                                 const newState = get();
                                 if (newState.hist['1d'].length === 0) {
+                                    get().setGlobalError({
+                                        title: '데이터 로드 실패',
+                                        description: '주식 기본 데이터(1일봉)를 로드하는 데 실패했습니다. 티커를 확인하거나 잠시 후 다시 시도해주세요.'
+                                    });
                                     throw new Error('Failed to load base stock data');
                                 }
                                 baseData = newState.hist['1d'];
@@ -279,7 +288,10 @@ export const useStore = create(
 
                     const data = state.hist[interval];
                     if (!data || data.length === 0) {
-                        alert(`[Debug] Simulation failed: No data for interval ${interval}. Mode: ${state.mode}, Ticker: ${state.ticker}`);
+                        get().setGlobalError({
+                            title: '시뮬레이션 실패',
+                            description: `No data for interval ${interval}. Mode: ${state.mode}, Ticker: ${state.ticker}`
+                        });
                         set((s) => ({ loadingSimul: { ...s.loadingSimul, [key]: false } }));
                         return;
                     }

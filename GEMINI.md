@@ -63,7 +63,12 @@ function FriendList({ friends }) {
 - **React 함수 내에서만 호출**: 일반 JS 함수가 아닌, React 컴포넌트나 커스텀 Hook 내에서만 호출하세요.
 - **동적 변경 금지**: Hook을 동적으로 생성하거나 변경하지 마세요.
 
-## 6. React 기능 활용 및 최적화 준수
+## 6. UI 컴포넌트 사용 규칙 (UI Component Rules)
+- **Native Dialog 사용 지양**: 브라우저 기본 `alert`, `confirm`, `prompt`는 사용하지 마세요. 대신 **shadcn/ui**의 `Dialog`, `AlertDialog`, `Toast` 등을 사용해야 합니다.
+- **일관된 디자인**: 모든 UI 요소는 `shadcn/ui` 디자인 시스템과 `Tailwind CSS`를 기반으로 스타일링해야 합니다.
+- **접근성 (A11y)**: 시맨틱 HTML, 키보드 탐색 지원.
+
+## 7. React 기능 활용 및 최적화 준수
 - 본 문서에 정리된 **React Hook**, **React Components**, **React API** 내용을 적극적으로 참고하여 개발하세요.
 - 각 기술의 올바른 사용법을 숙지하고, **성능**(렌더링 최적화, 메모리 관리)과 **효율성**을 최우선으로 고려하여 코드를 작성해야 합니다.
 - 단순 구현을 넘어, React가 제공하는 최신 기능과 API를 적재적소에 활용하여 최적화된 결과물을 개발하도록 신경 써주세요.

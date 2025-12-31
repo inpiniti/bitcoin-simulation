@@ -1,6 +1,16 @@
 import { cn } from "@/lib/utils"
 import { useStore } from "@/store/useStore"
 import { useState, useEffect } from "react"
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 export function TitleBar() {
     const {
@@ -10,30 +20,57 @@ export function TitleBar() {
     } = useStore()
     const [localTicker, setLocalTicker] = useState(ticker)
 
+    // 로컬 Alert 상태 관리
+    const [alertConfig, setAlertConfig] = useState({
+        open: false,
+        title: "",
+        description: "",
+        onConfirm: () => { }
+    })
+
     useEffect(() => {
         setLocalTicker(ticker)
     }, [ticker])
 
+    const openAlert = (title, description, onConfirm) => {
+        setAlertConfig({
+            open: true,
+            title,
+            description,
+            onConfirm: () => {
+                onConfirm()
+                setAlertConfig(prev => ({ ...prev, open: false }))
+            }
+        })
+    }
+
     const handleModeChange = (newMode) => {
         if (mode === newMode) return;
-        if (confirm("모드를 변경하시겠습니까? 기존 데이터는 초기화됩니다.")) {
-            setMode(newMode);
-        }
+
+        openAlert(
+            "모드 변경",
+            "모드를 변경하시겠습니까? 기존 데이터는 초기화됩니다.",
+            () => setMode(newMode)
+        )
     }
 
     const handleTickerSubmit = (e) => {
         if (e.key === 'Enter') {
             if (localTicker !== ticker) {
-                if (confirm(`종목을 '${localTicker}'(으)로 변경하시겠습니까? 데이터가 초기화됩니다.`)) {
-                    setTicker(localTicker);
-                }
+                openAlert(
+                    "종목 변경",
+                    `종목을 '${localTicker}'(으)로 변경하시겠습니까? 데이터가 초기화됩니다.`,
+                    () => setTicker(localTicker)
+                )
             }
         }
     }
 
     const handleTickerBlur = () => {
+        // Blur 시에는 변경 확정 없이 원래대로 되돌림 (혹은 Submit 유도)
+        // 여기선 그냥 원래 Ticker로 리셋만 (Confirm 없이)
         if (localTicker !== ticker) {
-            setLocalTicker(ticker) // Revert if not submitted
+            setLocalTicker(ticker)
         }
     }
 
@@ -124,10 +161,14 @@ export function TitleBar() {
                                             onMouseDown={(e) => {
                                                 e.preventDefault(); // Prevent input blur
                                                 if (ticker !== stock.ticker) {
-                                                    if (confirm(`'${stock.ticker}' (${stock.count} holders) 로 변경하시겠습니까?`)) {
-                                                        setTicker(stock.ticker);
-                                                        setLocalTicker(stock.ticker);
-                                                    }
+                                                    openAlert(
+                                                        "종목 변경",
+                                                        `'${stock.ticker}' (${stock.count} holders) 로 변경하시겠습니까?`,
+                                                        () => {
+                                                            setTicker(stock.ticker)
+                                                            setLocalTicker(stock.ticker)
+                                                        }
+                                                    )
                                                 }
                                             }}
                                         >
@@ -154,8 +195,6 @@ export function TitleBar() {
                 )}
             </div>
 
-
-
             {/* Right: Controls */}
             <div className="flex items-center gap-4">
                 {/* Data View Toggle */}
@@ -178,6 +217,22 @@ export function TitleBar() {
                     <button className="hover:text-[#cccccc] hover:bg-red-600 px-2 text-xs">×</button>
                 </div>
             </div>
+
+            {/* TitleBar Local Alert Dialog */}
+            <AlertDialog open={alertConfig.open} onOpenChange={(open) => !open && setAlertConfig(prev => ({ ...prev, open: false }))}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>{alertConfig.title}</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {alertConfig.description}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>취소</AlertDialogCancel>
+                        <AlertDialogAction onClick={alertConfig.onConfirm}>확인</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div >
     )
 }

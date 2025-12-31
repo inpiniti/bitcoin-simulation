@@ -1,4 +1,5 @@
 import { TitleBar, ActivityBar, Sidebar, EditorArea, StatusBar } from "@/components/layout"
+import { GlobalAlertDialog } from "@/components/GlobalAlertDialog"
 import './index.css'
 
 function App() {
@@ -21,6 +22,7 @@ function App() {
 
       {/* Status Bar */}
       <StatusBar />
+      <GlobalAlertDialog />
     </div>
   )
 }
