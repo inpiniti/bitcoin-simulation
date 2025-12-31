@@ -55,17 +55,18 @@ export async function fetchOneYearData(onProgress) {
 }
 
 /**
- * Yahoo Finance API를 통해 주식 1년치 일봉 데이터 조회
+ * Yahoo Finance API를 통해 주식 데이터 조회
  * @param {string} ticker - 종목 코드 (예: AAPL)
+ * @param {string} interval - 데이터 간격 (기본: 1d)
+ * @param {string} range - 데이터 범위 (기본: 365d)
  * @returns {Promise<Array>} 정규화된 캔들 데이터
  */
-export async function fetchStockOneYearData(ticker) {
+export async function fetchStockData(ticker, interval = '1d', range = '365d') {
     // Yahoo Finance 호환성을 위해 (.)을 (-)로 변환 (예: BRK.B -> BRK-B)
     const formattedTicker = ticker.replace(/\./g, '-');
 
     // CORS 문제를 회피하기 위해 Vite Proxy(/api/yahoo)를 사용합니다.
-    // Proxy 설정: vite.config.js
-    const url = `/api/yahoo/v8/finance/chart/${formattedTicker}?interval=1d&range=365d`;
+    const url = `/api/yahoo/v8/finance/chart/${formattedTicker}?interval=${interval}&range=${range}`;
     console.log(`Fetching stock data from: ${url}`);
 
     const response = await fetch(url);
@@ -112,8 +113,22 @@ export async function fetchStockOneYearData(ticker) {
         };
     }).filter(item => item !== null); // 필터링
 
-    console.log(`[API] Stock data loaded: ${normalized.length} items for ${ticker}`);
+    console.log(`[API] Stock data loaded: ${normalized.length} items for ${ticker} (${range})`);
     return normalized;
+}
+
+/**
+ * 1년치 일봉 조회 (하위 호환 및 기본 사용)
+ */
+export async function fetchStockOneYearData(ticker) {
+    return fetchStockData(ticker, '1d', '365d');
+}
+
+/**
+ * 50일치 일봉 조회 (전체 분석용)
+ */
+export async function fetchStockShortData(ticker) {
+    return fetchStockData(ticker, '1d', '60d'); // 여유있게 60일 (거래일 기준 50일 확보 위해)
 }
 
 

@@ -1,8 +1,12 @@
 import { create } from 'zustand'
 import { devtools, persist, createJSONStorage } from 'zustand/middleware'
 import { get as idbGet, set as idbSet, del as idbDel } from 'idb-keyval'
-import { fetchOneYearData, fetchStockOneYearData } from '@/lib/api'
-import { aggregateToInterval, addSlopeData, generateTrades, calculateFixedQuantityResult, calculateCumulativeResult, calculateMartingaleResult, INTERVALS } from '@/lib/dataProcessor'
+import { fetchOneYearData, fetchStockOneYearData, fetchStockShortData } from '@/lib/api'
+import { aggregateToInterval, addSlopeData, generateTrades, calculateFixedQuantityResult, calculateCumulativeResult, calculateMartingaleResult, analyzeSignal, INTERVALS } from '@/lib/dataProcessor'
+
+// ... (existing code)
+
+
 
 // IndexedDB 스토리지 어댑터
 const indexedDBStorage = {
@@ -74,6 +78,118 @@ export const useStore = create(
                 toggleDataViewMode: () => set((state) => ({ dataViewMode: !state.dataViewMode })),
 
                 setGlobalError: (error) => set({ globalError: error }),
+
+                // Market Analysis State & Actions
+                analysisMode: false,
+                analysisResult: [],
+                isAnalyzing: false,
+                analysisProgress: { current: 0, total: 0 },
+                activeStrategy: 'fixed',
+
+                setAnalysisMode: (mode) => set({ analysisMode: mode }),
+                setActiveStrategy: (strategy) => set({ activeStrategy: strategy }),
+
+                /**
+                 * 시장 전체 분석 실행 (Market Scanner)
+                 */
+                runMarketAnalysis: async () => {
+                    const state = get();
+                    // 로드된 추천 종목이 없으면 로드 시도
+                    if (state.recommendedStocks.length === 0) {
+                        await state.loadRecommendedTickers();
+                    }
+                    const stocks = get().recommendedStocks;
+                    if (stocks.length === 0) {
+                        get().setGlobalError('분석할 추천 종목 데이터가 없습니다.');
+                        return;
+                    }
+
+                    set({
+                        isAnalyzing: true,
+                        analysisResult: [],
+                        analysisProgress: { current: 0, total: stocks.length }
+                    });
+
+                    const results = [];
+                    // Stock 모드에서만 동작한다고 가정, 현재 Active Interval 사용
+                    const interval = state.activeInterval || '1d';
+                    const strategy = state.activeStrategy || 'fixed';
+
+                    let processedCount = 0;
+
+                    // API 부하 조절을 위해 순차 처리 (약간의 딜레이 포함 가능)
+                    for (const stock of stocks) {
+                        try {
+                            // 1. 데이터 조회 (최근 60일 데이터로 50일 확보)
+                            const rawData = await fetchStockShortData(stock.ticker);
+
+                            // 데이터가 너무 적으면 스킵
+                            if (rawData.length < 20) {
+                                results.push({ ticker: stock.ticker, signal: 'SKIP', reason: 'Not enough data' });
+                                continue;
+                            }
+
+                            // 2. Aggregate (Stock 모드 일봉 기준)
+                            let aggregated = rawData;
+                            if (interval !== '1d' && INTERVALS[interval] >= 1440) {
+                                const intervalMinutes = INTERVALS[interval];
+                                const stride = intervalMinutes / 1440;
+                                aggregated = aggregateToInterval(rawData, Math.max(1, Math.floor(stride)));
+                            }
+
+                            // 3. 지표 추가 (Slope, BB)
+                            const dataWithSlope = addSlopeData(aggregated);
+
+                            // 4. 신호 분석 (마지막 캔들 기준)
+                            const analysis = analyzeSignal(dataWithSlope, strategy);
+
+                            const lastCandle = dataWithSlope[dataWithSlope.length - 1];
+                            const prevCandle = dataWithSlope[dataWithSlope.length - 2];
+
+                            // 등락률 계산 (전일 종가 대비)
+                            const changeRate = prevCandle
+                                ? ((lastCandle.close - prevCandle.close) / prevCandle.close * 100)
+                                : 0;
+
+                            results.push({
+                                ticker: stock.ticker,
+                                name: stock.name || stock.ticker,
+                                signal: analysis.signal,
+                                reason: analysis.reason,
+                                price: lastCandle.close,
+                                changeRate: changeRate,
+                                slope: lastCandle.slope,
+                                bbStatus: lastCandle.bbStatus,
+                                timestamp: lastCandle.timestamp
+                            });
+
+                        } catch (e) {
+                            console.warn(`Analysis failed for ${stock.ticker}:`, e);
+                            results.push({
+                                ticker: stock.ticker,
+                                signal: 'ERROR',
+                                reason: 'Load Failed',
+                                price: 0
+                            });
+                        }
+
+                        processedCount++;
+                        set({ analysisProgress: { current: processedCount, total: stocks.length } });
+
+                        // UI 렌더링 양보를 위한 미세 딜레이
+                        await new Promise(r => setTimeout(r, 10));
+                    }
+
+                    // 정렬: BUY > SELL > HOLD > ERROR
+                    const priority = { 'BUY': 0, 'SELL': 1, 'HOLD': 2, 'SKIP': 3, 'ERROR': 4 };
+                    results.sort((a, b) => {
+                        const pA = priority[a.signal] ?? 99;
+                        const pB = priority[b.signal] ?? 99;
+                        return pA - pB;
+                    });
+
+                    set((s) => ({ analysisResult: results, isAnalyzing: false }));
+                },
 
                 /**
                  * 추천 종목 로드

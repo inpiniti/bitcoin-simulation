@@ -3,7 +3,7 @@ import { useStore } from "@/store/useStore"
 import { GitBranch, Check, X, Loader2 } from "lucide-react"
 
 export function StatusBar() {
-    const { activeInterval, hist, fetchProgress, loadingInterval, selectedResult } = useStore()
+    const { activeInterval, hist, fetchProgress, loadingInterval, selectedResult, isAnalyzing, analysisProgress } = useStore()
 
     const dataCount = activeInterval ? hist[activeInterval]?.length : 0
     const isLoading = Object.values(loadingInterval).some(Boolean)
@@ -17,14 +17,27 @@ export function StatusBar() {
                     main
                 </div>
 
-                {isLoading ? (
+                {/* Data Fetching Indicator */}
+                {isLoading && (
                     <div className="flex items-center gap-1">
                         <Loader2 className="w-3 h-3 animate-spin" />
                         {fetchProgress.total > 0
-                            ? `데이터 로딩 중... ${fetchProgress.current}/${fetchProgress.total}`
+                            ? `데이터 로딩.. ${fetchProgress.current}/${fetchProgress.total}`
                             : '처리 중...'}
                     </div>
-                ) : (
+                )}
+
+                {/* Market Analysis Indicator */}
+                {isAnalyzing && (
+                    <div className="flex items-center gap-1 bg-[#094771] px-2 rounded-sm border border-[#3e3e42]">
+                        <Loader2 className="w-3 h-3 animate-spin text-orange-300" />
+                        <span className="text-orange-100">
+                            분석 진행 중... {analysisProgress.current} / {analysisProgress.total}
+                        </span>
+                    </div>
+                )}
+
+                {!isLoading && !isAnalyzing && (
                     <div className="flex items-center gap-1">
                         <Check className="w-3 h-3" />
                         준비됨

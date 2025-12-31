@@ -38,14 +38,21 @@ function formatBtcPrice(price) {
     return Math.round(price).toLocaleString()
 }
 
+import { AnalysisPanel } from "../AnalysisPanel"
+
 export function EditorArea() {
-    const { selectedResult, setSelectedResult, dataViewMode, hist, activeInterval } = useStore()
+    const { selectedResult, setSelectedResult, dataViewMode, hist, activeInterval, analysisMode } = useStore()
     const [currentPage, setCurrentPage] = useState(1)
 
     // 페이지네이션 초기화 (간격, 결과 모드, 데이터 뷰 모드 변경 시)
     useEffect(() => {
         setCurrentPage(1)
-    }, [activeInterval, selectedResult, dataViewMode])
+    }, [activeInterval, selectedResult, dataViewMode, analysisMode])
+
+    // Analysis Mode 일 때
+    if (analysisMode) {
+        return <AnalysisPanel />
+    }
 
     // Data View 모드일 때
     if (dataViewMode) {

@@ -16,7 +16,8 @@ export function TitleBar() {
     const {
         mode, ticker, setMode, setTicker,
         dataViewMode, toggleDataViewMode,
-        recommendedStocks, loadingRecommendations, loadRecommendedTickers
+        recommendedStocks, loadingRecommendations, loadRecommendedTickers,
+        analysisMode, setAnalysisMode, runMarketAnalysis, isAnalyzing
     } = useStore()
     const [localTicker, setLocalTicker] = useState(ticker)
 
@@ -209,6 +210,34 @@ export function TitleBar() {
                 >
                     <span>{dataViewMode ? "👁️ Data View : ON" : "👁️ Data View : OFF"}</span>
                 </button>
+
+                {/* Market Analysis Button (Stock Mode Only) */}
+                {mode === 'stock' && (
+                    <button
+                        onClick={() => {
+                            if (analysisMode) {
+                                setAnalysisMode(false); // 끄기
+                            } else {
+                                setAnalysisMode(true); // 켜기
+                                runMarketAnalysis(); // 분석 실행
+                            }
+                        }}
+                        className={cn(
+                            "flex items-center gap-1.5 px-3 py-1 text-xs rounded-sm transition-colors border",
+                            analysisMode
+                                ? "bg-[#094771] text-white border-[#007acc]"
+                                : "bg-transparent text-[#9d9d9d] border-transparent hover:text-[#e1e1e1] hover:bg-[#2d2d2d]"
+                        )}
+                        disabled={isAnalyzing}
+                    >
+                        <span>
+                            {isAnalyzing
+                                ? "⏳ Analyzing..."
+                                : analysisMode ? "Close Analysis" : "🔍 Analyze All"
+                            }
+                        </span>
+                    </button>
+                )}
 
                 {/* Window Controls (Mock) */}
                 <div className="flex items-center gap-4 text-[#7d7d7d]">

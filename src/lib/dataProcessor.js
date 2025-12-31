@@ -517,3 +517,61 @@ export function calculateMartingaleResult(trades, baseQuantity = 100000, multipl
         },
     };
 }
+
+/**
+ * 마지막 캔들 기준으로 현재 매매 신호를 분석 (Market Scanner용)
+ * @param {Array} dataWithSlope - 지표가 포함된 데이터 배열
+ * @param {string} strategy - 전략 ('standard' | 'fixedQtyBB' 등)
+ * @returns {Object} { signal: 'BUY'|'SELL'|'HOLD', reason: string }
+ */
+export function analyzeSignal(dataWithSlope, strategy = 'standard') {
+    if (!dataWithSlope || dataWithSlope.length < 2) {
+        return { signal: 'HOLD', reason: 'Insufficient Data' };
+    }
+
+    const lastIndex = dataWithSlope.length - 1;
+    const curr = dataWithSlope[lastIndex];
+    const prev = dataWithSlope[lastIndex - 1];
+
+    // 기울기가 undefined이면 판단 불가
+    if (curr.slope === undefined || prev.slope === undefined) {
+        return { signal: 'HOLD', reason: 'Calculating Slope' };
+    }
+
+    const prevSign = prev.slope > 0 ? 'positive' : prev.slope < 0 ? 'negative' : 'zero';
+    const currSign = curr.slope > 0 ? 'positive' : curr.slope < 0 ? 'negative' : 'zero';
+
+    // 전략별 신호 판단
+    // 전략 이름에 'BB'가 포함되어 있으면 볼린저 밴드 전략 적용 (대소문자 무관하게 체크)
+    if (strategy && strategy.toLowerCase().includes('bb')) {
+        // 매수: 기울기 양전(음->양) AND (직전 캔들의 BB Status가 -2(하단이탈) 였음)
+        if (prevSign === 'negative' && currSign === 'positive') {
+            if (prev.bbStatus === -2) {
+                return { signal: 'BUY', reason: 'Slope Up & BB Rebound' };
+            }
+        }
+        // 매도: 기울기 음전(양->음)
+        else if (prevSign === 'positive' && currSign === 'negative') {
+            return { signal: 'SELL', reason: 'Slope Down' };
+        }
+    } else {
+        // Standard (기본 전략 - Slope만 봄)
+        if (prevSign === 'negative' && currSign === 'positive') {
+            return { signal: 'BUY', reason: 'Golden Cross (Slope)' };
+        }
+        else if (prevSign === 'positive' && currSign === 'negative') {
+            return { signal: 'SELL', reason: 'Dead Cross (Slope)' };
+        }
+    }
+
+    // 변화 없음 (HOLD)
+    // 현재 상태가 상승세인지 하락세인지 정보 제공
+    let currentStatus = curr.slope > 0 ? 'Rising' : 'Falling';
+
+    // 추가 정보: BB 상태가 특이하면 표시
+    let extra = '';
+    if (curr.bbStatus === 2) extra = ' (Overbought)';
+    if (curr.bbStatus === -2) extra = ' (Oversold)';
+
+    return { signal: 'HOLD', reason: `Maintains ${currentStatus}${extra}` };
+}

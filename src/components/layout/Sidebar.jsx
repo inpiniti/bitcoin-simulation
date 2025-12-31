@@ -30,7 +30,10 @@ export function Sidebar() {
         runCumulativeSimulation,
         runCumulativeBBSimulation,
         runMartingaleSimulation,
-        setSelectedResult
+        setSelectedResult,
+        setActiveStrategy,
+        analysisMode,
+        runMarketAnalysis
     } = useStore()
 
     const isDisabled = !activeInterval || hist[activeInterval]?.length === 0
@@ -47,6 +50,16 @@ export function Sidebar() {
     }
 
     const handleClick = async (strategy) => {
+        // 전역 전략 설정 업데이트
+        setActiveStrategy(strategy.key);
+
+        // 분석 모드라면 재분석 트리거 (현재 전략 기반)
+        if (analysisMode && mode === 'stock') {
+            runMarketAnalysis();
+            // 분석 모드에서는 개별 시뮬레이션 결과로 이동하지 않고 분석 패널 유지
+            return;
+        }
+
         if (isDisabled) return
 
         const simulKey = getSimulKey(strategy)
