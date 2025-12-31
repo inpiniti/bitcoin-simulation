@@ -95,21 +95,75 @@ export const useStore = create(
                     }
                 },
 
+                /**
+                 * 파생 간격 데이터 자동 생성
+                 * 기본 데이터(1m or 1d)가 로드된 후 호출됨
+                 */
+                autoGenerateIntervals: async () => {
+                    const state = get();
+                    const intervals = Object.keys(INTERVALS); // ['1m', '5m', ..., '1w']
+
+                    // 모드에 따라 생성 가능한 간격 필터링
+                    const targetIntervals = intervals.filter(iv => {
+                        if (iv === 'STOCK_BASE') return false; // 예외
+                        if (state.mode === 'coin') {
+                            // 코인은 1m 이미 로드됨, 나머지는 모두 생성 가능
+                            return iv !== '1m';
+                        } else {
+                            // 주식은 1d 미만 불가 (1d는 Base로 이미 로드됨)
+                            return INTERVALS[iv] >= 1440 && iv !== '1d';
+                        }
+                    });
+
+                    // 순차적 생성 (병렬 처리 시 UI 렉 발생 가능성 고려하여 순차 추천, 일단은 병렬 시도 후 문제되면 순차로 변경)
+                    // 여기서는 안전하게 순차 처리
+                    for (const iv of targetIntervals) {
+                        // 이미 있거나 로딩 중이면 스킵 (loadHistInterval 내부에서 체크함)
+                        await state.loadHistInterval(iv);
+                    }
+
+                    // 모든 생성이 완료된 후, 기본 간격을 Active 상태로 설정
+                    // Coin -> 1m, Stock -> 1d
+                    if (state.mode === 'coin') {
+                        set({ activeInterval: '1m' });
+                    } else {
+                        set({ activeInterval: '1d' });
+                    }
+                },
+
                 setMode: (mode) => {
                     const currentMode = get().mode;
                     if (currentMode !== mode) {
-                        // 모드 변경 시 데이터 초기화
                         get().clearAllData();
                         set({ mode });
+
+                        // 모드 변경 후 자동 데이터 로드 트리거
+                        setTimeout(() => {
+                            if (mode === 'coin') {
+                                get().loadHist1m();
+                            } else {
+                                get().loadStockData();
+                            }
+                        }, 0);
                     }
                 },
 
                 setTicker: (ticker) => {
                     const currentTicker = get().ticker;
+                    const mode = get().mode;
+
                     if (currentTicker !== ticker) {
-                        // 티커 변경 시 데이터 초기화
                         get().clearAllData();
                         set({ ticker });
+
+                        // 티커 변경 후 자동 데이터 로드 트리거 (주식 모드일 때만 유효하지만 코인도 티커 개념이 생긴다면 확장 가능)
+                        if (mode === 'stock') {
+                            setTimeout(() => {
+                                get().loadStockData();
+                            }, 0);
+                        } else if (mode === 'coin') {
+                            get().loadHist1m();
+                        }
                     }
                 },
 
@@ -118,8 +172,8 @@ export const useStore = create(
                  */
                 loadHist1m: async () => {
                     const state = get();
-                    if (state.mode !== 'coin') return; // Stock 모드에서는 1분 데이터 사용 불가 (현재 설계상)
-                    if (state.hist['1m'].length > 0) return; // 이미 로드됨
+                    if (state.mode !== 'coin') return;
+                    if (state.hist['1m'].length > 0) return;
 
                     set((s) => ({ loadingInterval: { ...s.loadingInterval, '1m': true } }));
 
@@ -128,46 +182,50 @@ export const useStore = create(
                             set({ fetchProgress: { current, total } });
                         });
 
-                        // 기울기 추가
                         const dataWithSlope = addSlopeData(rawData);
 
                         set((s) => ({
                             hist: { ...s.hist, '1m': dataWithSlope },
                             loadingInterval: { ...s.loadingInterval, '1m': false },
                         }));
+
+                        // 자동 파생 데이터 생성
+                        get().autoGenerateIntervals();
+
                     } catch (error) {
                         console.error('Failed to load 1m data:', error);
                         set((s) => ({ loadingInterval: { ...s.loadingInterval, '1m': false } }));
+                        get().setGlobalError({ title: '데이터 로드 실패', description: error.message });
                     }
                 },
 
                 /**
                  * 주식 데이터 로드 (Yahoo API) - Stock Mode Only
-                 * Stock은 1일 데이터가 기본(Base)임.
                  */
                 loadStockData: async () => {
                     const state = get();
                     if (state.mode !== 'stock') return;
-                    // 기존 데이터가 5개 이하(최소한의 캔들)라면 잘못된 데이터(이전 버그로 인한 1개 뭉침 등)로 간주하고 다시 로드
                     if (state.hist['1d'].length > 5) return;
 
-                    set((s) => ({ loadingInterval: { ...s.loadingInterval, 'STOCK_BASE': true } })); // Loading indicator for stock base
+                    set((s) => ({ loadingInterval: { ...s.loadingInterval, 'STOCK_BASE': true } }));
 
                     try {
                         let rawData = await fetchStockOneYearData(state.ticker);
 
-                        // 데이터가 너무 적으면 경고
                         if (rawData.length <= 5) {
-                            console.warn(`[Warning] Fetched data count is too low (${rawData.length}). Parser might be filtering too much or API returned empty.`);
+                            console.warn(`[Warning] Fetched data count is too low (${rawData.length}).`);
                         }
 
-                        // 기울기 추가 (일봉 기준)
                         const dataWithSlope = addSlopeData(rawData);
 
                         set((s) => ({
                             hist: { ...s.hist, '1d': dataWithSlope },
                             loadingInterval: { ...s.loadingInterval, 'STOCK_BASE': false },
                         }));
+
+                        // 자동 파생 데이터 생성
+                        get().autoGenerateIntervals();
+
                     } catch (error) {
                         console.error(`Failed to load stock data for ${state.ticker}:`, error);
                         set((s) => ({ loadingInterval: { ...s.loadingInterval, 'STOCK_BASE': false } }));
