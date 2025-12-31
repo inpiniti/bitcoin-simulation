@@ -42,16 +42,23 @@ export function ResultPanel() {
             </CardHeader>
             <CardContent className="flex-1 flex flex-col gap-4 overflow-hidden">
                 {/* 요약 통계 */}
-                <div className="grid grid-cols-2 gap-4">
+                {/* 요약 통계 */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                     <div className="space-y-1">
                         <span className="text-sm text-muted-foreground">수익률 :</span>
                         <p className={`text-xl font-bold ${summary.totalProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            {summary.totalProfit >= 0 ? '+' : ''}{summary.totalProfit?.toLocaleString()}원
+                            {summary.totalProfit >= 0 ? '+' : ''}{Math.round(summary.totalProfit)?.toLocaleString()}원
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                            ({summary.totalProfitRate?.toFixed(2)}%)
                         </p>
                     </div>
                     <div className="space-y-1">
                         <span className="text-sm text-muted-foreground">승률 :</span>
                         <p className="text-xl font-bold">{summary.winRate?.toFixed(1)}%</p>
+                        <p className="text-xs text-muted-foreground">
+                            {summary.wins}승 {summary.losses}패
+                        </p>
                     </div>
                     <div className="space-y-1">
                         <span className="text-sm text-muted-foreground">
@@ -60,13 +67,27 @@ export function ResultPanel() {
                         <p className="text-xl font-bold">
                             {summary.maxMultiplier
                                 ? `${summary.maxMultiplier?.toFixed(2)}x`
-                                : `${summary.wins}승 ${summary.losses}패`}
+                                : `${summary.totalCycles}회`}
                         </p>
                     </div>
-                    <div className="space-y-1">
-                        <span className="text-sm text-muted-foreground">사이클 수 :</span>
-                        <p className="text-xl font-bold">{summary.totalCycles}회</p>
-                    </div>
+
+                    {/* 누적/복리 모드 전용 지표 */}
+                    {summary.maxDrawdown !== undefined && (
+                        <div className="space-y-1">
+                            <span className="text-sm text-muted-foreground">MDD :</span>
+                            <p className="text-xl font-bold text-red-500">
+                                -{summary.maxDrawdown?.toFixed(2)}%
+                            </p>
+                        </div>
+                    )}
+                    {summary.finalCapital !== undefined && (
+                        <div className="space-y-1">
+                            <span className="text-sm text-muted-foreground">최종 자산 :</span>
+                            <p className="text-xl font-bold text-blue-500">
+                                {Math.round(summary.finalCapital)?.toLocaleString()}원
+                            </p>
+                        </div>
+                    )}
                 </div>
 
                 {/* 거래 내역 테이블 */}

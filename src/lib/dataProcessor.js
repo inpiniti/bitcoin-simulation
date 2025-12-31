@@ -133,14 +133,6 @@ export function addSlopeData(data) {
 
 /**
  * 기울기 변화에 따른 매매 기록 생성
- * - undefined에서 양수/음수로 변하는 경우는 무시
- * - 음수 -> 양수: 매수
- * - 양수 -> 음수: 매도
- * @param {Array} dataWithSlope - 기울기가 포함된 데이터
- * @returns {Array} 매매 기록 배열
- */
-/**
- * 기울기 변화에 따른 매매 기록 생성
  * @param {Array} dataWithSlope - 기울기가 포함된 데이터
  * @param {string} strategy - 전략 ('standard' | 'fixedQtyBB')
  * @returns {Array} 매매 기록 배열
@@ -327,6 +319,114 @@ export function calculateFixedQuantityResult(trades, quantity = 100000, costs = 
             totalProfitRate,
             totalFees,
             costs, // 사용된 수수료/슬리피지 설정 기록
+        },
+    };
+}
+
+/**
+ * 시뮬레이션 결과 계산 (수량 누적/복리) - 수수료/슬리피지 반영
+ * @param {Array} trades - 매매 기록
+ * @param {number} initialCapital - 초기 자본금
+ * @param {Object} costs - 수수료/슬리피지 설정
+ * @returns {Object} 시뮬레이션 결과
+ */
+export function calculateCumulativeResult(trades, initialCapital = 100000, costs = TRADING_COSTS) {
+    let currentCapital = initialCapital;
+    let totalFees = 0;
+    let wins = 0;
+    let losses = 0;
+
+    // MDD 계산용
+    let peakCapital = initialCapital;
+    let maxDrawdown = 0;
+
+    const tradeDetails = trades.map(trade => {
+        // 투자금 = 현재 자본금 전액
+        const quantity = currentCapital;
+
+        if (quantity <= 0) {
+            return {
+                ...trade,
+                quantity: 0,
+                btcAmount: 0,
+                realProfit: 0,
+                realProfitRate: 0,
+                currentCapital: 0,
+                note: 'Bankrupt'
+            };
+        }
+
+        // --- 매수 (가진 돈 안에서 해결) ---
+        // 가진 돈(quantity) = 실제매수금액(X) + 수수료(X * feeRate)
+        // quantity = X * (1 + feeRate)
+        // X = quantity / (1 + feeRate)
+        const actualInvest = quantity / (1 + costs.buyFee);
+        const buyFee = quantity - actualInvest;
+
+        // 슬리피지 적용된 매수가격
+        const actualBuyPrice = trade.buy.price * (1 + costs.slippage);
+        const btcAmount = actualInvest / actualBuyPrice;
+
+        // --- 매도 (전량 매도) ---
+        const actualSellPrice = trade.sell.price * (1 - costs.slippage);
+        const grossRevenue = btcAmount * actualSellPrice;
+        const sellFee = grossRevenue * costs.sellFee;
+        const netRevenue = grossRevenue - sellFee;
+
+        // 실질 손익
+        const realProfit = netRevenue - quantity;
+        const realProfitRate = (realProfit / quantity) * 100;
+
+        if (realProfit > 0) wins++;
+        else losses++;
+
+        totalFees += buyFee + sellFee;
+
+        // 자본금 갱신
+        currentCapital = netRevenue;
+
+        // MDD 갱신
+        if (currentCapital > peakCapital) peakCapital = currentCapital;
+        const drawdown = (peakCapital - currentCapital) / peakCapital * 100;
+        if (drawdown > maxDrawdown) maxDrawdown = drawdown;
+
+        return {
+            ...trade,
+            quantity, // 투입된 총 자본 (Fee 포함)
+            btcAmount,
+            actualBuyPrice,
+            actualSellPrice,
+            buyCost: quantity, // 매수 총 비용
+            sellRevenue: netRevenue, // 매도 후 수령액
+            buyFee,
+            sellFee,
+            totalFee: buyFee + sellFee,
+            realProfit,
+            realProfitRate,
+            currentCapital, // 잔액
+            sellValue: netRevenue, // UI 호환용
+        };
+    });
+
+    const totalCycles = trades.length;
+    const winRate = totalCycles > 0 ? (wins / totalCycles) * 100 : 0;
+    // 누적식의 총 수익률 = (최종 자본 - 초기 자본) / 초기 자본
+    const totalProfit = currentCapital - initialCapital;
+    const totalProfitRate = (totalProfit / initialCapital) * 100;
+
+    return {
+        trades: tradeDetails,
+        summary: {
+            totalCycles,
+            wins,
+            losses,
+            winRate,
+            totalProfit,
+            totalProfitRate,
+            totalFees,
+            maxDrawdown, // MDD 추가
+            finalCapital: currentCapital,
+            costs,
         },
     };
 }

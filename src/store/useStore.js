@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { devtools, persist, createJSONStorage } from 'zustand/middleware'
 import { get as idbGet, set as idbSet, del as idbDel } from 'idb-keyval'
 import { fetchOneYearData, fetchStockOneYearData } from '@/lib/api'
-import { aggregateToInterval, addSlopeData, generateTrades, calculateFixedQuantityResult, calculateMartingaleResult, INTERVALS } from '@/lib/dataProcessor'
+import { aggregateToInterval, addSlopeData, generateTrades, calculateFixedQuantityResult, calculateCumulativeResult, calculateMartingaleResult, INTERVALS } from '@/lib/dataProcessor'
 
 // IndexedDB 스토리지 어댑터
 const indexedDBStorage = {
@@ -393,6 +393,66 @@ export const useStore = create(
                     const trades = generateTrades(data, 'fixedQtyBB');
 
                     const result = calculateFixedQuantityResult(trades);
+
+                    set((s) => ({
+                        simul: { ...s.simul, [key]: result },
+                        loadingSimul: { ...s.loadingSimul, [key]: false },
+                    }));
+                },
+
+                /**
+                 * 시뮬레이션 실행 (수량 누적)
+                 */
+                runCumulativeSimulation: async (interval) => {
+                    const state = get();
+                    const key = `${state.mode}_${state.ticker}_${interval}_cumulative`;
+
+                    if (state.simul[key]) return;
+
+                    set((s) => ({ loadingSimul: { ...s.loadingSimul, [key]: true } }));
+
+                    await new Promise(resolve => setTimeout(resolve, 100));
+
+                    const data = state.hist[interval];
+                    if (!data || data.length === 0) {
+                        set((s) => ({ loadingSimul: { ...s.loadingSimul, [key]: false } }));
+                        return;
+                    }
+
+                    // 전략: Standard
+                    const trades = generateTrades(data, 'standard');
+                    // 결과 계산: Cumulative (복리)
+                    const result = calculateCumulativeResult(trades);
+
+                    set((s) => ({
+                        simul: { ...s.simul, [key]: result },
+                        loadingSimul: { ...s.loadingSimul, [key]: false },
+                    }));
+                },
+
+                /**
+                 * 시뮬레이션 실행 (수량 누적 + BB)
+                 */
+                runCumulativeBBSimulation: async (interval) => {
+                    const state = get();
+                    const key = `${state.mode}_${state.ticker}_${interval}_cumulative_bb`;
+
+                    if (state.simul[key]) return;
+
+                    set((s) => ({ loadingSimul: { ...s.loadingSimul, [key]: true } }));
+
+                    await new Promise(resolve => setTimeout(resolve, 100));
+
+                    const data = state.hist[interval];
+                    if (!data || data.length === 0) {
+                        set((s) => ({ loadingSimul: { ...s.loadingSimul, [key]: false } }));
+                        return;
+                    }
+
+                    // 전략: Fixed Qty + BB (로직 동일하므로 BB 조건 사용)
+                    const trades = generateTrades(data, 'fixedQtyBB');
+                    // 결과 계산: Cumulative (복리)
+                    const result = calculateCumulativeResult(trades);
 
                     set((s) => ({
                         simul: { ...s.simul, [key]: result },
