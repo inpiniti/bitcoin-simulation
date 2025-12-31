@@ -139,7 +139,13 @@ export function addSlopeData(data) {
  * @param {Array} dataWithSlope - 기울기가 포함된 데이터
  * @returns {Array} 매매 기록 배열
  */
-export function generateTrades(dataWithSlope) {
+/**
+ * 기울기 변화에 따른 매매 기록 생성
+ * @param {Array} dataWithSlope - 기울기가 포함된 데이터
+ * @param {string} strategy - 전략 ('standard' | 'fixedQtyBB')
+ * @returns {Array} 매매 기록 배열
+ */
+export function generateTrades(dataWithSlope, strategy = 'standard') {
     const trades = [];
     let currentPosition = null; // 'long' or null
     let buyRecord = null;
@@ -154,18 +160,47 @@ export function generateTrades(dataWithSlope) {
         const prevSign = prev.slope > 0 ? 'positive' : prev.slope < 0 ? 'negative' : 'zero';
         const currSign = curr.slope > 0 ? 'positive' : curr.slope < 0 ? 'negative' : 'zero';
 
-        // 음수 -> 양수: 매수 신호
-        if (prevSign === 'negative' && currSign === 'positive' && currentPosition === null) {
+        let buySignal = false;
+        let sellSignal = false;
+
+        if (strategy === 'fixedQtyBB') {
+            // [전략: 수량 고정 + BB]
+            // 매수: 기울기 양전 AND (이전 캔들 BB Status == -2 (하단 이탈))
+            if (prevSign === 'negative' && currSign === 'positive') {
+                if (prev.bbStatus === -2) {
+                    buySignal = true;
+                }
+            }
+            // 매도: 기울기 음전 AND (보유 수량이 있을 때 -> currentPosition === 'long')
+            else if (prevSign === 'positive' && currSign === 'negative') {
+                sellSignal = true;
+            }
+        } else {
+            // [기본 전략: Standard]
+            // 매수: 기울기 양전
+            if (prevSign === 'negative' && currSign === 'positive') {
+                buySignal = true;
+            }
+            // 매도: 기울기 음전
+            else if (prevSign === 'positive' && currSign === 'negative') {
+                sellSignal = true;
+            }
+        }
+
+        // 실제 매매 실행 로직
+        // 매수 신호 & 포지션 없음
+        if (buySignal && currentPosition === null) {
             buyRecord = {
                 type: 'buy',
                 timestamp: curr.timestamp,
                 price: curr.close, // 매매는 여전히 실제 체결가(close) 기준
                 index: i,
+                reason: strategy === 'fixedQtyBB' ? 'Slope Up & BB Lower Break' : 'Slope Up'
             };
             currentPosition = 'long';
         }
-        // 양수 -> 음수: 매도 신호
-        else if (prevSign === 'positive' && currSign === 'negative' && currentPosition === 'long') {
+        // 매도 신호 & 포지션 보유 중 (Long)
+        else if (sellSignal && currentPosition === 'long') {
             const sellRecord = {
                 type: 'sell',
                 timestamp: curr.timestamp,

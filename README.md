@@ -52,7 +52,7 @@
 - **데이터 소스 유연화**: 
     - **Coin**: Upbit API (1분봉 기반)
     - **Stock**: Yahoo Finance (일봉 기반, CORS Proxy 적용)
-- **매매 전략 시뮬레이션**: 수량 고정 및 다양한 배율의 마틴게일 전략 적용.
+- **매매 전략 시뮬레이션**: 수량 고정, **수량 고정 + BB(볼린저 밴드)**, 그리고 다양한 배율의 마틴게일 전략 적용.
 - **결과 분석**: 수익률, 승률, 최대 배율, 사이클 수 등 상세 지표 제공.
 - **거래 내역**: 시간별 구매/판매 상세 내역 리스트 출력.
 
@@ -175,9 +175,15 @@ bitcoin-simulation/
 ├── 📄 jsconfig.json           # JavaScript 경로 별칭 설정
 ├── 📄 eslint.config.js        # ESLint 린터 설정
 ├── 📄 components.json         # shadcn/ui 컴포넌트 설정
+├── 📄 vercel.json             # Vercel 배포 및 Serverless Function 설정
 ├── 📄 README.md               # 프로젝트 설명서 (현재 문서)
 ├── 📄 GEMINI.md               # AI 에이전트용 프로젝트 가이드
 ├── 📄 .gitignore              # Git 무시 파일 목록
+│
+├── 📁 api/                    # Vercel Serverless Functions
+│   ├── 📄 yahoo.js            # Yahoo Finance API 프록시
+│   └── 📄 dataroma.js         # Dataroma 크롤링 (슈퍼인베스터 데이터)
+│
 │
 ├── 📁 public/                 # 정적 파일 (빌드 시 복사)
 │   └── 📄 vite.svg            # Vite 로고 아이콘
@@ -241,6 +247,16 @@ bitcoin-simulation/
 | `jsconfig.json` | `@/` 경로 별칭 설정 (src 폴더 매핑) |
 | `eslint.config.js` | ESLint 규칙 설정. React/Hooks 린팅 |
 | `components.json` | shadcn/ui CLI 설정. 컴포넌트 스타일 및 경로 정의 |
+| `vercel.json` | Vercel 배포 설정. `/api/*` 요청을 Serverless Function으로 라우팅 |
+
+---
+
+### ☁️ 서버리스 함수 (Serverless Functions - Vercel)
+
+| 파일명 | 역할 |
+|--------|------|
+| `api/yahoo.js` | **Yahoo Finance 프록시**. CORS 문제 해결 및 주식 데이터 패칭 (Vite Proxy 대체) |
+| `api/dataroma.js` | **Dataroma 크롤러**. 슈퍼인베스터들의 보유 종목 데이터를 크롤링하여 제공 |
 
 ---
 

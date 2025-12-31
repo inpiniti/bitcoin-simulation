@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { cn } from "@/lib/utils"
 import { useStore } from "@/store/useStore"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -41,6 +41,11 @@ function formatBtcPrice(price) {
 export function EditorArea() {
     const { selectedResult, setSelectedResult, dataViewMode, hist, activeInterval } = useStore()
     const [currentPage, setCurrentPage] = useState(1)
+
+    // 페이지네이션 초기화 (간격, 결과 모드, 데이터 뷰 모드 변경 시)
+    useEffect(() => {
+        setCurrentPage(1)
+    }, [activeInterval, selectedResult, dataViewMode])
 
     // Data View 모드일 때
     if (dataViewMode) {
@@ -314,10 +319,10 @@ export function EditorArea() {
                                     <TableHead className="text-[#569cd6] text-[11px] h-8 sticky top-0 bg-[#1e1e1e]">#</TableHead>
                                     <TableHead className="text-[#569cd6] text-[11px] h-8 sticky top-0 bg-[#1e1e1e]">매수 시간</TableHead>
                                     <TableHead className="text-[#569cd6] text-[11px] h-8 text-right sticky top-0 bg-[#1e1e1e]">구매액</TableHead>
-                                    <TableHead className="text-[#569cd6] text-[11px] h-8 text-right sticky top-0 bg-[#1e1e1e]">매수 BTC시세</TableHead>
+                                    <TableHead className="text-[#569cd6] text-[11px] h-8 text-right sticky top-0 bg-[#1e1e1e]">매수 시세</TableHead>
                                     <TableHead className="text-[#569cd6] text-[11px] h-8 sticky top-0 bg-[#1e1e1e]">매도 시간</TableHead>
                                     <TableHead className="text-[#569cd6] text-[11px] h-8 text-right sticky top-0 bg-[#1e1e1e]">판매액</TableHead>
-                                    <TableHead className="text-[#569cd6] text-[11px] h-8 text-right sticky top-0 bg-[#1e1e1e]">매도 BTC시세</TableHead>
+                                    <TableHead className="text-[#569cd6] text-[11px] h-8 text-right sticky top-0 bg-[#1e1e1e]">매도 시세</TableHead>
                                     <TableHead className="text-[#569cd6] text-[11px] h-8 text-right sticky top-0 bg-[#1e1e1e]">손익</TableHead>
                                     <TableHead className="text-[#569cd6] text-[11px] h-8 text-right sticky top-0 bg-[#1e1e1e]">수익률</TableHead>
                                 </TableRow>

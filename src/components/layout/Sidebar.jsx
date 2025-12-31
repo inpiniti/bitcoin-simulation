@@ -5,6 +5,7 @@ import { useState } from "react"
 
 const STRATEGIES = [
     { key: 'fixed', label: '수량 고정', multiplier: null, icon: Lock },
+    { key: 'fixed_bb', label: '수량 고정 + BB', multiplier: null, icon: Lock },
     { key: 'martingale_1.1', label: '1.1x 마틴게일', multiplier: 1.1, icon: TrendingUp },
     { key: 'martingale_1.2', label: '1.2x 마틴게일', multiplier: 1.2, icon: TrendingUp },
     { key: 'martingale_1.3', label: '1.3x 마틴게일', multiplier: 1.3, icon: TrendingUp },
@@ -23,6 +24,7 @@ export function Sidebar() {
         simul,
         loadingSimul,
         runFixedSimulation,
+        runFixedBBSimulation,
         runMartingaleSimulation,
         setSelectedResult
     } = useStore()
@@ -30,6 +32,9 @@ export function Sidebar() {
     const isDisabled = !activeInterval || hist[activeInterval]?.length === 0
 
     const getSimulKey = (strategy) => {
+        if (strategy.key === 'fixed_bb') {
+            return `${mode}_${ticker}_${activeInterval}_fixed_bb`
+        }
         const suffix = strategy.multiplier
             ? `martingale_${strategy.multiplier}`
             : `fixed`
@@ -45,7 +50,9 @@ export function Sidebar() {
         if (hasResult) {
             setSelectedResult({ key: simulKey, ...simul[simulKey] })
         } else {
-            if (strategy.multiplier) {
+            if (strategy.key === 'fixed_bb') {
+                await runFixedBBSimulation(activeInterval)
+            } else if (strategy.multiplier) {
                 await runMartingaleSimulation(activeInterval, strategy.multiplier)
             } else {
                 await runFixedSimulation(activeInterval)
