@@ -24,7 +24,8 @@ export default async function handler(request, response) {
             return response.status(400).json({ error: 'Inputs are required' });
         }
 
-        const targetUrl = `https://api-inference.huggingface.co/models/${model}`;
+        // 최신 엔드포인트: router.huggingface.co
+        const targetUrl = `https://router.huggingface.co/hf-inference/models/${model}`;
 
         const headers = {
             "Content-Type": "application/json"
