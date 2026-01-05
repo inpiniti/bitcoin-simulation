@@ -38,7 +38,9 @@ export function ActivityBar() {
         activeInterval,
         loadHist1m,
         loadHistInterval,
-        setActiveInterval
+        setActiveInterval,
+        analysisMode,
+        runMarketAnalysis
     } = useStore()
 
     const handleClick = async (interval) => {
@@ -64,6 +66,11 @@ export function ActivityBar() {
                 await loadHistInterval(interval)
             }
             setActiveInterval(interval)
+        }
+
+        // 전체 분석 모드일 경우 구간 변경 시 즉시 재분석 실행
+        if (analysisMode) {
+            runMarketAnalysis()
         }
     }
 

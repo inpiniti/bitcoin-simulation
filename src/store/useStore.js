@@ -135,7 +135,7 @@ export const useStore = create(
                     const results = [];
                     // Stock 모드에서만 동작한다고 가정, 현재 Active Interval 사용
                     const interval = state.activeInterval || '1d';
-                    const strategy = state.activeStrategy || 'fixed';
+                    const options = state.strategyOptions; // 현재 전략 옵션 가져오기
 
                     let processedCount = 0;
 
@@ -163,7 +163,7 @@ export const useStore = create(
                             const dataWithSlope = addSlopeData(aggregated);
 
                             // 4. 신호 분석 (마지막 캔들 기준)
-                            const analysis = analyzeSignal(dataWithSlope, strategy);
+                            const analysis = analyzeSignal(dataWithSlope, options);
 
                             const lastCandle = dataWithSlope[dataWithSlope.length - 1];
                             const prevCandle = dataWithSlope[dataWithSlope.length - 2];

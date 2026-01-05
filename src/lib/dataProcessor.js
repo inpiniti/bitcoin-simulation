@@ -658,10 +658,17 @@ export function calculateMartingaleResult(trades, baseQuantity = 100000, multipl
 /**
  * 마지막 캔들 기준으로 현재 매매 신호를 분석 (Market Scanner용)
  * @param {Array} dataWithSlope - 지표가 포함된 데이터 배열
- * @param {string} strategy - 전략 ('standard' | 'fixedQtyBB' 등)
+ * @param {Object} options - 전략 옵션 (useBB, useTrend, useRSI, useVolumeFilter 등)
  * @returns {Object} { signal: 'BUY'|'SELL'|'HOLD', reason: string }
  */
-export function analyzeSignal(dataWithSlope, strategy = 'standard') {
+export function analyzeSignal(dataWithSlope, options = {}) {
+    const {
+        useBB = false,
+        useTrend = false,
+        useRSI = false,
+        useVolumeFilter = false
+    } = options;
+
     if (!dataWithSlope || dataWithSlope.length < 2) {
         return { signal: 'HOLD', reason: 'Insufficient Data' };
     }
@@ -672,43 +679,49 @@ export function analyzeSignal(dataWithSlope, strategy = 'standard') {
 
     // 기울기가 undefined이면 판단 불가
     if (curr.slope === undefined || prev.slope === undefined) {
-        return { signal: 'HOLD', reason: 'Calculating Slope' };
+        return { signal: 'HOLD', reason: 'Calculating...' };
     }
 
     const prevSign = prev.slope > 0 ? 'positive' : prev.slope < 0 ? 'negative' : 'zero';
     const currSign = curr.slope > 0 ? 'positive' : curr.slope < 0 ? 'negative' : 'zero';
 
-    // 전략별 신호 판단
-    // 전략 이름에 'BB'가 포함되어 있으면 볼린저 밴드 전략 적용 (대소문자 무관하게 체크)
-    if (strategy && strategy.toLowerCase().includes('bb')) {
-        // 매수: 기울기 양전(음->양) AND (직전 캔들의 BB Status가 -2(하단이탈) 였음)
-        if (prevSign === 'negative' && currSign === 'positive') {
-            if (prev.bbStatus === -2) {
-                return { signal: 'BUY', reason: 'Slope Up & BB Rebound' };
-            }
-        }
-        // 매도: 기울기 음전(양->음)
-        else if (prevSign === 'positive' && currSign === 'negative') {
-            return { signal: 'SELL', reason: 'Slope Down' };
-        }
-    } else {
-        // Standard (기본 전략 - Slope만 봄)
-        if (prevSign === 'negative' && currSign === 'positive') {
-            return { signal: 'BUY', reason: 'Golden Cross (Slope)' };
-        }
-        else if (prevSign === 'positive' && currSign === 'negative') {
-            return { signal: 'SELL', reason: 'Dead Cross (Slope)' };
+    // 1. 매수 신호 판단 (기울기 양전)
+    let buySignal = (prevSign === 'negative' && currSign === 'positive');
+    let buyReason = 'Slope Up';
+
+    if (buySignal) {
+        // 필터 체크
+        const failures = [];
+        if (useBB && prev.bbStatus !== -2) failures.push('BB');
+        if (useTrend && curr.ma50 && curr.close < curr.ma50) failures.push('Trend');
+        if (useRSI && curr.rsi !== undefined && curr.rsi > 70) failures.push('RSI');
+        if (useVolumeFilter && curr.vma20 && curr.volume < curr.vma20) failures.push('Volume');
+
+        if (failures.length > 0) {
+            buySignal = false;
+            buyReason = `Slope Up (Locked: ${failures.join(', ')})`;
+        } else {
+            buyReason = 'Strategy Match (BUY)';
         }
     }
 
-    // 변화 없음 (HOLD)
-    // 현재 상태가 상승세인지 하락세인지 정보 제공
-    let currentStatus = curr.slope > 0 ? 'Rising' : 'Falling';
+    if (buySignal) return { signal: 'BUY', reason: buyReason };
 
-    // 추가 정보: BB 상태가 특이하면 표시
+    // 2. 매도 신호 판단 (기울기 음전)
+    if (prevSign === 'positive' && currSign === 'negative') {
+        return { signal: 'SELL', reason: 'Slope Down' };
+    }
+
+    // 3. 변화 없음 (HOLD)
+    let currentStatus = curr.slope > 0 ? 'Rising' : 'Falling';
     let extra = '';
     if (curr.bbStatus === 2) extra = ' (Overbought)';
     if (curr.bbStatus === -2) extra = ' (Oversold)';
+
+    // 만약 기울기는 올랐는데 필터에 걸린 경우라면 Locked 이유를 보여줌
+    if (!buySignal && (prevSign === 'negative' && currSign === 'positive')) {
+        return { signal: 'HOLD', reason: buyReason };
+    }
 
     return { signal: 'HOLD', reason: `Maintains ${currentStatus}${extra}` };
 }

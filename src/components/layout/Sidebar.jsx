@@ -9,6 +9,9 @@ export function Sidebar() {
         strategyOptions,
         updateStrategyOptions,
         runSimulation,
+        analysisMode,
+        runMarketAnalysis,
+        isAnalyzing,
         isDisabled = !activeInterval
     } = useStore()
 
@@ -117,17 +120,27 @@ export function Sidebar() {
             {/* Run Button Container */}
             <div className="p-4 border-t border-[#3c3c3c] flex flex-col gap-2 bg-[#252526]">
                 <button
-                    disabled={!activeInterval}
-                    onClick={() => runSimulation()}
+                    disabled={!activeInterval || isAnalyzing}
+                    onClick={() => {
+                        if (analysisMode) {
+                            runMarketAnalysis()
+                        } else {
+                            runSimulation()
+                        }
+                    }}
                     className={cn(
                         "w-full py-2.5 text-[13px] font-bold rounded flex items-center justify-center gap-2 transition-all",
                         activeInterval
-                            ? "bg-[#0e639c] text-white hover:bg-[#1177bb] shadow-lg active:scale-95"
+                            ? (analysisMode ? "bg-[#094771] hover:bg-[#007acc]" : "bg-[#0e639c] hover:bg-[#1177bb]") + " text-white shadow-lg active:scale-95"
                             : "bg-[#333333] text-[#666666] cursor-not-allowed"
                     )}
                 >
-                    <Zap className="w-4 h-4 fill-white" />
-                    시뮬레이션 실행
+                    {isAnalyzing ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                        <Zap className={cn("w-4 h-4", analysisMode ? "text-[#9cdcfe]" : "fill-white")} />
+                    )}
+                    {isAnalyzing ? "분석 중..." : (analysisMode ? "시장 분석 실행" : "시뮬레이션 실행")}
                 </button>
                 {!activeInterval && (
                     <p className="text-[10px] text-[#888888] text-center">
