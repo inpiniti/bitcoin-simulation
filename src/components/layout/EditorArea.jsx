@@ -111,6 +111,8 @@ export function EditorArea() {
                                 <TableHead className="text-[#569cd6] text-[11px] h-8 text-right sticky top-0 bg-[#1e1e1e]">Close</TableHead>
                                 <TableHead className="text-[#569cd6] text-[11px] h-8 text-right sticky top-0 bg-[#1e1e1e] bg-[#252526]">Median</TableHead>
                                 <TableHead className="text-[#569cd6] text-[11px] h-8 text-right sticky top-0 bg-[#1e1e1e]">Slope</TableHead>
+                                <TableHead className="text-[#569cd6] text-[11px] h-8 text-right sticky top-0 bg-[#1e1e1e]">RSI(14)</TableHead>
+                                <TableHead className="text-[#569cd6] text-[11px] h-8 text-right sticky top-0 bg-[#1e1e1e]">MA50</TableHead>
                                 <TableHead className="text-[#569cd6] text-[11px] h-8 text-center sticky top-0 bg-[#1e1e1e]">BB Status</TableHead>
                             </TableRow>
                         </TableHeader>
@@ -144,6 +146,12 @@ export function EditorArea() {
                                             item.slope > 0 ? "text-[#4ec9b0]" : item.slope < 0 ? "text-[#f14c4c]" : "text-[#808080]"
                                         )}>
                                             {item.slope > 0 ? '+' : ''}{item.slope?.toLocaleString()}
+                                        </TableCell>
+                                        <TableCell className="font-mono text-[#ce9178] text-xs text-right py-1.5">
+                                            {item.rsi?.toFixed(1) || '-'}
+                                        </TableCell>
+                                        <TableCell className="font-mono text-[#d4d4d4] text-xs text-right py-1.5">
+                                            {item.ma50?.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '-'}
                                         </TableCell>
                                         <TableCell className={cn("font-mono text-xs text-center py-1.5 font-medium", bbColor)}>
                                             {bbText} <span className="text-[10px] opacity-70">({item.bbStatus})</span>
@@ -309,6 +317,24 @@ export function EditorArea() {
                                 {Math.round(summary.totalFees || 0)?.toLocaleString()}원
                             </p>
                         </div>
+
+                        {/* 전략 옵션 표시 */}
+                        {selectedResult.options && (
+                            <div className="pt-4 border-t border-[#3c3c3c] space-y-2">
+                                <span className="text-[11px] text-[#569cd6] uppercase tracking-wider">적용된 전략</span>
+                                <div className="flex flex-wrap gap-1">
+                                    <span className="text-[10px] px-1.5 py-0.5 bg-[#3c3c3c] text-[#cccccc] rounded">
+                                        {selectedResult.options.moneyManagement === 'cumulative' ? '누적(복리)' : '고정(단리)'}
+                                    </span>
+                                    {selectedResult.options.useBB && <span className="text-[10px] px-1.5 py-0.5 bg-[#0e639c] text-white rounded">BB필터</span>}
+                                    {selectedResult.options.useTrend && <span className="text-[10px] px-1.5 py-0.5 bg-[#0e639c] text-white rounded">추세필터</span>}
+                                    {selectedResult.options.useRSI && <span className="text-[10px] px-1.5 py-0.5 bg-[#0e639c] text-white rounded">RSI필터</span>}
+                                    {selectedResult.options.useStopLoss && <span className="text-[10px] px-1.5 py-0.5 bg-[#f14c4c] text-white rounded">손절({selectedResult.options.stopLossPcnt}%)</span>}
+                                    {selectedResult.options.useTakeProfit && <span className="text-[10px] px-1.5 py-0.5 bg-[#4ec9b0] text-black rounded font-bold">익절({selectedResult.options.takeProfitPcnt}%)</span>}
+                                    {selectedResult.options.martingaleMultiplier > 1.0 && <span className="text-[10px] px-1.5 py-0.5 bg-[#c586c0] text-white rounded">마틴({selectedResult.options.martingaleMultiplier}x)</span>}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
 

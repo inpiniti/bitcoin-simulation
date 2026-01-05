@@ -3,149 +3,136 @@ import { useStore } from "@/store/useStore"
 import { ChevronDown, ChevronRight, Loader2, Lock, TrendingUp, Zap, Coins } from "lucide-react"
 import { useState } from "react"
 
-const STRATEGIES = [
-    { key: 'fixed', label: '수량 고정 (단리)', multiplier: null, icon: Lock },
-    { key: 'fixed_bb', label: '수량 고정 + BB', multiplier: null, icon: Lock },
-    { key: 'cumulative', label: '수량 누적 (복리)', multiplier: null, icon: Coins },
-    { key: 'cumulative_bb', label: '수량 누적 + BB', multiplier: null, icon: Coins },
-    { key: 'martingale_1.1', label: '1.1x 마틴게일', multiplier: 1.1, icon: TrendingUp },
-    { key: 'martingale_1.2', label: '1.2x 마틴게일', multiplier: 1.2, icon: TrendingUp },
-    { key: 'martingale_1.3', label: '1.3x 마틴게일', multiplier: 1.3, icon: TrendingUp },
-    { key: 'martingale_1.4', label: '1.4x 마틴게일', multiplier: 1.4, icon: TrendingUp },
-    { key: 'martingale_1.5', label: '1.5x 마틴게일', multiplier: 1.5, icon: TrendingUp },
-    { key: 'martingale_2', label: '2x 마틴게일', multiplier: 2, icon: Zap },
-]
-
 export function Sidebar() {
-    const [isExpanded, setIsExpanded] = useState(true)
     const {
-        mode,
-        ticker,
         activeInterval,
-        hist,
-        simul,
-        loadingSimul,
-        runFixedSimulation,
-        runFixedBBSimulation,
-        runCumulativeSimulation,
-        runCumulativeBBSimulation,
-        runMartingaleSimulation,
-        setSelectedResult,
-        setActiveStrategy,
-        analysisMode,
-        runMarketAnalysis
+        strategyOptions,
+        updateStrategyOptions,
+        runSimulation,
+        isDisabled = !activeInterval
     } = useStore()
 
-    const isDisabled = !activeInterval || hist[activeInterval]?.length === 0
-
-    const getSimulKey = (strategy) => {
-        if (strategy.key === 'fixed_bb') return `${mode}_${ticker}_${activeInterval}_fixed_bb`
-        if (strategy.key === 'cumulative') return `${mode}_${ticker}_${activeInterval}_cumulative`
-        if (strategy.key === 'cumulative_bb') return `${mode}_${ticker}_${activeInterval}_cumulative_bb`
-
-        const suffix = strategy.multiplier
-            ? `martingale_${strategy.multiplier}`
-            : `fixed`
-        return `${mode}_${ticker}_${activeInterval}_${suffix}`
-    }
-
-    const handleClick = async (strategy) => {
-        // 전역 전략 설정 업데이트
-        setActiveStrategy(strategy.key);
-
-        // 분석 모드라면 재분석 트리거 (현재 전략 기반)
-        if (analysisMode && mode === 'stock') {
-            runMarketAnalysis();
-            // 분석 모드에서는 개별 시뮬레이션 결과로 이동하지 않고 분석 패널 유지
-            return;
-        }
-
-        if (isDisabled) return
-
-        const simulKey = getSimulKey(strategy)
-        const hasResult = simul[simulKey]
-
-        if (hasResult) {
-            setSelectedResult({ key: simulKey, ...simul[simulKey] })
-        } else {
-            if (strategy.key === 'fixed_bb') {
-                await runFixedBBSimulation(activeInterval)
-            } else if (strategy.key === 'cumulative') {
-                await runCumulativeSimulation(activeInterval)
-            } else if (strategy.key === 'cumulative_bb') {
-                await runCumulativeBBSimulation(activeInterval)
-            } else if (strategy.multiplier) {
-                await runMartingaleSimulation(activeInterval, strategy.multiplier)
-            } else {
-                await runFixedSimulation(activeInterval)
-            }
-            // Store might have updated, need to read fresh state or rely on key consistency
-            const result = useStore.getState().simul[simulKey]
-            if (result) {
-                setSelectedResult({ key: simulKey, ...result })
-            }
-        }
+    const handleOptionChange = (key, value) => {
+        updateStrategyOptions({ [key]: value })
     }
 
     return (
-        <div className="w-60 bg-[#252526] border-r border-[#3c3c3c] flex flex-col">
+        <div className="w-64 bg-[#252526] border-r border-[#3c3c3c] flex flex-col overflow-hidden">
             {/* Header */}
-            <div className="h-9 flex items-center px-4 text-[11px] text-[#bbbbbb] uppercase tracking-wider">
-                시뮬레이션 전략
+            <div className="h-9 flex items-center px-4 text-[11px] text-[#bbbbbb] uppercase tracking-wider border-b border-[#3c3c3c]">
+                매매 전략 설정
             </div>
 
-            {/* Explorer Section */}
-            <div className="flex-1 overflow-auto">
-                <button
-                    onClick={() => setIsExpanded(!isExpanded)}
-                    className="w-full flex items-center gap-1 px-2 py-1 text-[11px] text-[#cccccc] font-semibold hover:bg-[#2a2a2a]"
-                >
-                    {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                    매매 전략 ({STRATEGIES.length})
-                </button>
-
-                {isExpanded && (
-                    <div className="pl-4">
-                        {STRATEGIES.map((strategy) => {
-                            const simulKey = activeInterval ? getSimulKey(strategy) : null
-                            const hasResult = simulKey ? simul[simulKey] : false
-                            const isLoading = simulKey ? loadingSimul[simulKey] : false
-                            const Icon = strategy.icon
-
-                            return (
-                                <button
-                                    key={strategy.key}
-                                    onClick={() => handleClick(strategy)}
-                                    disabled={isDisabled || isLoading}
-                                    className={cn(
-                                        "w-full flex items-center gap-2 px-2 py-1 text-[13px] text-left transition-colors",
-                                        isDisabled && "opacity-40 cursor-not-allowed",
-                                        hasResult && "text-[#4ec9b0]",
-                                        !hasResult && !isDisabled && "text-[#cccccc] hover:bg-[#2a2a2a]",
-                                        isLoading && "text-[#f7931a]"
-                                    )}
-                                >
-                                    {isLoading
-                                        ? <Loader2 className="w-4 h-4 animate-spin" />
-                                        : <Icon className="w-4 h-4" />
-                                    }
-                                    {strategy.label}
-                                    {hasResult && (
-                                        <span className="ml-auto text-[10px] text-[#6a9955]">✓</span>
-                                    )}
-                                </button>
-                            )
-                        })}
+            <div className="flex-1 overflow-auto p-4 space-y-6">
+                {/* 1. 수량 & 자산관리 */}
+                <section className="space-y-2">
+                    <h3 className="text-[12px] font-bold text-[#cccccc] flex items-center gap-2">
+                        <Lock className="w-3.5 h-3.5" /> 자산 관리
+                    </h3>
+                    <div className="grid grid-cols-2 gap-2">
+                        <button
+                            onClick={() => handleOptionChange('moneyManagement', 'fixed')}
+                            className={cn(
+                                "py-1.5 text-[12px] rounded border transition-colors",
+                                strategyOptions.moneyManagement === 'fixed'
+                                    ? "bg-[#0e639c] border-[#1177bb] text-white"
+                                    : "bg-[#333333] border-[#444444] text-[#aaaaaa] hover:bg-[#3c3c3c]"
+                            )}
+                        >
+                            고정 (단리)
+                        </button>
+                        <button
+                            onClick={() => handleOptionChange('moneyManagement', 'cumulative')}
+                            className={cn(
+                                "py-1.5 text-[12px] rounded border transition-colors",
+                                strategyOptions.moneyManagement === 'cumulative'
+                                    ? "bg-[#0e639c] border-[#1177bb] text-white"
+                                    : "bg-[#333333] border-[#444444] text-[#aaaaaa] hover:bg-[#3c3c3c]"
+                            )}
+                        >
+                            누적 (복리)
+                        </button>
                     </div>
+                </section>
+
+                {/* 2. 필터 설정 */}
+                <section className="space-y-3">
+                    <h3 className="text-[12px] font-bold text-[#cccccc] flex items-center gap-2">
+                        <Zap className="w-3.5 h-3.5" /> 진입/청산 필터
+                    </h3>
+                    <div className="space-y-2">
+                        {[
+                            { id: 'useBB', label: '볼린저 밴드 (BB -2)', desc: '하단 이탈 시 매수' },
+                            { id: 'useTrend', label: '추세 필터 (MA50)', desc: '정배열(MA위)일 때만 매수' },
+                            { id: 'useRSI', label: 'RSI 필터 (70미만)', desc: '과매수 시 매수 금지' },
+                            { id: 'useStopLoss', label: '손절매 (-2%)', desc: '도달 시 즉시 손절' },
+                            { id: 'useTakeProfit', label: '익절매 (+5%)', desc: '목표 도달 시 즉시 익절' },
+                        ].map(item => (
+                            <label key={item.id} className="flex items-center gap-3 group cursor-pointer">
+                                <div className="relative flex items-center">
+                                    <input
+                                        type="checkbox"
+                                        checked={strategyOptions[item.id]}
+                                        onChange={(e) => handleOptionChange(item.id, e.target.checked)}
+                                        className="sr-only"
+                                    />
+                                    <div className={cn(
+                                        "w-4 h-4 rounded border transition-colors flex items-center justify-center",
+                                        strategyOptions[item.id] ? "bg-[#007acc] border-[#007acc]" : "border-[#555555] group-hover:border-[#777777]"
+                                    )}>
+                                        {strategyOptions[item.id] && <div className="w-2 h-2 bg-white rounded-sm" />}
+                                    </div>
+                                </div>
+                                <div className="flex flex-col">
+                                    <span className="text-[13px] text-[#cccccc]">{item.label}</span>
+                                    <span className="text-[10px] text-[#666666]">{item.desc}</span>
+                                </div>
+                            </label>
+                        ))}
+                    </div>
+                </section>
+
+                {/* 3. 마틴게일 */}
+                <section className="space-y-2">
+                    <h3 className="text-[12px] font-bold text-[#cccccc] flex items-center gap-2">
+                        <TrendingUp className="w-3.5 h-3.5" /> 마틴게일 배율
+                    </h3>
+                    <select
+                        value={strategyOptions.martingaleMultiplier}
+                        onChange={(e) => handleOptionChange('martingaleMultiplier', parseFloat(e.target.value))}
+                        className="w-full bg-[#3c3c3c] border border-[#555555] text-[12px] text-[#cccccc] p-1.5 rounded focus:outline-none focus:border-[#007acc]"
+                    >
+                        <option value={1.0}>사용 안함 (1.0x)</option>
+                        <option value={1.1}>1.1배 증가</option>
+                        <option value={1.2}>1.2배 증가</option>
+                        <option value={1.3}>1.3배 증가</option>
+                        <option value={1.5}>1.5배 증가</option>
+                        <option value={2.0}>2.0배 증가 (Classic)</option>
+                    </select>
+                </section>
+            </div>
+
+            {/* Run Button Container */}
+            <div className="p-4 border-t border-[#3c3c3c] flex flex-col gap-2 bg-[#252526]">
+                <button
+                    disabled={!activeInterval}
+                    onClick={() => runSimulation()}
+                    className={cn(
+                        "w-full py-2.5 text-[13px] font-bold rounded flex items-center justify-center gap-2 transition-all",
+                        activeInterval
+                            ? "bg-[#0e639c] text-white hover:bg-[#1177bb] shadow-lg active:scale-95"
+                            : "bg-[#333333] text-[#666666] cursor-not-allowed"
+                    )}
+                >
+                    <Zap className="w-4 h-4 fill-white" />
+                    시뮬레이션 실행
+                </button>
+                {!activeInterval && (
+                    <p className="text-[10px] text-[#888888] text-center">
+                        Activity Bar에서 간격을 선택하세요
+                    </p>
                 )}
             </div>
-
-            {/* Info */}
-            {isDisabled && (
-                <div className="p-4 text-[11px] text-[#6a6a6a] border-t border-[#3c3c3c]">
-                    왼쪽 Activity Bar에서<br />간격을 먼저 선택하세요.
-                </div>
-            )}
         </div>
     )
 }

@@ -121,58 +121,98 @@ export function aggregateToInterval(data1min, intervalMinutes) {
 }
 
 /**
- * 데이터에 파생 지표(Median, Slope, Bollinger Bands) 추가
- * 1. Median: (Open + Close) / 2
- * 2. Slope: 현재 Median - 이전 Median
- * 3. Bollinger Bands: Median 기준 20-period, 2-multiplier
- * 
- * @param {Array} data - 캔들 데이터 배열
- * @returns {Array} 파생 지표가 추가된 데이터
+ * RSI (Relative Strength Index) 계산
+ */
+export function calculateRSI(data, period = 14) {
+    if (data.length <= period) return data.map(d => ({ ...d, rsi: undefined }));
+
+    let gains = 0;
+    let losses = 0;
+
+    for (let i = 1; i <= period; i++) {
+        const change = data[i].close - data[i - 1].close;
+        if (change > 0) gains += change;
+        else losses -= change;
+    }
+
+    let avgGain = gains / period;
+    let avgLoss = losses / period;
+
+    const result = new Array(data.length);
+    for (let i = 0; i <= period; i++) {
+        result[i] = { ...data[i], rsi: undefined };
+    }
+
+    if (avgLoss === 0) result[period].rsi = 100;
+    else {
+        const rs = avgGain / avgLoss;
+        result[period].rsi = 100 - (100 / (1 + rs));
+    }
+
+    for (let i = period + 1; i < data.length; i++) {
+        const change = data[i].close - data[i - 1].close;
+        let gain = 0, loss = 0;
+        if (change > 0) gain = change;
+        else loss = -change;
+
+        avgGain = (avgGain * (period - 1) + gain) / period;
+        avgLoss = (avgLoss * (period - 1) + loss) / period;
+
+        if (avgLoss === 0) result[i] = { ...data[i], rsi: 100 };
+        else {
+            const rs = avgGain / avgLoss;
+            result[i] = { ...data[i], rsi: 100 - (100 / (1 + rs)) };
+        }
+    }
+    return result;
+}
+
+/**
+ * MA (Moving Average) 계산
+ */
+export function calculateMA(data, period = 50) {
+    return data.map((item, index) => {
+        if (index < period - 1) return { ...item, [`ma${period}`]: undefined };
+        const slice = data.slice(index - period + 1, index + 1);
+        const sum = slice.reduce((acc, cur) => acc + (cur.close || cur.trade_price), 0);
+        return { ...item, [`ma${period}`]: sum / period };
+    });
+}
+
+/**
+ * 데이터에 모든 파생 지표(Median, Slope, Bollinger Bands, RSI, MA50) 추가
  */
 export function addDerivedData(data) {
-    // 1. Median & Slope 계산
-    const withMedianAndSlope = data.map((item, index) => {
+    // 1. Median & Slope
+    let processed = data.map((item, index) => {
         const median = (item.open + item.close) / 2;
         const prevMedian = index > 0 ? (data[index - 1].open + data[index - 1].close) / 2 : undefined;
         const slope = prevMedian !== undefined ? median - prevMedian : undefined;
-
-        return {
-            ...item,
-            median,
-            slope,
-        };
+        return { ...item, median, slope };
     });
 
-    // 2. Bollinger Bands 계산 (Median 기준)
+    // 2. RSI (14)
+    processed = calculateRSI(processed, 14);
+
+    // 3. MA (50)
+    processed = calculateMA(processed, 50);
+
+    // 4. Bollinger Bands (20, 2)
     const period = 20;
     const multiplier = 2;
 
-    return withMedianAndSlope.map((item, index, array) => {
+    return processed.map((item, index, array) => {
         if (index < period - 1) {
-            // 충분한 데이터가 없을 경우
             return { ...item, bbStatus: 0, bbUpper: undefined, bbLower: undefined, bbMean: undefined };
         }
-
-        // 지난 20개(현재 포함)의 Median 데이터 가져오기
         const slice = array.slice(index - period + 1, index + 1).map(d => d.median);
-
-        // 평균 (SMA - Middle Band)
         const mean = slice.reduce((sum, val) => sum + val, 0) / period;
-
-        // 표준편차 (Standard Deviation)
         const squaredDiffs = slice.map(val => Math.pow(val - mean, 2));
         const variance = squaredDiffs.reduce((sum, val) => sum + val, 0) / period;
         const stdDev = Math.sqrt(variance);
-
-        // 상단/하단 밴드
         const upperBand = mean + (multiplier * stdDev);
         const lowerBand = mean - (multiplier * stdDev);
 
-        // 상태값(Status) 결정 (Median Price 기준)
-        // 2: 상단 밴드 이탈 (Price > Upper Band)
-        // 1: 상단 구간 (Mean < Price <= Upper Band)
-        // -1: 하단 구간 (Lower Band <= Price < Mean)
-        // -2: 하단 밴드 이탈 (Price < Lower Band)
         let bbStatus = 0;
         const price = item.median;
 
@@ -181,13 +221,7 @@ export function addDerivedData(data) {
         else if (price >= lowerBand && price < mean) bbStatus = -1;
         else if (price < lowerBand) bbStatus = -2;
 
-        return {
-            ...item,
-            bbUpper: upperBand,
-            bbLower: lowerBand,
-            bbMean: mean,
-            bbStatus,
-        };
+        return { ...item, bbUpper: upperBand, bbLower: lowerBand, bbMean: mean, bbStatus };
     });
 }
 
@@ -200,92 +234,109 @@ export function addSlopeData(data) {
 }
 
 /**
- * 기울기 변화에 따른 매매 기록 생성
- * @param {Array} dataWithSlope - 기울기가 포함된 데이터
- * @param {string} strategy - 전략 ('standard' | 'fixedQtyBB')
- * @returns {Array} 매매 기록 배열
+ * 통합 매매 엔진: 다양한 필터 및 손절/익절 조건 적용
  */
-export function generateTrades(dataWithSlope, strategy = 'standard') {
+export function generateIntegratedTrades(data, options = {}) {
+    const {
+        useBB = false,
+        useTrend = false,
+        useRSI = false,
+        useStopLoss = false,
+        stopLossPcnt = -2.0,
+        useTakeProfit = false,
+        takeProfitPcnt = 5.0
+    } = options;
+
     const trades = [];
-    let currentPosition = null; // 'long' or null
+    let currentPosition = null;
     let buyRecord = null;
 
-    for (let i = 1; i < dataWithSlope.length; i++) {
-        const prev = dataWithSlope[i - 1];
-        const curr = dataWithSlope[i];
+    for (let i = 1; i < data.length; i++) {
+        const prev = data[i - 1];
+        const curr = data[i];
 
-        // undefined에서 변경되는 경우 무시
         if (prev.slope === undefined) continue;
 
         const prevSign = prev.slope > 0 ? 'positive' : prev.slope < 0 ? 'negative' : 'zero';
         const currSign = curr.slope > 0 ? 'positive' : curr.slope < 0 ? 'negative' : 'zero';
 
-        let buySignal = false;
-        let sellSignal = false;
+        // --- 매수 판단 ---
+        if (currentPosition === null) {
+            let buySignal = (prevSign === 'negative' && currSign === 'positive');
 
-        if (strategy === 'fixedQtyBB') {
-            // [전략: 수량 고정 + BB]
-            // 매수: 기울기 양전 AND (이전 캔들 BB Status == -2 (하단 이탈))
-            if (prevSign === 'negative' && currSign === 'positive') {
-                if (prev.bbStatus === -2) {
-                    buySignal = true;
+            if (buySignal) {
+                // 필터 체크
+                if (useBB && prev.bbStatus !== -2) buySignal = false;
+                if (useTrend && curr.ma50 && curr.close < curr.ma50) buySignal = false;
+                if (useRSI && curr.rsi !== undefined && curr.rsi > 70) buySignal = false;
+            }
+
+            if (buySignal) {
+                buyRecord = {
+                    type: 'buy',
+                    timestamp: curr.timestamp,
+                    price: curr.close,
+                    index: i,
+                    reason: 'Strategy Match'
+                };
+                currentPosition = 'long';
+            }
+        }
+        // --- 매도/청산 판단 ---
+        else if (currentPosition === 'long') {
+            let sellSignal = (prevSign === 'positive' && currSign === 'negative');
+            let sellReason = 'Slope Down';
+
+            // 강제 청산 (손절/익절) 체크
+            if (useStopLoss || useTakeProfit) {
+                const currentProfitRate = ((curr.close - buyRecord.price) / buyRecord.price) * 100;
+
+                if (useStopLoss && currentProfitRate <= stopLossPcnt) {
+                    sellSignal = true;
+                    sellReason = `Stop Loss (${stopLossPcnt}%)`;
+                } else if (useTakeProfit && currentProfitRate >= takeProfitPcnt) {
+                    sellSignal = true;
+                    sellReason = `Take Profit (${takeProfitPcnt}%)`;
                 }
             }
-            // 매도: 기울기 음전 AND (보유 수량이 있을 때 -> currentPosition === 'long')
-            else if (prevSign === 'positive' && currSign === 'negative') {
-                sellSignal = true;
+
+            if (sellSignal) {
+                const sellRecord = {
+                    type: 'sell',
+                    timestamp: curr.timestamp,
+                    price: curr.close,
+                    index: i,
+                    reason: sellReason
+                };
+
+                const profit = sellRecord.price - buyRecord.price;
+                const profitRate = (profit / buyRecord.price) * 100;
+
+                trades.push({
+                    cycle: trades.length + 1,
+                    buy: buyRecord,
+                    sell: sellRecord,
+                    profit,
+                    profitRate,
+                });
+
+                currentPosition = null;
+                buyRecord = null;
             }
-        } else {
-            // [기본 전략: Standard]
-            // 매수: 기울기 양전
-            if (prevSign === 'negative' && currSign === 'positive') {
-                buySignal = true;
-            }
-            // 매도: 기울기 음전
-            else if (prevSign === 'positive' && currSign === 'negative') {
-                sellSignal = true;
-            }
-        }
-
-        // 실제 매매 실행 로직
-        // 매수 신호 & 포지션 없음
-        if (buySignal && currentPosition === null) {
-            buyRecord = {
-                type: 'buy',
-                timestamp: curr.timestamp,
-                price: curr.close, // 매매는 여전히 실제 체결가(close) 기준
-                index: i,
-                reason: strategy === 'fixedQtyBB' ? 'Slope Up & BB Lower Break' : 'Slope Up'
-            };
-            currentPosition = 'long';
-        }
-        // 매도 신호 & 포지션 보유 중 (Long)
-        else if (sellSignal && currentPosition === 'long') {
-            const sellRecord = {
-                type: 'sell',
-                timestamp: curr.timestamp,
-                price: curr.close, // 매매는 여전히 실제 체결가(close) 기준
-                index: i,
-            };
-
-            // 한 사이클(매수 + 매도) 완성
-            const profit = sellRecord.price - buyRecord.price;
-            const profitRate = (profit / buyRecord.price) * 100;
-
-            trades.push({
-                cycle: trades.length + 1,
-                buy: buyRecord,
-                sell: sellRecord,
-                profit,
-                profitRate,
-            });
-
-            currentPosition = null;
-            buyRecord = null;
         }
     }
 
     return trades;
+}
+
+/**
+ * 기울기 변화에 따른 매매 기록 생성 (하위 호환 유지)
+ */
+export function generateTrades(dataWithSlope, strategy = 'standard') {
+    if (strategy === 'fixedQtyBB') {
+        return generateIntegratedTrades(dataWithSlope, { useBB: true });
+    }
+    return generateIntegratedTrades(dataWithSlope, { useBB: false });
 }
 
 /**

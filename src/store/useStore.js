@@ -72,12 +72,31 @@ export const useStore = create(
                 // Global Error State (for AlertDialog)
                 globalError: null,
 
+                // Strategy Options
+                strategyOptions: {
+                    moneyManagement: 'fixed', // 'fixed' | 'cumulative'
+                    isCompound: false,        // 단리/복리 (cumulative일 때 의미있음) 
+                    useBB: false,
+                    useTrend: false,
+                    useRSI: false,
+                    useStopLoss: false,
+                    stopLossPcnt: -2.0,
+                    useTakeProfit: false,
+                    takeProfitPcnt: 5.0,
+                    martingaleMultiplier: 1.0, // 1.0 = No Martingale
+                    baseQuantity: 100000,
+                },
+
                 // Actions
                 setFetchProgress: (current, total) => set({ fetchProgress: { current, total } }),
 
                 toggleDataViewMode: () => set((state) => ({ dataViewMode: !state.dataViewMode })),
 
                 setGlobalError: (error) => set({ globalError: error }),
+
+                updateStrategyOptions: (options) => set(state => ({
+                    strategyOptions: { ...state.strategyOptions, ...options }
+                })),
 
                 // Market Analysis State & Actions
                 analysisMode: false,
@@ -298,7 +317,8 @@ export const useStore = create(
                             set({ fetchProgress: { current, total } });
                         });
 
-                        const dataWithSlope = addSlopeData(rawData);
+                        const { addDerivedData } = await import('@/lib/dataProcessor');
+                        const dataWithSlope = addDerivedData(rawData);
 
                         set((s) => ({
                             hist: { ...s.hist, '1m': dataWithSlope },
@@ -332,7 +352,8 @@ export const useStore = create(
                             console.warn(`[Warning] Fetched data count is too low (${rawData.length}).`);
                         }
 
-                        const dataWithSlope = addSlopeData(rawData);
+                        const { addDerivedData } = await import('@/lib/dataProcessor');
+                        const dataWithSlope = addDerivedData(rawData);
 
                         set((s) => ({
                             hist: { ...s.hist, '1d': dataWithSlope },
@@ -434,7 +455,8 @@ export const useStore = create(
                             aggregated = aggregateToInterval(baseData, INTERVALS[interval]);
                         }
 
-                        const dataWithSlope = addSlopeData(aggregated);
+                        const { addDerivedData } = await import('@/lib/dataProcessor');
+                        const dataWithSlope = addDerivedData(aggregated);
 
                         set((s) => ({
                             hist: { ...s.hist, [interval]: dataWithSlope },
@@ -448,154 +470,55 @@ export const useStore = create(
                 },
 
                 /**
-                 * 시뮬레이션 실행 (수량 고정)
+                 * 통합 시뮬레이션 실행 (새로운 UI용)
                  */
-                runFixedSimulation: async (interval) => {
+                runSimulation: async () => {
                     const state = get();
-                    const key = `${state.mode}_${state.ticker}_${interval}_fixed`;
-
-                    if (state.simul[key]) return; // 이미 실행됨
-
-                    set((s) => ({ loadingSimul: { ...s.loadingSimul, [key]: true } }));
-
-                    await new Promise(resolve => setTimeout(resolve, 100));
-
-                    const data = state.hist[interval];
-                    if (!data || data.length === 0) {
-                        get().setGlobalError({
-                            title: '시뮬레이션 실패',
-                            description: `No data for interval ${interval}. Mode: ${state.mode}, Ticker: ${state.ticker}`
-                        });
-                        set((s) => ({ loadingSimul: { ...s.loadingSimul, [key]: false } }));
+                    const interval = state.activeInterval;
+                    if (!interval) {
+                        get().setGlobalError('간격을 먼저 선택해주세요.');
                         return;
                     }
 
-                    // 기본 전략: Standard
-                    const trades = generateTrades(data, 'standard');
+                    const options = state.strategyOptions;
+                    const data = state.hist[interval];
+                    if (!data || data.length === 0) {
+                        get().setGlobalError('데이터가 없습니다.');
+                        return;
+                    }
+
+                    // 1. 매매 기록 생성 (필터 적용)
+                    const { generateIntegratedTrades, calculateFixedQuantityResult, calculateCumulativeResult, calculateMartingaleResult } = await import('@/lib/dataProcessor');
+                    const trades = generateIntegratedTrades(data, options);
 
                     if (trades.length === 0) {
-                        // ... (Error handling omitted for brevity, logic remains same)
-                    }
-
-                    // Stock 수수료 등은 Config가 필요하지만, 현재 하드코딩된 값 사용. (추후 개선 포인트)
-                    const result = calculateFixedQuantityResult(trades);
-
-                    set((s) => ({
-                        simul: { ...s.simul, [key]: result },
-                        loadingSimul: { ...s.loadingSimul, [key]: false },
-                    }));
-                },
-
-                /**
-                 * 시뮬레이션 실행 (수량 고정 + BB)
-                 */
-                runFixedBBSimulation: async (interval) => {
-                    const state = get();
-                    const key = `${state.mode}_${state.ticker}_${interval}_fixed_bb`;
-
-                    if (state.simul[key]) return; // 이미 실행됨
-
-                    set((s) => ({ loadingSimul: { ...s.loadingSimul, [key]: true } }));
-
-                    await new Promise(resolve => setTimeout(resolve, 100));
-
-                    const data = state.hist[interval];
-                    if (!data || data.length === 0) {
-                        set((s) => ({ loadingSimul: { ...s.loadingSimul, [key]: false } }));
+                        get().setGlobalError('해당 조건으로 발생한 매매 내역이 없습니다.');
                         return;
                     }
 
-                    // 새로운 전략: Fixed Qty + BB
-                    const trades = generateTrades(data, 'fixedQtyBB');
-
-                    const result = calculateFixedQuantityResult(trades);
-
-                    set((s) => ({
-                        simul: { ...s.simul, [key]: result },
-                        loadingSimul: { ...s.loadingSimul, [key]: false },
-                    }));
-                },
-
-                /**
-                 * 시뮬레이션 실행 (수량 누적)
-                 */
-                runCumulativeSimulation: async (interval) => {
-                    const state = get();
-                    const key = `${state.mode}_${state.ticker}_${interval}_cumulative`;
-
-                    if (state.simul[key]) return;
-
-                    set((s) => ({ loadingSimul: { ...s.loadingSimul, [key]: true } }));
-
-                    await new Promise(resolve => setTimeout(resolve, 100));
-
-                    const data = state.hist[interval];
-                    if (!data || data.length === 0) {
-                        set((s) => ({ loadingSimul: { ...s.loadingSimul, [key]: false } }));
-                        return;
+                    // 2. 결과 계산 (자산 관리 방식 적용)
+                    let result;
+                    if (options.martingaleMultiplier > 1.0) {
+                        // 마틴게일
+                        result = calculateMartingaleResult(trades, options.baseQuantity, options.martingaleMultiplier);
+                    } else if (options.moneyManagement === 'cumulative') {
+                        // 누적 (복리)
+                        result = calculateCumulativeResult(trades, options.baseQuantity);
+                    } else {
+                        // 고정 (단리)
+                        result = calculateFixedQuantityResult(trades, options.baseQuantity);
                     }
 
-                    // 전략: Standard
-                    const trades = generateTrades(data, 'standard');
-                    // 결과 계산: Cumulative (복리)
-                    const result = calculateCumulativeResult(trades);
+                    // 3. 결과 저장 (Key 생성: strategy 기반)
+                    const key = `custom_${Date.now()}`; // 고유 키 사용하되 UI에서는 최신 결과 표시
+                    const resultWithMeta = {
+                        ...result,
+                        options: { ...options } // 당시 옵션 복사본 저장
+                    };
 
-                    set((s) => ({
-                        simul: { ...s.simul, [key]: result },
-                        loadingSimul: { ...s.loadingSimul, [key]: false },
-                    }));
-                },
-
-                /**
-                 * 시뮬레이션 실행 (수량 누적 + BB)
-                 */
-                runCumulativeBBSimulation: async (interval) => {
-                    const state = get();
-                    const key = `${state.mode}_${state.ticker}_${interval}_cumulative_bb`;
-
-                    if (state.simul[key]) return;
-
-                    set((s) => ({ loadingSimul: { ...s.loadingSimul, [key]: true } }));
-
-                    await new Promise(resolve => setTimeout(resolve, 100));
-
-                    const data = state.hist[interval];
-                    if (!data || data.length === 0) {
-                        set((s) => ({ loadingSimul: { ...s.loadingSimul, [key]: false } }));
-                        return;
-                    }
-
-                    // 전략: Fixed Qty + BB (로직 동일하므로 BB 조건 사용)
-                    const trades = generateTrades(data, 'fixedQtyBB');
-                    // 결과 계산: Cumulative (복리)
-                    const result = calculateCumulativeResult(trades);
-
-                    set((s) => ({
-                        simul: { ...s.simul, [key]: result },
-                        loadingSimul: { ...s.loadingSimul, [key]: false },
-                    }));
-                },
-
-                /**
-                 * 마틴게일 시뮬레이션 실행
-                 */
-                runMartingaleSimulation: async (interval, multiplier) => {
-                    const state = get();
-                    const key = `${state.mode}_${state.ticker}_${interval}_martingale_${multiplier}`;
-
-                    if (state.simul[key]) return;
-
-                    set((s) => ({ loadingSimul: { ...s.loadingSimul, [key]: true } }));
-
-                    await new Promise(resolve => setTimeout(resolve, 100));
-
-                    const data = state.hist[interval];
-                    const trades = generateTrades(data);
-                    const result = calculateMartingaleResult(trades, 100000, multiplier);
-
-                    set((s) => ({
-                        simul: { ...s.simul, [key]: result },
-                        loadingSimul: { ...s.loadingSimul, [key]: false },
+                    set(s => ({
+                        simul: { ...s.simul, [key]: resultWithMeta },
+                        selectedResult: { key, ...resultWithMeta }
                     }));
                 },
 
