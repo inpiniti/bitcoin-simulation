@@ -15,6 +15,19 @@ const INTERVALS = [
     { key: '5d', label: '5일', icon: CalendarDays },
     { key: '6d', label: '6일', icon: CalendarDays },
     { key: '1w', label: '1주', icon: CalendarRange },
+    { key: '8d', label: '8일', icon: CalendarDays },
+    { key: '9d', label: '9일', icon: CalendarDays },
+    { key: '10d', label: '10일', icon: CalendarDays },
+    { key: '11d', label: '11일', icon: CalendarDays },
+    { key: '12d', label: '12일', icon: CalendarDays },
+    { key: '13d', label: '13일', icon: CalendarDays },
+    { key: '14d', label: '14일', icon: CalendarDays },
+    { key: '15d', label: '15일', icon: CalendarDays },
+    { key: '16d', label: '16일', icon: CalendarDays },
+    { key: '17d', label: '17일', icon: CalendarDays },
+    { key: '18d', label: '18일', icon: CalendarDays },
+    { key: '19d', label: '19일', icon: CalendarDays },
+    { key: '20d', label: '20일', icon: CalendarDays },
 ]
 
 export function ActivityBar() {
