@@ -329,8 +329,10 @@ export function EditorArea() {
                                     {selectedResult.options.useBB && <span className="text-[10px] px-1.5 py-0.5 bg-[#0e639c] text-white rounded">BB필터</span>}
                                     {selectedResult.options.useTrend && <span className="text-[10px] px-1.5 py-0.5 bg-[#0e639c] text-white rounded">추세필터</span>}
                                     {selectedResult.options.useRSI && <span className="text-[10px] px-1.5 py-0.5 bg-[#0e639c] text-white rounded">RSI필터</span>}
+                                    {selectedResult.options.useVolumeFilter && <span className="text-[10px] px-1.5 py-0.5 bg-[#dcdcaa] text-black rounded font-bold">거래량필터</span>}
                                     {selectedResult.options.useStopLoss && <span className="text-[10px] px-1.5 py-0.5 bg-[#f14c4c] text-white rounded">손절({selectedResult.options.stopLossPcnt}%)</span>}
                                     {selectedResult.options.useTakeProfit && <span className="text-[10px] px-1.5 py-0.5 bg-[#4ec9b0] text-black rounded font-bold">익절({selectedResult.options.takeProfitPcnt}%)</span>}
+                                    {selectedResult.options.useTrailingStop && <span className="text-[10px] px-1.5 py-0.5 bg-[#ce9178] text-white rounded">추적손절({selectedResult.options.trailingStopPcnt}%)</span>}
                                     {selectedResult.options.martingaleMultiplier > 1.0 && <span className="text-[10px] px-1.5 py-0.5 bg-[#c586c0] text-white rounded">마틴({selectedResult.options.martingaleMultiplier}x)</span>}
                                 </div>
                             </div>

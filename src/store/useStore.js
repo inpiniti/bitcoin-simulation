@@ -79,10 +79,13 @@ export const useStore = create(
                     useBB: false,
                     useTrend: false,
                     useRSI: false,
+                    useVolumeFilter: false,
                     useStopLoss: false,
                     stopLossPcnt: -2.0,
                     useTakeProfit: false,
                     takeProfitPcnt: 5.0,
+                    useTrailingStop: false,
+                    trailingStopPcnt: -2.0,
                     martingaleMultiplier: 1.0, // 1.0 = No Martingale
                     baseQuantity: 100000,
                 },

@@ -170,12 +170,13 @@ export function calculateRSI(data, period = 14) {
 /**
  * MA (Moving Average) 계산
  */
-export function calculateMA(data, period = 50) {
+export function calculateMA(data, period = 50, key = 'close') {
     return data.map((item, index) => {
-        if (index < period - 1) return { ...item, [`ma${period}`]: undefined };
+        const targetKey = key === 'volume' ? 'vma' : 'ma';
+        if (index < period - 1) return { ...item, [`${targetKey}${period}`]: undefined };
         const slice = data.slice(index - period + 1, index + 1);
-        const sum = slice.reduce((acc, cur) => acc + (cur.close || cur.trade_price), 0);
-        return { ...item, [`ma${period}`]: sum / period };
+        const sum = slice.reduce((acc, cur) => acc + (cur[key] || 0), 0);
+        return { ...item, [`${targetKey}${period}`]: sum / period };
     });
 }
 
@@ -194,8 +195,9 @@ export function addDerivedData(data) {
     // 2. RSI (14)
     processed = calculateRSI(processed, 14);
 
-    // 3. MA (50)
-    processed = calculateMA(processed, 50);
+    // 3. MA (50) & Volume MA (20)
+    processed = calculateMA(processed, 50, 'close');
+    processed = calculateMA(processed, 20, 'volume');
 
     // 4. Bollinger Bands (20, 2)
     const period = 20;
@@ -241,15 +243,19 @@ export function generateIntegratedTrades(data, options = {}) {
         useBB = false,
         useTrend = false,
         useRSI = false,
+        useVolumeFilter = false, // 거래량 필터 추가
         useStopLoss = false,
         stopLossPcnt = -2.0,
         useTakeProfit = false,
-        takeProfitPcnt = 5.0
+        takeProfitPcnt = 5.0,
+        useTrailingStop = false, // 추적 손절매 추가
+        trailingStopPcnt = -2.0, // 고점 대비 하락폭
     } = options;
 
     const trades = [];
     let currentPosition = null;
     let buyRecord = null;
+    let highestPriceDuringTrade = 0; // 추적 손절매용 최고가 기록
 
     for (let i = 1; i < data.length; i++) {
         const prev = data[i - 1];
@@ -269,6 +275,7 @@ export function generateIntegratedTrades(data, options = {}) {
                 if (useBB && prev.bbStatus !== -2) buySignal = false;
                 if (useTrend && curr.ma50 && curr.close < curr.ma50) buySignal = false;
                 if (useRSI && curr.rsi !== undefined && curr.rsi > 70) buySignal = false;
+                if (useVolumeFilter && curr.vma20 && curr.volume < curr.vma20) buySignal = false; // 거래량 필터
             }
 
             if (buySignal) {
@@ -280,6 +287,7 @@ export function generateIntegratedTrades(data, options = {}) {
                     reason: 'Strategy Match'
                 };
                 currentPosition = 'long';
+                highestPriceDuringTrade = curr.close; // 진입 시 최고가 초기화
             }
         }
         // --- 매도/청산 판단 ---
@@ -287,9 +295,15 @@ export function generateIntegratedTrades(data, options = {}) {
             let sellSignal = (prevSign === 'positive' && currSign === 'negative');
             let sellReason = 'Slope Down';
 
-            // 강제 청산 (손절/익절) 체크
-            if (useStopLoss || useTakeProfit) {
+            // 보유 중 최고가 갱신 (추적 손절매용)
+            if (curr.high > highestPriceDuringTrade) {
+                highestPriceDuringTrade = curr.high;
+            }
+
+            // 강제 청산 (손절/익절/추적손절) 체크
+            if (useStopLoss || useTakeProfit || useTrailingStop) {
                 const currentProfitRate = ((curr.close - buyRecord.price) / buyRecord.price) * 100;
+                const dropFromPeakPcnt = ((curr.close - highestPriceDuringTrade) / highestPriceDuringTrade) * 100;
 
                 if (useStopLoss && currentProfitRate <= stopLossPcnt) {
                     sellSignal = true;
@@ -297,6 +311,10 @@ export function generateIntegratedTrades(data, options = {}) {
                 } else if (useTakeProfit && currentProfitRate >= takeProfitPcnt) {
                     sellSignal = true;
                     sellReason = `Take Profit (${takeProfitPcnt}%)`;
+                } else if (useTrailingStop && dropFromPeakPcnt <= trailingStopPcnt) {
+                    // 고점에서 일정 수준 하락 시 매도
+                    sellSignal = true;
+                    sellReason = `Trailing Stop (${trailingStopPcnt}%)`;
                 }
             }
 
