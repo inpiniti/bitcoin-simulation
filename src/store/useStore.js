@@ -48,6 +48,7 @@ export const useStore = create(
 
                 // Simulation results
                 simul: {},
+                dataCache: {}, // { [ticker]: { timestamp: number, data: array } }
 
                 // Loading states
                 loadingInterval: {},
@@ -142,8 +143,30 @@ export const useStore = create(
                     // API 부하 조절을 위해 순차 처리 (약간의 딜레이 포함 가능)
                     for (const stock of stocks) {
                         try {
-                            // 1. 데이터 조회 (최근 60일 데이터로 50일 확보)
-                            const rawData = await fetchStockShortData(stock.ticker);
+                            const now = Date.now();
+                            const today = new Date().toISOString().split('T')[0]; // "2024-01-05"
+
+                            let rawData;
+                            const cachedEntry = state.dataCache[stock.ticker];
+
+                            // 캐시 체크: 데이터가 존재하고, 저장된 날짜가 오늘과 같다면 캐시 사용
+                            if (cachedEntry && new Date(cachedEntry.timestamp).toISOString().split('T')[0] === today) {
+                                rawData = cachedEntry.data;
+                                console.log(`[Cache] Using cached data for ${stock.ticker}`);
+                            } else {
+                                // 1. 데이터 조회 (최근 60일 데이터로 50일 확보)
+                                rawData = await fetchStockShortData(stock.ticker);
+
+                                // 캐시 업데이트
+                                if (rawData && rawData.length > 0) {
+                                    set(s => ({
+                                        dataCache: {
+                                            ...s.dataCache,
+                                            [stock.ticker]: { timestamp: now, data: rawData }
+                                        }
+                                    }));
+                                }
+                            }
 
                             // 데이터가 너무 적으면 스킵
                             if (rawData.length < 20) {
@@ -565,6 +588,7 @@ export const useStore = create(
                     activeInterval: state.activeInterval,
                     dataViewMode: state.dataViewMode,
                     recommendedStocks: state.recommendedStocks,
+                    dataCache: state.dataCache,
                 }),
             }
         ),
