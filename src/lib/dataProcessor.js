@@ -26,29 +26,83 @@ export const TRADING_COSTS = {
 };
 
 /**
- * 1분봉 데이터를 특정 간격으로 변환
- * @param {Array} data1min - 1분봉 데이터 배열
- * @param {number} intervalMinutes - 변환할 간격 (분)
+ * 1분봉 데이터를 특정 간격으로 변환 (Sliding Window 방식)
+ * @param {Array} data1min - 데이터 배열 (1분봉 또는 일봉)
+ * @param {number} intervalMinutes - 윈도우 크기 (아이템 개수 단위)
  * @returns {Array} 변환된 데이터
  */
 export function aggregateToInterval(data1min, intervalMinutes) {
-    if (intervalMinutes === 1) return data1min;
+    // 윈도우 크기가 1이면 원본 반환
+    if (intervalMinutes <= 1) return data1min;
 
     const result = [];
-    for (let i = 0; i < data1min.length; i += intervalMinutes) {
-        const chunk = data1min.slice(i, i + intervalMinutes);
-        if (chunk.length === 0) continue;
+    const len = data1min.length;
+
+    // Performance Guard: 윈도우가 너무 크면 High/Low 계산 단순화 (120개 이상)
+    const simplifyHighLow = intervalMinutes > 120;
+
+    // 초기 볼륨 계산 (첫 윈도우)
+    let currentVolume = 0;
+    // 윈도우 크기가 데이터보다 크면 처리 불가, 빈 배열 반환
+    if (len < intervalMinutes) return result;
+
+    for (let j = 0; j < intervalMinutes; j++) {
+        const c = data1min[j];
+        currentVolume += (c.candle_acc_trade_volume || c.volume || 0);
+    }
+
+    // Sliding Window Loop (Stride = 1)
+    // i는 윈도우의 시작 인덱스
+    // 윈도우 범위: [i, i + intervalMinutes - 1]
+    for (let i = 0; i <= len - intervalMinutes; i++) {
+        const startIdx = i;
+        const endIdx = i + intervalMinutes - 1;
+
+        const first = data1min[startIdx];
+        const last = data1min[endIdx];
+
+        // 업데이트된 볼륨 (첫 번째 루프 제외하고 갱신)
+        if (i > 0) {
+            const outItem = data1min[i - 1];
+            currentVolume -= (outItem.candle_acc_trade_volume || outItem.volume || 0);
+            currentVolume += (last.candle_acc_trade_volume || last.volume || 0);
+        }
+
+        // High/Low 계산
+        let high, low;
+        if (simplifyHighLow) {
+            // 성능을 위해 Open/Close 중 큰/작은 값 사용
+            const o = first.opening_price || first.open;
+            const c = last.trade_price || last.close;
+            high = Math.max(o, c);
+            low = Math.min(o, c);
+        } else {
+            // 정밀 계산 (부분 배열 순회)
+            // 성능 최적화를 위해 slice 없이 직접 루프
+            let maxVal = -Infinity;
+            let minVal = Infinity;
+            for (let k = startIdx; k <= endIdx; k++) {
+                const item = data1min[k];
+                const h = item.high_price || item.high;
+                const l = item.low_price || item.low;
+                if (h > maxVal) maxVal = h;
+                if (l < minVal) minVal = l;
+            }
+            high = maxVal;
+            low = minVal;
+        }
 
         const aggregated = {
-            timestamp: chunk[0].timestamp || chunk[0].candle_date_time_kst,
-            open: chunk[0].opening_price || chunk[0].open,
-            high: Math.max(...chunk.map(c => c.high_price || c.high)),
-            low: Math.min(...chunk.map(c => c.low_price || c.low)),
-            close: chunk[chunk.length - 1].trade_price || chunk[chunk.length - 1].close,
-            volume: chunk.reduce((sum, c) => sum + (c.candle_acc_trade_volume || c.volume || 0), 0),
+            timestamp: last.timestamp || last.candle_date_time_kst, // 캔들 완성 시점 (End Time)
+            open: first.opening_price || first.open,
+            high: high,
+            low: low,
+            close: last.trade_price || last.close,
+            volume: currentVolume,
         };
         result.push(aggregated);
     }
+
     return result;
 }
 
