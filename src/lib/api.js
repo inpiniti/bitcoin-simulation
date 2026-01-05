@@ -158,3 +158,67 @@ export async function fetchRecommendedTickers() {
     const json = await response.json();
     return json.stocks || [];
 }
+
+/**
+ * 야후 파이낸스에서 종목 관련 뉴스 헤드라인 수집
+ */
+export async function fetchStockNews(ticker) {
+    try {
+        const formattedTicker = ticker.replace('.', '-');
+        const url = `/api/yahoo/v1/finance/search?q=${formattedTicker}&quotesCount=1&newsCount=5`;
+        const response = await fetch(url);
+        if (!response.ok) return [];
+
+        const data = await response.json();
+        return (data.news || []).map(item => item.title);
+    } catch (err) {
+        console.error('Fetch News Error:', err);
+        return [];
+    }
+}
+
+/**
+ * Hugging Face FinBERT를 이용한 텍스트 감성 분석
+ * 점수: -1 (부정) ~ 1 (긍정)
+ */
+export async function getSentimentScore(textList) {
+    if (!textList || textList.length === 0) return 0;
+
+    try {
+        const text = textList.join(". ");
+
+        // Hugging Face Inference API (ProsusAI/finbert)
+        const hfToken = import.meta.env.VITE_HF_TOKEN;
+        const headers = { "Content-Type": "application/json" };
+
+        // 토큰이 있을 경우에만 헤더에 추가
+        if (hfToken) {
+            headers["Authorization"] = `Bearer ${hfToken}`;
+        }
+
+        const response = await fetch(
+            "https://api-inference.huggingface.co/models/ProsusAI/finbert",
+            {
+                method: "POST",
+                headers: headers,
+                body: JSON.stringify({ inputs: text }),
+            }
+        );
+
+        if (!response.ok) return 0;
+
+        const result = await response.json();
+
+        // FinBERT 결과 구조: [[{ label: 'positive', score: 0.9 }, ...]]
+        const scores = result[0];
+        if (!scores) return 0;
+
+        const pos = scores.find(s => s.label === 'positive')?.score || 0;
+        const neg = scores.find(s => s.label === 'negative')?.score || 0;
+
+        return pos - neg;
+    } catch (err) {
+        console.error('Sentiment Analysis Error:', err);
+        return 0;
+    }
+}

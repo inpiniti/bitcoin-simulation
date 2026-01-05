@@ -55,6 +55,7 @@ export function AnalysisPanel() {
                             <TableHead className="text-[#9d9d9d] w-[100px]">Signal</TableHead>
                             <TableHead className="text-[#9d9d9d] text-right">Price</TableHead>
                             <TableHead className="text-[#9d9d9d] text-right">Change (24h)</TableHead>
+                            <TableHead className="text-[#9d9d9d] text-center w-[120px]">AI Sentiment</TableHead>
                             <TableHead className="text-[#9d9d9d]">Reason / Status</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -84,6 +85,17 @@ export function AnalysisPanel() {
                                 </TableCell>
                                 <TableCell className={`text-right font-mono font-medium ${item.changeRate > 0 ? 'text-[#f23645]' : item.changeRate < 0 ? 'text-[#089981]' : 'text-[#9d9d9d]'}`}>
                                     {item.changeRate ? `${item.changeRate > 0 ? '+' : ''}${item.changeRate.toFixed(2)}%` : '-'}
+                                </TableCell>
+                                <TableCell className="text-center">
+                                    <div className="flex flex-col items-center gap-0.5">
+                                        <span className={`text-[11px] font-bold ${item.sentiment > 0.2 ? 'text-[#089981]' : item.sentiment < -0.2 ? 'text-[#f23645]' : 'text-[#9d9d9d]'}`}>
+                                            {item.sentiment > 0.2 ? '🟢 ' : item.sentiment < -0.2 ? '🔴 ' : '⚪ '}
+                                            {item.sentiment ? item.sentiment.toFixed(2) : '0.00'}
+                                        </span>
+                                        {item.news && item.news.length > 0 && (
+                                            <span className="text-[8px] text-[#555] opacity-50">News analyzed</span>
+                                        )}
+                                    </div>
                                 </TableCell>
                                 <TableCell className="text-[#9d9d9d] text-xs">
                                     {item.reason}

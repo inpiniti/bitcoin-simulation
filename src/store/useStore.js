@@ -1,8 +1,8 @@
 import { create } from 'zustand'
 import { devtools, persist, createJSONStorage } from 'zustand/middleware'
 import { get as idbGet, set as idbSet, del as idbDel } from 'idb-keyval'
-import { fetchOneYearData, fetchStockOneYearData, fetchStockShortData } from '@/lib/api'
-import { aggregateToInterval, addSlopeData, generateTrades, calculateFixedQuantityResult, calculateCumulativeResult, calculateMartingaleResult, analyzeSignal, INTERVALS } from '@/lib/dataProcessor'
+import { fetchOneYearData, fetchStockOneYearData, fetchStockShortData, fetchStockNews, getSentimentScore } from '@/lib/api'
+import { aggregateToInterval, addSlopeData, generateTrades, calculateFixedQuantityResult, calculateCumulativeResult, calculateMartingaleResult, analyzeSignal, INTERVALS, addDerivedData } from '@/lib/dataProcessor'
 
 // ... (existing code)
 
@@ -165,6 +165,10 @@ export const useStore = create(
                             // 4. 신호 분석 (마지막 캔들 기준)
                             const analysis = analyzeSignal(dataWithSlope, options);
 
+                            // 5. AI 감성 분석 (News + FinBERT)
+                            const newsHeadlines = await fetchStockNews(stock.ticker);
+                            const sentimentScore = await getSentimentScore(newsHeadlines);
+
                             const lastCandle = dataWithSlope[dataWithSlope.length - 1];
                             const prevCandle = dataWithSlope[dataWithSlope.length - 2];
 
@@ -182,6 +186,8 @@ export const useStore = create(
                                 changeRate: changeRate,
                                 slope: lastCandle.slope,
                                 bbStatus: lastCandle.bbStatus,
+                                sentiment: sentimentScore,
+                                news: newsHeadlines,
                                 timestamp: lastCandle.timestamp
                             });
 
