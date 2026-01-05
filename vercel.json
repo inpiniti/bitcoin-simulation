@@ -7,6 +7,10 @@
         {
             "source": "/api/dataroma",
             "destination": "/api/dataroma"
+        },
+        {
+            "source": "/api/hf",
+            "destination": "/api/hf"
         }
     ]
 }

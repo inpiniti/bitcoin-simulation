@@ -178,7 +178,7 @@ export async function fetchStockNews(ticker) {
 }
 
 /**
- * Hugging Face FinBERT를 이용한 텍스트 감성 분석
+ * Hugging Face FinBERT를 이용한 텍스트 감성 분석 (Proxy 이용)
  * 점수: -1 (부정) ~ 1 (긍정)
  */
 export async function getSentimentScore(textList) {
@@ -187,23 +187,16 @@ export async function getSentimentScore(textList) {
     try {
         const text = textList.join(". ");
 
-        // Hugging Face Inference API (ProsusAI/finbert)
-        const hfToken = import.meta.env.VITE_HF_TOKEN;
-        const headers = { "Content-Type": "application/json" };
-
-        // 토큰이 있을 경우에만 헤더에 추가
-        if (hfToken) {
-            headers["Authorization"] = `Bearer ${hfToken}`;
-        }
-
-        const response = await fetch(
-            "https://api-inference.huggingface.co/models/ProsusAI/finbert",
-            {
-                method: "POST",
-                headers: headers,
-                body: JSON.stringify({ inputs: text }),
-            }
-        );
+        // 브라우저에서 직접 호출하지 않고, 내부 프록시(/api/hf)를 거쳐 호출합니다.
+        // 이를 통해 API 토큰 노출을 방지하고 CORS 문제를 해결합니다.
+        const response = await fetch("/api/hf", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                inputs: text,
+                model: "ProsusAI/finbert"
+            }),
+        });
 
         if (!response.ok) return 0;
 
