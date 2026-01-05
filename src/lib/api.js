@@ -134,7 +134,7 @@ export async function fetchStockShortData(ticker) {
 
 
 /**
- * Dataroma 크롤링 API를 통해 추천 종목 리스트 조회 (자산가 10인 이상)
+ * Dataroma 크롤링 API를 통해 추천 종목 리스트 조회 (자산가 5인 이상)
  * @returns {Promise<Array>} { ticker, name, count } 배열
  */
 export async function fetchRecommendedTickers() {

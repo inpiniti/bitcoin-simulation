@@ -31,7 +31,7 @@ export default defineConfig({
               const name = $(tds[1]).text().trim();
               const count = parseInt($(tds[3]).text().trim(), 10);
 
-              if (ticker && !isNaN(count) && count >= 10) {
+              if (ticker && !isNaN(count) && count >= 5) {
                 stocks.push({ ticker, name, count });
               }
             });

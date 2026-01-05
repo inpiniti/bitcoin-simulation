@@ -68,6 +68,7 @@ export const useStore = create(
 
                 // Recommended Stocks (DataRoma)
                 recommendedStocks: [],
+                lastRecommendedFetch: 0, // 마지막 호출 시간 (ms)
                 loadingRecommendations: false,
 
                 // Global Error State (for AlertDialog)
@@ -243,22 +244,31 @@ export const useStore = create(
                 },
 
                 /**
-                 * 추천 종목 로드
+                 * 추천 종목 로드 (24시간 캐시 적용)
                  */
                 loadRecommendedTickers: async () => {
                     const state = get();
-                    // 이미 로드되었으면 스킵
-                    if (state.recommendedStocks.length > 0) return;
+                    const now = Date.now();
+                    const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
+
+                    // 데이터가 있고 24시간이 지나지 않았으면 스킵
+                    if (state.recommendedStocks.length > 0 && (now - state.lastRecommendedFetch < TWENTY_FOUR_HOURS)) {
+                        console.log('[Cache] Using local recommended stocks (within 24h)');
+                        return;
+                    }
 
                     set({ loadingRecommendations: true });
                     try {
                         const { fetchRecommendedTickers } = await import('@/lib/api');
                         const stocks = await fetchRecommendedTickers();
-                        set({ recommendedStocks: stocks, loadingRecommendations: false });
+                        set({
+                            recommendedStocks: stocks,
+                            lastRecommendedFetch: now,
+                            loadingRecommendations: false
+                        });
                     } catch (error) {
                         console.error('Failed to load recommended tickers:', error);
                         set({ loadingRecommendations: false });
-                        // 실패해도 에러를 띄우지 않고 빈 배열 유지 (Input 사용 가능하게)
                     }
                 },
 
@@ -573,6 +583,8 @@ export const useStore = create(
                     activeInterval: null,
                     selectedResult: null,
                     fetchProgress: { current: 0, total: 0 },
+                    recommendedStocks: [],
+                    lastRecommendedFetch: 0,
                 }),
             }),
             {
@@ -588,6 +600,7 @@ export const useStore = create(
                     activeInterval: state.activeInterval,
                     dataViewMode: state.dataViewMode,
                     recommendedStocks: state.recommendedStocks,
+                    lastRecommendedFetch: state.lastRecommendedFetch,
                     dataCache: state.dataCache,
                 }),
             }

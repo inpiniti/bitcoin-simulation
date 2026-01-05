@@ -44,6 +44,11 @@ export default async function handler(request, response) {
         }
 
         const data = await apiResponse.json();
+
+        // CDN 캐시 설정: 1시간 캐시, 24시간까지 백그라운드 갱신
+        // 주식 일봉 데이터는 하루에 한 번 크게 변하므로 1시간 정도의 캐시는 합리적임
+        response.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate=86400');
+
         response.status(200).json(data);
     } catch (error) {
         console.error('Yahoo Proxy Error:', error);

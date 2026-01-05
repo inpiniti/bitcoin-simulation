@@ -135,10 +135,8 @@ export function TitleBar() {
                                 onKeyDown={handleTickerSubmit}
                                 onBlur={handleTickerBlur}
                                 onFocus={(e) => {
-                                    // 포커스 시 추천 리스트 로드 (Lazy Load)
-                                    if (recommendedStocks.length === 0) {
-                                        loadRecommendedTickers();
-                                    }
+                                    // 포커스 시 추천 리스트 로드 및 갱신
+                                    loadRecommendedTickers();
                                 }}
                                 placeholder="AAPL"
                             />

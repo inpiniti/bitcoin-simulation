@@ -50,15 +50,17 @@ export default async function handler(request, response) {
             const count = parseInt(countText, 10);
 
             if (ticker && !isNaN(count)) {
-                // 조건: 자산가 10명 이상
-                if (count >= 10) {
+                // 조건: 자산가 5명 이상
+                if (count >= 5) {
                     stocks.push({ ticker, name, count });
                 }
             }
         });
 
-        console.log(`[Dataroma] Found ${stocks.length} stocks with >= 10 holders.`);
+        console.log(`[Dataroma] Found ${stocks.length} stocks with >= 5 holders.`);
 
+        // CDN 캐시 설정: 1시간 캐시, 24시간까지 백그라운드 갱신
+        response.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate=86400');
         response.status(200).json({ stocks });
     } catch (error) {
         console.error('Dataroma Proxy Error:', error);

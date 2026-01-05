@@ -67,6 +67,9 @@
         *   주식은 **일봉(1 Day) 데이터**를 기본으로 사용.
         *   데이터 호환성을 위해 `close` 데이터를 `trade_price`로 매핑하여 저장.
     *   **자동 트리거**: 자산 모드(Coin/Stock) 또는 티커 변경 시, 해당 자산의 기본 데이터(Coin: 1분봉, Stock: 1일봉)를 자동으로 조회합니다.
+    *   **API 호출 최적화 (Caching)**: 
+        *   **브라우저 캐시**: `IndexedDB`를 통해 로드된 데이터를 영속적으로 저장 (Zustand Persist).
+        *   **Vercel CDN 캐시**: Serverless Function(`api/yahoo.js`, `api/dataroma.js`)에 **Shared Cache Control**(S-Maxage)을 적용. 1시간 동안 캐시하며, 백그라운드에서 최신 데이터를 갱신(Stale-While-Revalidate)하여 외부 API 호출 제한을 방지하고 응답 속도를 극대화함.
 
 2.  **간격별 데이터 생성 (Aggregation - Sliding Window)**
     *   기존의 비중복 구간 방식(1~3, 4~6)에서 **슬라이딩 윈도우 방식(Moving Window)**으로 변경되었습니다. (User Request)
@@ -151,7 +154,7 @@
 *   **자산 토글 (Toggle)**: `Coin` / `Stock` 선택. 변경 시 확인 팝업 후 데이터 초기화.
 *   **스마트 티커 선택 (Smart Ticker Selection)**:
     *   기본적으로 직접 입력 가능.
-    *   **추천 모드**: Dataroma 크롤링을 통해 **슈퍼인베스터 10인 이상**이 보유한 우량 종목 리스트를 제공.
+    *   **추천 모드**: Dataroma 크롤링을 통해 **슈퍼인베스터 5인 이상**이 보유한 우량 종목 리스트를 제공.
     *   UI: 콤보박스 (Select + Input) 형태.
 *   **데이터 보기 (Data View Toggle)**: 시뮬레이션 UI ↔ 데이터 테이블 UI 전환.
     *   **ON**: 중앙 영역이 날짜별 상세 데이터 테이블로 변경됨.
@@ -206,7 +209,6 @@
 | **데이터** | 1분봉 정밀 데이터 | 1일봉(Daily) 데이터 |
 | **통화** | KRW | USD (현재 수치는 원화로 가정하고 시뮬레이션) |
 
-#### 향후 과제
 *   **Time-Gap 처리**: 주식의 장 시작(Open) 시 갭상승/하락을 별도 로직으로 처리 필요.
 *   **환율 연동**: USD 주식 거래 시 환율 변동성 반영.
 
