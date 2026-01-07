@@ -34,6 +34,7 @@ function CustomTooltip({ active, payload, label }) {
 
     const data = payload[0]?.payload
     const isPrediction = data?.type === 'prediction'
+    const price = isPrediction ? data?.predictionPrice : data?.price
 
     return (
         <div className="bg-[#252526] border border-[#3c3c3c] p-3 rounded-lg shadow-lg">
@@ -42,7 +43,7 @@ function CustomTooltip({ active, payload, label }) {
                 "text-lg font-mono font-bold",
                 isPrediction ? "text-[#9cdcfe]" : "text-[#4fc1ff]"
             )}>
-                ${data?.price?.toFixed(2)}
+                ${price?.toFixed(2)}
             </p>
             {isPrediction && (
                 <p className="text-[10px] text-[#ce9178] mt-1">AI 예측 (TimesFM)</p>

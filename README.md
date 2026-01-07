@@ -153,7 +153,7 @@
 #### 상단 컨트롤 (Top Controls)
 *   **자산 토글 (Toggle)**: `Coin` / `Stock` 선택. 변경 시 확인 팝업 후 데이터 초기화.
 *   **스마트 티커 선택 (Smart Ticker Selection)**:
-    *   기본적으로 직접 입력 가능.
+    *   기본적으로 직접 입력 가능 (Enter 키 입력 시 변경 확인 팝업).
     *   **추천 모드**: Dataroma 크롤링을 통해 **슈퍼인베스터 5인 이상**이 보유한 우량 종목 리스트를 제공.
     *   UI: 콤보박스 (Select + Input) 형태.
 *   **데이터 보기 (Data View Toggle)**: 시뮬레이션 UI ↔ 데이터 테이블 UI 전환.

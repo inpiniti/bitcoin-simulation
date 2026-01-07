@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils"
 import { useStore } from "@/store/useStore"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import {
     AlertDialog,
     AlertDialogAction,
@@ -20,26 +20,32 @@ export function TitleBar() {
         analysisMode, setAnalysisMode, runMarketAnalysis, isAnalyzing
     } = useStore()
     const [localTicker, setLocalTicker] = useState(ticker)
+    const skipBlurRef = useRef(false)
 
     // 로컬 Alert 상태 관리
     const [alertConfig, setAlertConfig] = useState({
         open: false,
         title: "",
         description: "",
-        onConfirm: () => { }
+        onConfirm: () => { },
+        onCancel: () => { }
     })
 
     useEffect(() => {
         setLocalTicker(ticker)
     }, [ticker])
 
-    const openAlert = (title, description, onConfirm) => {
+    const openAlert = (title, description, onConfirm, onCancel = null) => {
         setAlertConfig({
             open: true,
             title,
             description,
             onConfirm: () => {
                 onConfirm()
+                setAlertConfig(prev => ({ ...prev, open: false }))
+            },
+            onCancel: () => {
+                if (onCancel) onCancel()
                 setAlertConfig(prev => ({ ...prev, open: false }))
             }
         })
@@ -57,11 +63,22 @@ export function TitleBar() {
 
     const handleTickerSubmit = (e) => {
         if (e.key === 'Enter') {
+            if (e.nativeEvent.isComposing) return;
+            e.preventDefault();
+
             if (localTicker !== ticker) {
+                skipBlurRef.current = true
                 openAlert(
                     "종목 변경",
                     `종목을 '${localTicker}'(으)로 변경하시겠습니까? 데이터가 초기화됩니다.`,
-                    () => setTicker(localTicker)
+                    () => {
+                        setTicker(localTicker)
+                        skipBlurRef.current = false
+                    },
+                    () => {
+                        setLocalTicker(ticker)
+                        skipBlurRef.current = false
+                    }
                 )
             }
         }
@@ -69,7 +86,8 @@ export function TitleBar() {
 
     const handleTickerBlur = () => {
         // Blur 시에는 변경 확정 없이 원래대로 되돌림 (혹은 Submit 유도)
-        // 여기선 그냥 원래 Ticker로 리셋만 (Confirm 없이)
+        if (skipBlurRef.current) return;
+
         if (localTicker !== ticker) {
             setLocalTicker(ticker)
         }
@@ -255,7 +273,7 @@ export function TitleBar() {
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel>취소</AlertDialogCancel>
+                        <AlertDialogCancel onClick={alertConfig.onCancel}>취소</AlertDialogCancel>
                         <AlertDialogAction onClick={alertConfig.onConfirm}>확인</AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
