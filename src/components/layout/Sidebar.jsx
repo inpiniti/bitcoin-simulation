@@ -66,7 +66,8 @@ export function Sidebar() {
                     <div className="space-y-2">
                         {[
                             { id: 'useBB', label: '볼린저 밴드 (BB -2)', desc: '하단 이탈 시 매수' },
-                            { id: 'useTrend', label: '추세 필터 (MA50)', desc: '정배열(MA위)일 때만 매수' },
+                            { id: 'useTrend', label: '추세 필터 (MA50)', desc: '장기 추세 위일 때 매수' },
+                            { id: 'useTrend20', label: '추세 필터 (MA20)', desc: '단기 추세 위일 때 매수' },
                             { id: 'useRSI', label: 'RSI 필터 (70미만)', desc: '과매수 시 매수 금지' },
                             { id: 'useVolumeFilter', label: '거래량 필터', desc: '평균(VMA20) 이상 시 매수' },
                             { id: 'useStopLoss', label: '손절매 (-2%)', desc: '도달 시 즉시 손절' },

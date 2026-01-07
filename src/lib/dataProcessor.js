@@ -195,8 +195,9 @@ export function addDerivedData(data) {
     // 2. RSI (14)
     processed = calculateRSI(processed, 14);
 
-    // 3. MA (50) & Volume MA (20)
+    // 3. MA (50), MA (20) & Volume MA (20)
     processed = calculateMA(processed, 50, 'close');
+    processed = calculateMA(processed, 20, 'close');
     processed = calculateMA(processed, 20, 'volume');
 
     // 4. Bollinger Bands (20, 2)
@@ -242,6 +243,7 @@ export function generateIntegratedTrades(data, options = {}) {
     const {
         useBB = false,
         useTrend = false,
+        useTrend20 = false, // MA20 추세 필터 추가
         useRSI = false,
         useVolumeFilter = false, // 거래량 필터 추가
         useStopLoss = false,
@@ -274,6 +276,7 @@ export function generateIntegratedTrades(data, options = {}) {
                 // 필터 체크
                 if (useBB && prev.bbStatus !== -2) buySignal = false;
                 if (useTrend && curr.ma50 && curr.close < curr.ma50) buySignal = false;
+                if (useTrend20 && curr.ma20 && curr.close < curr.ma20) buySignal = false; // MA20 필터
                 if (useRSI && curr.rsi !== undefined && curr.rsi > 70) buySignal = false;
                 if (useVolumeFilter && curr.vma20 && curr.volume < curr.vma20) buySignal = false; // 거래량 필터
             }
@@ -665,6 +668,7 @@ export function analyzeSignal(dataWithSlope, options = {}) {
     const {
         useBB = false,
         useTrend = false,
+        useTrend20 = false,
         useRSI = false,
         useVolumeFilter = false
     } = options;
@@ -693,7 +697,8 @@ export function analyzeSignal(dataWithSlope, options = {}) {
         // 필터 체크
         const failures = [];
         if (useBB && prev.bbStatus !== -2) failures.push('BB');
-        if (useTrend && curr.ma50 && curr.close < curr.ma50) failures.push('Trend');
+        if (useTrend && curr.ma50 && curr.close < curr.ma50) failures.push('Trend(50)');
+        if (useTrend20 && curr.ma20 && curr.close < curr.ma20) failures.push('Trend(20)');
         if (useRSI && curr.rsi !== undefined && curr.rsi > 70) failures.push('RSI');
         if (useVolumeFilter && curr.vma20 && curr.volume < curr.vma20) failures.push('Volume');
 

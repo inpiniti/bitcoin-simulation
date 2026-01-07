@@ -80,6 +80,7 @@ export const useStore = create(
                     isCompound: false,        // 단리/복리 (cumulative일 때 의미있음) 
                     useBB: false,
                     useTrend: false,
+                    useTrend20: false,        // MA20 추세 필터
                     useRSI: false,
                     useVolumeFilter: false,
                     useStopLoss: false,
