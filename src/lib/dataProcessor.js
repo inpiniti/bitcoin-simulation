@@ -252,6 +252,7 @@ export function generateIntegratedTrades(data, options = {}) {
         takeProfitPcnt = 5.0,
         useTrailingStop = false, // 추적 손절매 추가
         trailingStopPcnt = -2.0, // 고점 대비 하락폭
+        useSellAtBB2 = false,    // BB 상단(2) 도달 매도 추가
     } = options;
 
     const trades = [];
@@ -301,6 +302,12 @@ export function generateIntegratedTrades(data, options = {}) {
             // 보유 중 최고가 갱신 (추적 손절매용)
             if (curr.high > highestPriceDuringTrade) {
                 highestPriceDuringTrade = curr.high;
+            }
+
+            // BB 상단 매도 전략 (직전 캔들이 BB +2 이상일 때)
+            if (useSellAtBB2 && prev.bbStatus >= 2) {
+                sellSignal = true;
+                sellReason = 'BB Upper Break (+2)';
             }
 
             // 강제 청산 (손절/익절/추적손절) 체크
@@ -670,7 +677,7 @@ export function analyzeSignal(dataWithSlope, options = {}) {
         useTrend = false,
         useTrend20 = false,
         useRSI = false,
-        useVolumeFilter = false
+        useSellAtBB2 = false
     } = options;
 
     if (!dataWithSlope || dataWithSlope.length < 2) {
@@ -712,7 +719,13 @@ export function analyzeSignal(dataWithSlope, options = {}) {
 
     if (buySignal) return { signal: 'BUY', reason: buyReason };
 
-    // 2. 매도 신호 판단 (기울기 음전)
+    // 2. 매도 신호 판단
+    // 2-1. BB 상단 매도 (Scanner에서는 '현재' 상태가 2이면 매도 기회로 봄)
+    if (useSellAtBB2 && curr.bbStatus >= 2) {
+        return { signal: 'SELL', reason: 'BB Upper Break' };
+    }
+
+    // 2-2. 기울기 음전
     if (prevSign === 'positive' && currSign === 'negative') {
         return { signal: 'SELL', reason: 'Slope Down' };
     }

@@ -98,10 +98,43 @@ export function Sidebar() {
                     </div>
                 </section>
 
-                {/* 3. 마틴게일 */}
+                {/* 3. 매도 전략 */}
+                <section className="space-y-3">
+                    <h3 className="text-[12px] font-bold text-[#cccccc] flex items-center gap-2">
+                        <TrendingUp className="w-3.5 h-3.5" /> 매도 전략
+                    </h3>
+                    <div className="space-y-2">
+                        {[
+                            { id: 'useSellAtBB2', label: 'BB 상단 매도', desc: '직전 캔들 BB +2(상단) 도달 시 매도' },
+                        ].map(item => (
+                            <label key={item.id} className="flex items-center gap-3 group cursor-pointer">
+                                <div className="relative flex items-center">
+                                    <input
+                                        type="checkbox"
+                                        checked={strategyOptions[item.id]}
+                                        onChange={(e) => handleOptionChange(item.id, e.target.checked)}
+                                        className="sr-only"
+                                    />
+                                    <div className={cn(
+                                        "w-4 h-4 rounded border transition-colors flex items-center justify-center",
+                                        strategyOptions[item.id] ? "bg-[#ce9178] border-[#ce9178]" : "border-[#555555] group-hover:border-[#777777]"
+                                    )}>
+                                        {strategyOptions[item.id] && <div className="w-2 h-2 bg-white rounded-sm" />}
+                                    </div>
+                                </div>
+                                <div className="flex flex-col">
+                                    <span className="text-[13px] text-[#cccccc]">{item.label}</span>
+                                    <span className="text-[10px] text-[#666666]">{item.desc}</span>
+                                </div>
+                            </label>
+                        ))}
+                    </div>
+                </section>
+
+                {/* 4. 마틴게일 */}
                 <section className="space-y-2">
                     <h3 className="text-[12px] font-bold text-[#cccccc] flex items-center gap-2">
-                        <TrendingUp className="w-3.5 h-3.5" /> 마틴게일 배율
+                        <Coins className="w-3.5 h-3.5" /> 마틴게일 배율
                     </h3>
                     <select
                         value={strategyOptions.martingaleMultiplier}

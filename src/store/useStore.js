@@ -89,6 +89,7 @@ export const useStore = create(
                     takeProfitPcnt: 5.0,
                     useTrailingStop: false,
                     trailingStopPcnt: -2.0,
+                    useSellAtBB2: false,       // BB 상단(2) 도달 시 매도
                     martingaleMultiplier: 1.0, // 1.0 = No Martingale
                     baseQuantity: 100000,
                 },
