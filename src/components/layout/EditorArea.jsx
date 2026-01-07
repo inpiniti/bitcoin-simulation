@@ -11,7 +11,8 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table"
-import { FileCode, X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react"
+import { FileCode, X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, LineChart as LineChartIcon, TableIcon } from "lucide-react"
+import { ChartView } from "../ChartView"
 
 // 페이지당 거래 수
 const ITEMS_PER_PAGE = 50
@@ -43,6 +44,7 @@ import { AnalysisPanel } from "../AnalysisPanel"
 export function EditorArea() {
     const { selectedResult, setSelectedResult, dataViewMode, hist, activeInterval, analysisMode } = useStore()
     const [currentPage, setCurrentPage] = useState(1)
+    const [viewType, setViewType] = useState('table') // 'table' | 'chart'
 
     // 페이지네이션 초기화 (간격, 결과 모드, 데이터 뷰 모드 변경 시)
     useEffect(() => {
@@ -68,6 +70,41 @@ export function EditorArea() {
                             좌측 Activity Bar에서 간격을 선택해주세요.
                         </p>
                     </div>
+                </div>
+            )
+        }
+
+        // 차트 모드일 경우 ChartView 렌더링
+        if (viewType === 'chart') {
+            return (
+                <div className="flex-1 bg-[#1e1e1e] flex flex-col">
+                    {/* View Toggle Header */}
+                    <div className="h-9 bg-[#252526] flex items-center border-b border-[#3c3c3c] px-4 justify-between">
+                        <div className="flex items-center gap-2 text-[13px] text-[#cccccc]">
+                            <LineChartIcon className="w-4 h-4 text-[#4fc1ff]" />
+                            <span>CHART VIEW: {activeInterval} ({data.length.toLocaleString()} rows)</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setViewType('table')}
+                                className="h-7 px-2 text-xs text-[#888888] hover:text-[#cccccc]"
+                            >
+                                <TableIcon className="w-3.5 h-3.5 mr-1" />
+                                테이블
+                            </Button>
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                className="h-7 px-2 text-xs bg-[#0e639c] text-white"
+                            >
+                                <LineChartIcon className="w-3.5 h-3.5 mr-1" />
+                                차트
+                            </Button>
+                        </div>
+                    </div>
+                    <ChartView />
                 </div>
             )
         }
@@ -99,6 +136,25 @@ export function EditorArea() {
                     <div className="flex items-center gap-2 text-[13px] text-[#cccccc]">
                         <FileCode className="w-4 h-4 text-blue-500" />
                         <span>DATA VIEW: {activeInterval} ({totalItems.toLocaleString()} rows)</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            className="h-7 px-2 text-xs bg-[#0e639c] text-white"
+                        >
+                            <TableIcon className="w-3.5 h-3.5 mr-1" />
+                            테이블
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setViewType('chart')}
+                            className="h-7 px-2 text-xs text-[#888888] hover:text-[#cccccc]"
+                        >
+                            <LineChartIcon className="w-3.5 h-3.5 mr-1" />
+                            차트
+                        </Button>
                     </div>
                 </div>
 

@@ -173,12 +173,20 @@
 #### 시뮬레이션 버튼 (Simulation Buttons)
 *   클릭 시 선택된 전략(Fixed, Martingale)으로 시뮬레이션 실행 및 결과 저장.
 
-#### 데이터 뷰어 (Data Viewer - New)
+#### 데이터 뷰어 (Data Viewer)
 *   toggle ON 시 활성화되는 뷰.
-*   **컬럼 구조**: `날짜` | `가격 (Median)` | `기울기 (Slope)` | `볼린저 밴드 (Status)`
-*   **기능**: 날짜순 정렬, 스크롤 지원.
+*   **테이블 모드**: `날짜` | `가격 (Median)` | `기울기 (Slope)` | `볼린저 밴드 (Status)` 등 상세 데이터 조회.
+*   **차트 모드 (New)**: 
+    *   가격 데이터를 시각적인 라인 차트로 표시.
+    *   **AI 가격 예측 (Forecast)**: 외부 AI 모델(TimesFM-2.5)을 호출하여 미래 30일 가격 예측 데이터를 조회.
+    *   **API Endpoint**: `POST https://younginpiniti-bitcoin-ai-backend.hf.space/v1/forecast`
+    *   **Payload**: `{ "symbol": "[TICKER]", "interval": "day" }`
+    *   **시각적 구분**: 
+        *   **과거 데이터 (Historical)**: 파란 계열 **실선(solid line)**으로 표시.
+        *   **예측 데이터 (Prediction)**: 밝은 계열 **점선(dashed line)**으로 표시하여 명확히 구분.
+    *   **차트 라이브러리**: Recharts (React 기반 경량 차트 라이브러리).
 
-#### 시장 전체 분석 (Market Analysis / Scanner) - New
+#### 시장 전체 분석 (Market Analysis / Scanner)
 *   **목적**: 단일 종목 시뮬레이션이 아닌, 보유 중인 티커 리스트(추천 종목 등) 전체를 스캔하여 **현재 시점**에서의 매매 신호를 포착.
 *   **진입점**: TitleBar 내 "전체 분석(Analyze All)" 버튼. (Stock Mode 전용)
 *   **동작 방식**:
@@ -186,7 +194,7 @@
     2.  **데이터 조회**: 각 종목별로 **최근 50일치** 일봉 데이터를 로드. (전체 365일 대신 50일치만 조회하여 속도 최적화)
     3.  **분석 (Parsing)**:
         *   각 종목 데이터에 대해 `median`, `slope`, `bb`, `rsi`, `ma50`, `vma20` 등 모든 지표 계산.
-        *   **AI 감성 분석 (Sentiment Analysis) - New**: 
+        *   **AI 감성 분석 (Sentiment Analysis)**: 
             *   Yahoo Finance에서 해당 종목의 최신 뉴스 헤드라인 수집.
             *   Hugging Face **FinBERT** 모델을 통해 뉴스 긍정/부정 수치화.
             *   기술적 지표와 결합하여 최종 신뢰도 보정.

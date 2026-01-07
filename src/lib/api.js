@@ -215,3 +215,35 @@ export async function getSentimentScore(textList) {
         return 0;
     }
 }
+
+/**
+ * AI 가격 예측 API 호출 (TimesFM-2.5 모델 기반)
+ * @param {string} symbol - 종목 코드 (예: AAPL)
+ * @param {string} interval - 예측 간격 ('day' 또는 'minute')
+ * @returns {Promise<Object|null>} 예측 결과 또는 null
+ */
+export async function fetchForecast(symbol, interval = 'day') {
+    try {
+        const response = await fetch('https://younginpiniti-bitcoin-ai-backend.hf.space/v1/forecast', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'User-Agent': 'Motia/1.0',
+                'Accept': 'application/json',
+            },
+            body: JSON.stringify({ symbol, interval }),
+        });
+
+        if (!response.ok) {
+            console.error('Forecast API Error:', response.statusText);
+            return null;
+        }
+
+        const data = await response.json();
+        console.log(`[API] Forecast loaded for ${symbol}:`, data.predictionCount, 'predictions');
+        return data;
+    } catch (err) {
+        console.error('Forecast API Error:', err);
+        return null;
+    }
+}
