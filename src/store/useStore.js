@@ -167,6 +167,9 @@ export const useStore = create(
                 setGroupStocks: (stocks) => set({ groupStocks: stocks }),
                 setLoadingGroupStocks: (loading) => set({ loadingGroupStocks: loading }),
 
+                // 분석 중지
+                stopAnalysis: () => set({ isAnalyzing: false }),
+
                 /**
                  * 시장 전체 분석 실행 (Market Scanner)
                  */
@@ -206,6 +209,9 @@ export const useStore = create(
                     let processedCount = 0;
 
                     for (const stock of stocks) {
+                        // 사용자 중지 체크
+                        if (!get().isAnalyzing) break;
+
                         try {
                             const now = Date.now();
                             const today = new Date().toISOString().split('T')[0];
@@ -236,7 +242,10 @@ export const useStore = create(
                             if (!rawData || rawData.length < 20) {
                                 results.push({ ticker: stock.ticker, signal: 'SKIP', reason: 'Not enough data' });
                                 processedCount++;
-                                set({ analysisProgress: { current: processedCount, total: stocks.length } });
+                                set({
+                                    analysisProgress: { current: processedCount, total: stocks.length },
+                                    analysisResult: [...results]
+                                });
                                 continue;
                             }
 
@@ -287,7 +296,10 @@ export const useStore = create(
                         }
 
                         processedCount++;
-                        set({ analysisProgress: { current: processedCount, total: stocks.length } });
+                        set({
+                            analysisProgress: { current: processedCount, total: stocks.length },
+                            analysisResult: [...results]
+                        });
 
                         await new Promise(r => setTimeout(r, 10));
                     }

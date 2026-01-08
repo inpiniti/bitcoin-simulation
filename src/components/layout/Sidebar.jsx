@@ -11,6 +11,7 @@ export function Sidebar() {
         viewMode,
         runMarketAnalysis,
         isAnalyzing,
+        stopAnalysis,
     } = useStore()
 
     const hasData = (hist['1d']?.length || 0) > 0
@@ -154,8 +155,13 @@ export function Sidebar() {
             {/* Run Button Container */}
             <div className="p-4 border-t border-[#3c3c3c] flex flex-col gap-2 bg-[#252526]">
                 <button
-                    disabled={!hasData || isAnalyzing}
+                    disabled={!hasData}
                     onClick={() => {
+                        if (isAnalyzing) {
+                            stopAnalysis()
+                            return
+                        }
+
                         if (isAnalyzeMode) {
                             runMarketAnalysis()
                         } else {
@@ -164,9 +170,11 @@ export function Sidebar() {
                     }}
                     className={cn(
                         "w-full py-2.5 text-[13px] font-bold rounded flex items-center justify-center gap-2 transition-all",
-                        hasData
-                            ? (isAnalyzeMode ? "bg-[#094771] hover:bg-[#007acc]" : "bg-[#0e639c] hover:bg-[#1177bb]") + " text-white shadow-lg active:scale-95"
-                            : "bg-[#333333] text-[#666666] cursor-not-allowed"
+                        !hasData
+                            ? "bg-[#333333] text-[#666666] cursor-not-allowed"
+                            : isAnalyzing
+                                ? "bg-[#c72e2e] hover:bg-[#f44336] text-white shadow-lg active:scale-95"
+                                : (isAnalyzeMode ? "bg-[#094771] hover:bg-[#007acc]" : "bg-[#0e639c] hover:bg-[#1177bb]") + " text-white shadow-lg active:scale-95"
                     )}
                 >
                     {isAnalyzing ? (
@@ -174,7 +182,7 @@ export function Sidebar() {
                     ) : (
                         <Zap className={cn("w-4 h-4", isAnalyzeMode ? "text-[#9cdcfe]" : "fill-white")} />
                     )}
-                    {isAnalyzing ? "분석 중..." : (isAnalyzeMode ? "시장 분석 실행" : "시뮬레이션 실행")}
+                    {isAnalyzing ? "분석 중지 (취소)" : (isAnalyzeMode ? "시장 분석 실행" : "시뮬레이션 실행")}
                 </button>
                 {!hasData && (
                     <p className="text-[10px] text-[#888888] text-center">
