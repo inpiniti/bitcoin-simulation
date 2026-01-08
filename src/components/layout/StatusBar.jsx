@@ -1,12 +1,12 @@
 import { cn } from "@/lib/utils"
 import { useStore } from "@/store/useStore"
-import { GitBranch, Check, X, Loader2 } from "lucide-react"
+import { GitBranch, Check, Loader2 } from "lucide-react"
 
 export function StatusBar() {
-    const { activeInterval, hist, fetchProgress, loadingInterval, selectedResult, isAnalyzing, analysisProgress } = useStore()
+    const { hist, loadingInterval, selectedResult, isAnalyzing, analysisProgress, mode, ticker } = useStore()
 
-    const dataCount = activeInterval ? hist[activeInterval]?.length : 0
-    const isLoading = Object.values(loadingInterval).some(Boolean)
+    const dataCount = hist['1d']?.length || 0
+    const isLoading = loadingInterval['1d'] || loadingInterval['STOCK_BASE']
 
     return (
         <div className="h-6 bg-[#007acc] flex items-center px-2 text-white text-[11px] select-none">
@@ -17,13 +17,11 @@ export function StatusBar() {
                     main
                 </div>
 
-                {/* Data Fetching Indicator */}
+                {/* Data Loading Indicator */}
                 {isLoading && (
                     <div className="flex items-center gap-1">
                         <Loader2 className="w-3 h-3 animate-spin" />
-                        {fetchProgress.total > 0
-                            ? `데이터 로딩.. ${fetchProgress.current}/${fetchProgress.total}`
-                            : '처리 중...'}
+                        데이터 로딩...
                     </div>
                 )}
 
@@ -47,12 +45,10 @@ export function StatusBar() {
 
             {/* Center */}
             <div className="flex-1 text-center">
-                {activeInterval && (
-                    <span>
-                        활성 간격: <strong>{activeInterval}</strong> |
-                        데이터: <strong>{dataCount.toLocaleString()}</strong>개
-                    </span>
-                )}
+                <span>
+                    {mode === 'coin' ? 'BTC-KRW' : ticker} (1d) |
+                    데이터: <strong>{dataCount.toLocaleString()}</strong>개
+                </span>
             </div>
 
             {/* Right */}
@@ -67,7 +63,7 @@ export function StatusBar() {
                     </span>
                 )}
                 <span>UTF-8</span>
-                <span>Bitcoin Simulation v1.0</span>
+                <span>Bitcoin Simulation v2.0</span>
             </div>
         </div>
     )

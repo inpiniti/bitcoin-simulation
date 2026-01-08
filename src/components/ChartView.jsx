@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react"
 import { cn } from "@/lib/utils"
 import { useStore } from "@/store/useStore"
 import { fetchForecast } from "@/lib/api"
-import { LineChart as LineChartIcon, TableIcon, Loader2, TrendingUp } from "lucide-react"
+import { LineChart as LineChartIcon, Loader2, TrendingUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
     ResponsiveContainer,
@@ -34,7 +34,6 @@ function CustomTooltip({ active, payload, label }) {
 
     const data = payload[0]?.payload
     const isPrediction = data?.type === 'prediction'
-    const price = isPrediction ? data?.predictionPrice : data?.price
 
     return (
         <div className="bg-[#252526] border border-[#3c3c3c] p-3 rounded-lg shadow-lg">
@@ -43,7 +42,7 @@ function CustomTooltip({ active, payload, label }) {
                 "text-lg font-mono font-bold",
                 isPrediction ? "text-[#9cdcfe]" : "text-[#4fc1ff]"
             )}>
-                ${price?.toFixed(2)}
+                {data?.price?.toLocaleString() || data?.predictionPrice?.toLocaleString()}
             </p>
             {isPrediction && (
                 <p className="text-[10px] text-[#ce9178] mt-1">AI 예측 (TimesFM)</p>
@@ -53,14 +52,14 @@ function CustomTooltip({ active, payload, label }) {
 }
 
 export function ChartView() {
-    const { hist, activeInterval, ticker, mode } = useStore()
+    const { hist, ticker, mode } = useStore()
     const [isLoadingForecast, setIsLoadingForecast] = useState(false)
     const [forecastData, setForecastData] = useState(null)
     const [showForecast, setShowForecast] = useState(true)
 
-    // 현재 간격의 히스토리 데이터
+    // 현재 일봉 히스토리 데이터
     const histData = useMemo(() => {
-        const data = activeInterval ? hist[activeInterval] : []
+        const data = hist['1d'] || []
         if (!data || data.length === 0) return []
 
         // 최근 180일 데이터만 차트에 표시 (성능 및 가독성)
@@ -72,15 +71,15 @@ export function ChartView() {
             price: item.close,
             type: 'historical'
         }))
-    }, [hist, activeInterval])
+    }, [hist])
 
     // 예측 데이터 로드
     const loadForecast = async () => {
-        if (mode !== 'stock' || !ticker) return
+        const symbol = mode === 'coin' ? 'BTC-KRW' : ticker
 
         setIsLoadingForecast(true)
         try {
-            const result = await fetchForecast(ticker, 'day')
+            const result = await fetchForecast(symbol, 'day')
             if (result && result.predictions) {
                 setForecastData(result)
             }
@@ -94,19 +93,18 @@ export function ChartView() {
     // ticker 변경 시 예측 데이터 초기화
     useEffect(() => {
         setForecastData(null)
-    }, [ticker])
+    }, [ticker, mode])
 
     // 차트 데이터 (히스토리 + 예측)
     const chartData = useMemo(() => {
         const combined = [...histData]
 
         if (showForecast && forecastData?.predictions) {
-            // 마지막 히스토리 날짜에서 연결
-            forecastData.predictions.forEach((pred, index) => {
+            forecastData.predictions.forEach((pred) => {
                 combined.push({
                     date: formatShortDate(pred.date),
                     fullDate: new Date(pred.date).toLocaleDateString('ko-KR'),
-                    price: null, // historical line 끊기
+                    price: null,
                     predictionPrice: pred.price,
                     type: 'prediction'
                 })
@@ -115,9 +113,6 @@ export function ChartView() {
 
         return combined
     }, [histData, forecastData, showForecast])
-
-    // 마지막 히스토리 가격 (연결선용)
-    const lastHistoricalPrice = histData.length > 0 ? histData[histData.length - 1].price : null
 
     // Y축 도메인 계산
     const yDomain = useMemo(() => {
@@ -135,12 +130,12 @@ export function ChartView() {
 
     if (histData.length === 0) {
         return (
-            <div className="flex-1 flex items-center justify-center text-[#5a5a5a]">
+            <div className="flex-1 flex items-center justify-center text-[#5a5a5a] bg-[#1e1e1e]">
                 <div className="text-center">
                     <LineChartIcon className="w-16 h-16 mx-auto mb-4 opacity-30" />
                     <p className="text-sm">차트를 표시할 데이터가 없습니다.</p>
                     <p className="text-xs mt-2 text-[#4a4a4a]">
-                        좌측 Activity Bar에서 간격을 선택해주세요.
+                        상단에서 Coin/Stock 모드를 선택하면 자동으로 데이터가 로드됩니다.
                     </p>
                 </div>
             </div>
@@ -153,39 +148,35 @@ export function ChartView() {
             <div className="h-10 px-4 flex items-center justify-between border-b border-[#3c3c3c] bg-[#252526]">
                 <div className="flex items-center gap-2 text-[13px] text-[#cccccc]">
                     <LineChartIcon className="w-4 h-4 text-[#4fc1ff]" />
-                    <span>CHART VIEW: {ticker || 'BTC'} ({activeInterval})</span>
+                    <span>CHART VIEW: {mode === 'coin' ? 'BTC' : ticker} (1d, {histData.length} days)</span>
                 </div>
                 <div className="flex items-center gap-2">
-                    {mode === 'stock' && (
-                        <>
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={loadForecast}
-                                disabled={isLoadingForecast}
-                                className={cn(
-                                    "h-7 text-xs gap-1",
-                                    forecastData ? "text-[#4ec9b0]" : "text-[#cccccc]"
-                                )}
-                            >
-                                {isLoadingForecast ? (
-                                    <Loader2 className="w-3 h-3 animate-spin" />
-                                ) : (
-                                    <TrendingUp className="w-3 h-3" />
-                                )}
-                                AI 예측 로드
-                            </Button>
-                            {forecastData && (
-                                <Button
-                                    variant={showForecast ? "secondary" : "ghost"}
-                                    size="sm"
-                                    onClick={() => setShowForecast(!showForecast)}
-                                    className="h-7 text-xs"
-                                >
-                                    {showForecast ? "예측 숨기기" : "예측 보기"}
-                                </Button>
-                            )}
-                        </>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={loadForecast}
+                        disabled={isLoadingForecast}
+                        className={cn(
+                            "h-7 text-xs gap-1",
+                            forecastData ? "text-[#4ec9b0]" : "text-[#cccccc]"
+                        )}
+                    >
+                        {isLoadingForecast ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                            <TrendingUp className="w-3 h-3" />
+                        )}
+                        AI 예측 로드
+                    </Button>
+                    {forecastData && (
+                        <Button
+                            variant={showForecast ? "secondary" : "ghost"}
+                            size="sm"
+                            onClick={() => setShowForecast(!showForecast)}
+                            className="h-7 text-xs"
+                        >
+                            {showForecast ? "예측 숨기기" : "예측 보기"}
+                        </Button>
                     )}
                 </div>
             </div>
@@ -207,7 +198,7 @@ export function ChartView() {
                             stroke="#6a6a6a"
                             tick={{ fill: '#888888', fontSize: 10 }}
                             tickLine={{ stroke: '#3c3c3c' }}
-                            tickFormatter={(val) => `$${val}`}
+                            tickFormatter={(val) => mode === 'coin' ? `${(val / 1000000).toFixed(0)}M` : `$${val}`}
                         />
                         <Tooltip content={<CustomTooltip />} />
                         <Legend
