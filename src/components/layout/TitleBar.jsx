@@ -171,33 +171,48 @@ export function TitleBar() {
                                     <div className="px-2 py-1.5 text-[10px] text-[#6a9955] bg-[#1e1e1e] font-bold sticky top-0 border-b border-[#3e3e42]">
                                         🔥 Superinvestors' Top Picks
                                     </div>
-                                    {recommendedStocks.map((stock) => (
-                                        <button
-                                            key={stock.ticker}
-                                            className="w-full text-left px-2 py-1.5 hover:bg-[#094771] hover:text-white flex items-center justify-between group/item"
-                                            onMouseDown={(e) => {
-                                                e.preventDefault(); // Prevent input blur
-                                                if (ticker !== stock.ticker) {
-                                                    openAlert(
-                                                        "종목 변경",
-                                                        `'${stock.ticker}' (${stock.count} holders) 로 변경하시겠습니까?`,
-                                                        () => {
-                                                            setTicker(stock.ticker)
-                                                            setLocalTicker(stock.ticker)
-                                                        }
-                                                    )
-                                                }
-                                            }}
-                                        >
-                                            <div>
-                                                <span className="text-xs font-bold text-[#d4d4d4] w-12 inline-block">{stock.ticker}</span>
-                                                <span className="text-[10px] text-[#9d9d9d] group-hover/item:text-[#cccccc] truncate max-w-[120px] inline-block align-bottom">{stock.name}</span>
+                                    {recommendedStocks
+                                        .filter(stock =>
+                                            localTicker === "" ||
+                                            stock.ticker.toLowerCase().includes(localTicker.toLowerCase()) ||
+                                            stock.name.toLowerCase().includes(localTicker.toLowerCase())
+                                        )
+                                        .map((stock) => (
+                                            <button
+                                                key={stock.ticker}
+                                                className="w-full text-left px-2 py-1.5 hover:bg-[#094771] hover:text-white flex items-center justify-between group/item"
+                                                onMouseDown={(e) => {
+                                                    e.preventDefault(); // Prevent input blur
+                                                    if (ticker !== stock.ticker) {
+                                                        openAlert(
+                                                            "종목 변경",
+                                                            `'${stock.ticker}' (${stock.count} holders) 로 변경하시겠습니까?`,
+                                                            () => {
+                                                                setTicker(stock.ticker)
+                                                                setLocalTicker(stock.ticker)
+                                                            }
+                                                        )
+                                                    }
+                                                }}
+                                            >
+                                                <div>
+                                                    <span className="text-xs font-bold text-[#d4d4d4] w-12 inline-block">{stock.ticker}</span>
+                                                    <span className="text-[10px] text-[#9d9d9d] group-hover/item:text-[#cccccc] truncate max-w-[120px] inline-block align-bottom">{stock.name}</span>
+                                                </div>
+                                                <span className="text-[10px] bg-[#3c3c3c] text-[#cccccc] px-1 rounded-sm group-hover/item:bg-[#1e1e1e]">
+                                                    {stock.count}
+                                                </span>
+                                            </button>
+                                        ))}
+                                    {recommendedStocks.filter(stock =>
+                                        localTicker === "" ||
+                                        stock.ticker.toLowerCase().includes(localTicker.toLowerCase()) ||
+                                        stock.name.toLowerCase().includes(localTicker.toLowerCase())
+                                    ).length === 0 && (
+                                            <div className="px-2 py-2 text-[10px] text-[#666] text-center italic">
+                                                No matching stocks found
                                             </div>
-                                            <span className="text-[10px] bg-[#3c3c3c] text-[#cccccc] px-1 rounded-sm group-hover/item:bg-[#1e1e1e]">
-                                                {stock.count}
-                                            </span>
-                                        </button>
-                                    ))}
+                                        )}
                                 </div>
                             )}
                         </div>
