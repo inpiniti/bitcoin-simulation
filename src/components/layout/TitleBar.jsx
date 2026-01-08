@@ -44,6 +44,11 @@ export function TitleBar() {
         }
     }, [mode, ticker])
 
+    // 추천 종목 로드 (앱 시작 시 한 번만)
+    useEffect(() => {
+        loadRecommendedTickers()
+    }, [])
+
     const openAlert = (title, description, onConfirm, onCancel = null) => {
         setAlertConfig({
             open: true,
@@ -157,7 +162,6 @@ export function TitleBar() {
                                 onChange={(e) => setLocalTicker(e.target.value.toUpperCase())}
                                 onKeyDown={handleTickerSubmit}
                                 onBlur={handleTickerBlur}
-                                onFocus={() => loadRecommendedTickers()}
                                 placeholder="AAPL"
                             />
                             <div className="absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none text-[#666]">
