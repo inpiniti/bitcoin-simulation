@@ -2,7 +2,7 @@
     "rewrites": [
         {
             "source": "/api/kis/:path*",
-            "destination": "/api/kis/:path*"
+            "destination": "/api/kis"
         },
         {
             "source": "/api/yahoo/:path*",

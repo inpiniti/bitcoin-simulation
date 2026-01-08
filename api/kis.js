@@ -1,4 +1,4 @@
-// Vercel Serverless Function for Korea Investment Securities API Proxy
+// Vercel Serverless Function for Korea Investment Securities API Proxy (Single File Handler)
 export default async function handler(req, res) {
     // CORS 헤더 설정
     res.setHeader('Access-Control-Allow-Credentials', 'true')
@@ -16,13 +16,18 @@ export default async function handler(req, res) {
     }
 
     try {
-        // 경로 및 쿼리 파라미터 분리
-        const { path, ...queryParams } = req.query
-        const targetPath = Array.isArray(path) ? path.join('/') : path || ''
+        // 경로 추출 (URL 기반)
+        const url = new URL(req.url, `http://${req.headers.host}`)
+        const pathname = url.pathname
 
-        // 쿼리 스트링 재구성 (GET 요청 등에 필수)
-        const queryString = new URLSearchParams(queryParams).toString()
-        const targetUrl = `https://openapi.koreainvestment.com:9443/${targetPath}${queryString ? '?' + queryString : ''}`
+        // '/api/kis/' 제거하여 타겟 경로 추출
+        // 예: /api/kis/oauth2/tokenP -> oauth2/tokenP
+        let targetPath = pathname.replace(/^\/api\/kis/, '');
+        if (targetPath.startsWith('/')) targetPath = targetPath.substring(1);
+
+        const search = url.search // ?query=string
+
+        const targetUrl = `https://openapi.koreainvestment.com:9443/${targetPath}${search}`
 
         // 요청 헤더 복사 (필요한 것만)
         const headers = {
@@ -43,18 +48,31 @@ export default async function handler(req, res) {
 
         // POST 요청인 경우 body 추가
         if (req.method === 'POST' && req.body) {
-            // Vercel은 JSON body를 자동으로 파싱하여 객체로 제공할 수 있음
             options.body = (typeof req.body === 'object') ? JSON.stringify(req.body) : req.body
         }
 
         console.log(`[KIS Proxy] ${req.method} ${targetUrl}`)
 
         const response = await fetch(targetUrl, options)
-        const data = await response.json()
 
+        // 응답 처리
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`[KIS Proxy Error] Upstream ${response.status}:`, errorText);
+            // JSON으로 파싱 시도 후 실패하면 text 그대로 전달
+            try {
+                res.status(response.status).json(JSON.parse(errorText));
+            } catch (e) {
+                res.status(response.status).send(errorText);
+            }
+            return;
+        }
+
+        const data = await response.json()
         res.status(response.status).json(data)
+
     } catch (error) {
-        console.error('[KIS Proxy Error]:', error)
+        console.error('[KIS Proxy Handler Error]:', error)
         res.status(500).json({ error: error.message })
     }
 }
