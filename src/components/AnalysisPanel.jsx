@@ -10,7 +10,7 @@ export function AnalysisPanel() {
 
     // Order Dialog State
     const [orderDialogOpen, setOrderDialogOpen] = useState(false)
-    const [orderConfig, setOrderConfig] = useState({ type: 'buy', ticker: '', price: 0 })
+    const [orderConfig, setOrderConfig] = useState({ type: 'buy', ticker: '', price: 0, exchange: '' })
 
     // Loading state is handled in StatusBar
 
@@ -46,7 +46,8 @@ export function AnalysisPanel() {
             setOrderConfig({
                 type: item.signal.toLowerCase(), // 'buy' or 'sell'
                 ticker: item.ticker,
-                price: item.price
+                price: item.price,
+                exchange: item.exchange
             })
             setOrderDialogOpen(true)
         }
@@ -131,6 +132,7 @@ export function AnalysisPanel() {
                 orderType={orderConfig.type}
                 ticker={orderConfig.ticker}
                 currentPrice={orderConfig.price}
+                initialExchange={orderConfig.exchange}
             />
         </div>
     )

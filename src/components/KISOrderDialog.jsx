@@ -22,7 +22,7 @@ import {
 import { Loader2, DollarSign, ShoppingCart } from "lucide-react"
 import { orderOverseasStock, getOverseasCurrentPrice } from "@/lib/kisApi"
 
-export function KISOrderDialog({ open, onOpenChange, orderType, ticker, currentPrice }) {
+export function KISOrderDialog({ open, onOpenChange, orderType, ticker, currentPrice, initialExchange }) {
     const { kisAuth } = useStore()
     const [price, setPrice] = useState('0')
     const [quantity, setQuantity] = useState('1')
@@ -32,16 +32,31 @@ export function KISOrderDialog({ open, onOpenChange, orderType, ticker, currentP
     const [error, setError] = useState('')
     const [resultMsg, setResultMsg] = useState('')
 
+    const mapExchangeToKis = (yahooExchange) => {
+        if (!yahooExchange) return 'NAS'
+        const ex = yahooExchange.toUpperCase()
+        if (ex.includes('NAS')) return 'NAS'
+        if (ex.includes('NYS') || ex.includes('NEW YORK')) return 'NYS'
+        if (ex.includes('AMEX') || ex.includes('AMERICAN')) return 'AMS'
+        if (ex.includes('HK')) return 'HKS'
+        if (ex.includes('JP') || ex.includes('TOKYO')) return 'TSE'
+        if (ex.includes('SHANGHAI')) return 'SHS'
+        if (ex.includes('SHENZHEN')) return 'SZS'
+        if (ex.includes('HO CHI MINH')) return 'HSX'
+        if (ex.includes('HANOI')) return 'HNX'
+        return 'NAS' // Default
+    }
+
     // 다이얼로그 열릴 때 초기화
     useEffect(() => {
         if (open) {
             setPrice(currentPrice ? String(currentPrice) : '0')
             setQuantity('1')
-            setExchange('NAS') // Default
+            setExchange(mapExchangeToKis(initialExchange)) // 매핑된 거래소 설정
             setError('')
             setResultMsg('')
         }
-    }, [open, currentPrice])
+    }, [open, currentPrice, initialExchange])
 
     // 실시간 가격 조회 (exchange 변경 시에도 동작)
     useEffect(() => {

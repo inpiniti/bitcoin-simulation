@@ -211,20 +211,23 @@ export const useStore = create(
                             const today = new Date().toISOString().split('T')[0];
 
                             let rawData;
+                            let exchange = stock.exchange || 'NAS';
                             const cachedEntry = state.dataCache[stock.ticker];
 
                             // KIS에서 가져온 티커가 Yahoo Finance 형식과 다를 수 있으므로 주의 (ex. 005930.KS)
                             // 현재 해외 주식이므로 대부분 호환될 것으로 예상 (AAPL, TSLA...)
                             if (cachedEntry && new Date(cachedEntry.timestamp).toISOString().split('T')[0] === today) {
                                 rawData = cachedEntry.data;
+                                if (cachedEntry.exchange) exchange = cachedEntry.exchange;
                             } else {
                                 rawData = await fetchStockShortData(stock.ticker);
+                                if (rawData && rawData.exchange) exchange = rawData.exchange;
 
                                 if (rawData && rawData.length > 0) {
                                     set(s => ({
                                         dataCache: {
                                             ...s.dataCache,
-                                            [stock.ticker]: { timestamp: now, data: rawData }
+                                            [stock.ticker]: { timestamp: now, data: rawData, exchange }
                                         }
                                     }));
                                 }
@@ -269,7 +272,8 @@ export const useStore = create(
                                 bbStatus: lastCandle.bbStatus,
                                 sentiment: sentimentScore,
                                 news: newsHeadlines,
-                                timestamp: lastCandle.timestamp
+                                timestamp: lastCandle.timestamp,
+                                exchange: exchange
                             });
 
                         } catch (e) {

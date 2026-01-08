@@ -94,7 +94,8 @@ export function TitleBar() {
                     setGroupStocks(result.holdings.map(h => ({
                         ticker: h.pdno,
                         name: h.prdt_name,
-                        count: parseInt(h.ccld_qty_smtl1 || 0)
+                        count: parseInt(h.ccld_qty_smtl1 || 0),
+                        exchange: h.ovrs_excg_cd
                     })))
                 }
             } else if (tickerGroup === 'pricedrop') {
@@ -105,7 +106,8 @@ export function TitleBar() {
                     setGroupStocks(result.stocks.map(s => ({
                         ticker: s.ticker,
                         name: s.name,
-                        count: parseFloat(s.changeRate || 0).toFixed(2) + '%'
+                        count: parseFloat(s.changeRate || 0).toFixed(2) + '%',
+                        exchange: 'NAS'
                     })))
                 }
             } else if (tickerGroup === 'pricesurge') {
@@ -116,7 +118,8 @@ export function TitleBar() {
                     setGroupStocks(result.stocks.map(s => ({
                         ticker: s.ticker,
                         name: s.name,
-                        count: '+' + parseFloat(s.changeRate || 0).toFixed(2) + '%'
+                        count: '+' + parseFloat(s.changeRate || 0).toFixed(2) + '%',
+                        exchange: 'NAS'
                     })))
                 }
             } else if (tickerGroup === 'volumesurge') {
@@ -127,7 +130,8 @@ export function TitleBar() {
                     setGroupStocks(result.stocks.map(s => ({
                         ticker: s.ticker,
                         name: s.name,
-                        count: parseFloat(s.volumeRate || 0).toFixed(0) + '%'
+                        count: parseFloat(s.volumeRate || 0).toFixed(0) + '%',
+                        exchange: 'NAS'
                     })))
                 }
             }

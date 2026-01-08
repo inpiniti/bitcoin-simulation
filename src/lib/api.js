@@ -87,6 +87,11 @@ export async function fetchStockData(ticker, interval = '1d', range = '365d') {
         };
     }).filter(item => item !== null); // 필터링
 
+    // 메타 정보 추가 (거래소 정보 등)
+    if (result.meta) {
+        normalized.exchange = result.meta.exchangeName;
+    }
+
     console.log(`[API] Stock data loaded: ${normalized.length} items for ${ticker} (${range})`);
     return normalized;
 }
