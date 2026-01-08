@@ -19,6 +19,7 @@ export function TitleBar() {
         loadDailyData, hist, loadingInterval
     } = useStore()
     const [localTicker, setLocalTicker] = useState(ticker)
+    const [filterText, setFilterText] = useState('') // 드롭다운 필터용 (포커스 시 리셋)
     const skipBlurRef = useRef(false)
 
     const isLoading = loadingInterval['1d'] || loadingInterval['STOCK_BASE']
@@ -159,9 +160,14 @@ export function TitleBar() {
                                 type="text"
                                 className="bg-[#252526] text-[#cccccc] border border-[#3e3e42] rounded px-2 py-0.5 text-xs focus:border-[#007acc] focus:outline-none w-32 text-center uppercase pr-6"
                                 value={localTicker}
-                                onChange={(e) => setLocalTicker(e.target.value.toUpperCase())}
+                                onChange={(e) => {
+                                    const val = e.target.value.toUpperCase()
+                                    setLocalTicker(val)
+                                    setFilterText(val) // 입력 시에만 필터 적용
+                                }}
                                 onKeyDown={handleTickerSubmit}
                                 onBlur={handleTickerBlur}
+                                onFocus={() => setFilterText('')} // 포커스 시 필터 초기화 (전체 보기)
                                 placeholder="AAPL"
                             />
                             <div className="absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none text-[#666]">
@@ -177,9 +183,9 @@ export function TitleBar() {
                                     </div>
                                     {recommendedStocks
                                         .filter(stock =>
-                                            localTicker === "" ||
-                                            stock.ticker.toLowerCase().includes(localTicker.toLowerCase()) ||
-                                            stock.name.toLowerCase().includes(localTicker.toLowerCase())
+                                            filterText === "" ||
+                                            stock.ticker.toLowerCase().includes(filterText.toLowerCase()) ||
+                                            stock.name.toLowerCase().includes(filterText.toLowerCase())
                                         )
                                         .map((stock) => (
                                             <button
@@ -209,9 +215,9 @@ export function TitleBar() {
                                             </button>
                                         ))}
                                     {recommendedStocks.filter(stock =>
-                                        localTicker === "" ||
-                                        stock.ticker.toLowerCase().includes(localTicker.toLowerCase()) ||
-                                        stock.name.toLowerCase().includes(localTicker.toLowerCase())
+                                        filterText === "" ||
+                                        stock.ticker.toLowerCase().includes(filterText.toLowerCase()) ||
+                                        stock.name.toLowerCase().includes(filterText.toLowerCase())
                                     ).length === 0 && (
                                             <div className="px-2 py-2 text-[10px] text-[#666] text-center italic">
                                                 No matching stocks found
