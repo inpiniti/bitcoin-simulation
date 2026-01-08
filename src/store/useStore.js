@@ -85,6 +85,78 @@ export const useStore = create(
                     strategyOptions: { ...state.strategyOptions, ...options }
                 })),
 
+                // Korea Investment Securities (KIS) Authentication
+                kisAuth: {
+                    isLoggedIn: false,
+                    appkey: '',
+                    appsecret: '',
+                    accountNo: '', // 계좌번호 앞 8자리
+                    accountCode: '', // 계좌번호 뒤 2자리
+                    accessToken: '',
+                    tokenExpiry: null,
+                },
+
+                /**
+                 * KIS 로그인
+                 */
+                loginKIS: async (appkey, appsecret, accountNo, accountCode) => {
+                    try {
+                        const { getAccessToken } = await import('@/lib/kisApi')
+                        const result = await getAccessToken(appkey, appsecret)
+
+                        if (result.success) {
+                            set({
+                                kisAuth: {
+                                    isLoggedIn: true,
+                                    appkey,
+                                    appsecret,
+                                    accountNo,
+                                    accountCode,
+                                    accessToken: result.access_token,
+                                    tokenExpiry: result.access_token_token_expired,
+                                }
+                            })
+                            return { success: true }
+                        } else {
+                            return { success: false, error: result.error }
+                        }
+                    } catch (error) {
+                        console.error('KIS 로그인 오류:', error)
+                        return { success: false, error: error.message }
+                    }
+                },
+
+                /**
+                 * KIS 로그아웃
+                 */
+                logoutKIS: async () => {
+                    const state = get()
+                    if (state.kisAuth.accessToken) {
+                        try {
+                            const { revokeAccessToken } = await import('@/lib/kisApi')
+                            await revokeAccessToken(
+                                state.kisAuth.appkey,
+                                state.kisAuth.appsecret,
+                                state.kisAuth.accessToken
+                            )
+                        } catch (error) {
+                            console.error('토큰 폐기 오류:', error)
+                        }
+                    }
+
+                    set({
+                        kisAuth: {
+                            isLoggedIn: false,
+                            appkey: '',
+                            appsecret: '',
+                            accountNo: '',
+                            accountCode: '',
+                            accessToken: '',
+                            tokenExpiry: null,
+                        }
+                    })
+                },
+
                 /**
                  * 시장 전체 분석 실행 (Market Scanner)
                  */
@@ -343,6 +415,7 @@ export const useStore = create(
                     recommendedStocks: state.recommendedStocks,
                     lastRecommendedFetch: state.lastRecommendedFetch,
                     dataCache: state.dataCache,
+                    kisAuth: state.kisAuth, // KIS 로그인 상태 저장
                 }),
             }
         ),

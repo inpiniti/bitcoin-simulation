@@ -60,6 +60,12 @@ export default defineConfig({
         secure: false, // 자체 서명된 인증서 허용 (프록시/방화벽 SSL 인터셉션 우회)
         rewrite: (path) => path.replace(/^\/api\/yahoo/, ''),
       },
+      '/api/kis': {
+        target: 'https://openapi.koreainvestment.com:9443',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace(/^\/api\/kis/, ''),
+      },
     },
   },
 })

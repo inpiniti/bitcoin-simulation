@@ -2,8 +2,46 @@
 readme.md에 설계도가 적혀 있습니다.
 구현하기전에는 항상 설계도를 확인하면서 개발해주세요.
 
+# 한국투자증권 API 문서링크
+koreainvestment.md에 API 문서링크가 적혀 있습니다.
+관련 내용 구현하기전에는 항상 해당 API 문서를 확인하면서 개발해주세요.
+
 # 언어
 한국어를 사용해서 답변을 부탁드립니다.
+
+# 외부 API 호출 규칙 (External API Call Rules)
+
+## CORS 문제 해결
+모든 외부 API 호출은 CORS 문제를 방지하기 위해 **프록시**를 통해 이루어져야 합니다.
+
+### 1. 로컬 개발 환경 (Vite Proxy)
+- `vite.config.js`의 `server.proxy` 설정 사용
+- 예시: `/api/kis`, `/api/yahoo`, `/api/dataroma`
+
+### 2. 프로덕션 환경 (Vercel Serverless Functions)
+- `api/` 디렉토리에 서버리스 함수 생성
+- 동적 경로 지원: `api/[service]/[...path].js`
+
+### 3. API 클라이언트 구현 규칙
+```javascript
+// ✅ Good: 환경에 따라 프록시 엔드포인트 사용
+const API_BASE_URL = import.meta.env.DEV 
+    ? '/api/service'  // 개발: Vite 프록시
+    : '/api/service'  // 프로덕션: Vercel 함수
+
+// ❌ Bad: 직접 외부 API 호출 (CORS 에러 발생)
+const API_BASE_URL = 'https://external-api.com'
+```
+
+### 4. 현재 프록시 설정된 API
+- **Yahoo Finance**: `/api/yahoo` → `https://query1.finance.yahoo.com`
+- **DataRoma**: `/api/dataroma` → `https://www.dataroma.com`
+- **한국투자증권 (KIS)**: `/api/kis` → `https://openapi.koreainvestment.com:9443`
+
+### 5. 새로운 외부 API 추가 시
+1. `vite.config.js`에 프록시 설정 추가
+2. `api/` 디렉토리에 서버리스 함수 생성
+3. API 클라이언트에서 프록시 엔드포인트 사용
 
 # React 개발 규칙 (React Rules)
 

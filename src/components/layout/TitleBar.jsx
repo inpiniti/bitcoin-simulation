@@ -11,15 +11,20 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { KISLoginDialog } from "@/components/KISLoginDialog"
+import { KISAccountDialog } from "@/components/KISAccountDialog"
 
 export function TitleBar() {
     const {
         mode, ticker, setMode, setTicker,
         recommendedStocks, loadingRecommendations, loadRecommendedTickers,
-        loadDailyData, hist, loadingInterval
+        loadDailyData, hist, loadingInterval,
+        kisAuth, loginKIS, logoutKIS
     } = useStore()
     const [localTicker, setLocalTicker] = useState(ticker)
     const [filterText, setFilterText] = useState('') // 드롭다운 필터용 (포커스 시 리셋)
+    const [loginDialogOpen, setLoginDialogOpen] = useState(false)
+    const [accountDialogOpen, setAccountDialogOpen] = useState(false)
     const skipBlurRef = useRef(false)
 
     const isLoading = loadingInterval['1d'] || loadingInterval['STOCK_BASE']
@@ -253,6 +258,32 @@ export function TitleBar() {
                     )}
                 </div>
 
+                {/* KIS Login/Account Button */}
+                {kisAuth.isLoggedIn ? (
+                    <button
+                        onClick={() => setAccountDialogOpen(true)}
+                        className="flex items-center gap-1.5 px-3 py-1 text-xs rounded-sm transition-colors border bg-[#2d2d2d] text-[#4ec9b0] border-[#4ec9b0] hover:bg-[#1e1e1e]"
+                    >
+                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                            <circle cx="12" cy="7" r="4" />
+                        </svg>
+                        <span>KIS 계좌</span>
+                    </button>
+                ) : (
+                    <button
+                        onClick={() => setLoginDialogOpen(true)}
+                        className="flex items-center gap-1.5 px-3 py-1 text-xs rounded-sm transition-colors border bg-transparent text-[#9d9d9d] border-transparent hover:text-[#e1e1e1] hover:bg-[#2d2d2d]"
+                    >
+                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+                            <polyline points="10 17 15 12 10 7" />
+                            <line x1="15" y1="12" x2="3" y2="12" />
+                        </svg>
+                        <span>KIS 로그인</span>
+                    </button>
+                )}
+
                 {/* Window Controls (Mock) */}
                 <div className="flex items-center gap-4 text-[#7d7d7d]">
                     <button className="hover:text-[#cccccc] text-xs">−</button>
@@ -276,6 +307,23 @@ export function TitleBar() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+
+            {/* KIS Login Dialog */}
+            <KISLoginDialog
+                open={loginDialogOpen}
+                onOpenChange={setLoginDialogOpen}
+                onLogin={loginKIS}
+            />
+
+            {/* KIS Account Dialog */}
+            <KISAccountDialog
+                open={accountDialogOpen}
+                onOpenChange={setAccountDialogOpen}
+                kisAuth={kisAuth}
+                onLogout={async () => {
+                    await logoutKIS()
+                }}
+            />
         </div >
     )
 }
