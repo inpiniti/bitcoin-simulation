@@ -253,15 +253,17 @@ export const useStore = create(
                             const analysis = analyzeSignal(dataWithSlope, options);
 
                             // 뉴스 및 감성 분석은 시간이 오래 걸리므로 비동기 또는 생략 고려
-                            // 일단 유지
+                            // 일단 유지 -> 성능 이슈 및 에러로 인해 비활성화 (2025-01-09)
                             let sentimentScore = 0;
                             let newsHeadlines = [];
+                            /*
                             try {
                                 newsHeadlines = await fetchStockNews(stock.ticker);
                                 sentimentScore = await getSentimentScore(newsHeadlines);
                             } catch (err) {
                                 console.warn(`News fetch failed for ${stock.ticker}`, err);
                             }
+                            */
 
                             const lastCandle = dataWithSlope[dataWithSlope.length - 1];
                             const prevCandle = dataWithSlope[dataWithSlope.length - 2];
