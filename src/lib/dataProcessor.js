@@ -677,6 +677,7 @@ export function analyzeSignal(dataWithSlope, options = {}) {
         useTrend = false,
         useTrend20 = false,
         useRSI = false,
+        useVolumeFilter = false,
         useSellAtBB2 = false
     } = options;
 
