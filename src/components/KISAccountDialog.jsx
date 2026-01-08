@@ -35,20 +35,32 @@ export function KISAccountDialog({ open, onOpenChange, kisAuth, onLogout }) {
         try {
             const { accessToken, appkey, appsecret, accountNo, accountCode } = kisAuth
 
-            if ((activeMenu === 'balance' || activeMenu === 'account') && !data.balance) {
+            if (activeMenu === 'balance' || activeMenu === 'account') {
                 const result = await getOverseasBalance(accessToken, appkey, appsecret, accountNo, accountCode)
                 if (result.success) {
                     setData(prev => ({ ...prev, balance: result }))
                 }
-            } else if (activeMenu === 'orders' && !data.orders) {
+            } else if (activeMenu === 'orders') {
                 const result = await getUnfilledOrders(accessToken, appkey, appsecret, accountNo, accountCode)
                 if (result.success) {
                     setData(prev => ({ ...prev, orders: result }))
                 }
-            } else if (activeMenu === 'profit' && !data.profit) {
-                // 최근 30일 손익
-                const endDate = new Date().toISOString().slice(0, 10).replace(/-/g, '')
-                const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10).replace(/-/g, '')
+            } else if (activeMenu === 'profit') {
+                // 최근 30일 손익 (UTC가 아닌 로컬 시간 기준 날짜 사용)
+                const now = new Date()
+                const past = new Date(now)
+                past.setDate(now.getDate() - 30)
+
+                const formatDate = (d) => {
+                    const year = d.getFullYear()
+                    const month = String(d.getMonth() + 1).padStart(2, '0')
+                    const day = String(d.getDate()).padStart(2, '0')
+                    return `${year}${month}${day}`
+                }
+
+                const endDate = formatDate(now)
+                const startDate = formatDate(past)
+
                 const result = await getPeriodProfit(accessToken, appkey, appsecret, accountNo, accountCode, startDate, endDate)
                 if (result.success) {
                     setData(prev => ({ ...prev, profit: result }))
