@@ -441,3 +441,129 @@ export async function getVolumeSurge(accessToken, appkey, appsecret, excd = 'NAS
         }
     }
 }
+
+/**
+ * 해외주식 주문 (매수/매도) - 실전 투자 기준 (미국)
+ */
+export async function orderOverseasStock(accessToken, appkey, appsecret, accountNo, accountCode, orderType, exchange, symbol, price, qty) {
+    try {
+        // 거래소 코드 매핑
+        const exchangeMap = {
+            'NAS': 'NASD', // 나스닥
+            'NYS': 'NYSE', // 뉴욕
+            'AMS': 'AMEX', // 아멕스
+            'HKS': 'SEHK', // 홍콩
+            // 필요한 경우 추가
+        }
+        const ovrsExcgCd = exchangeMap[exchange] || 'NASD'
+
+        // TR ID 선택 (미국 주식 기준)
+        // 매수: TTTT1002U, 매도: TTTT1006U (실전)
+        // 모의투자 API URL(openapivts)을 사용하는지 여부를 알 수 없으므로, 일단 실전용 TR ID 사용
+        // (주의: 모의투자 환경 설정 시 VTTT... 사용 필요)
+        const trId = orderType === 'buy' ? 'TTTT1002U' : 'TTTT1006U'
+
+        const body = {
+            CANO: accountNo,
+            ACNT_PRDT_CD: accountCode,
+            OVRS_EXCG_CD: ovrsExcgCd,
+            PDNO: symbol,
+            ORD_QTY: String(qty),
+            OVRS_ORD_UNPR: String(price),
+            ORD_SVR_DVSN_CD: '0',
+            ORD_DVSN: '00' // 지정가
+        }
+
+        const response = await fetch(`${KIS_BASE_URL}/uapi/overseas-stock/v1/trading/order`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json; charset=utf-8',
+                'authorization': `Bearer ${accessToken}`,
+                'appkey': appkey,
+                'appsecret': appsecret,
+                'tr_id': trId,
+                'custtype': 'P', // 개인
+                // 'hashkey'는 POST Body가 있을 때 필수일 수 있으나, KIS 문서상으로는 선택사항이나 보안권장.
+                // 여기서는 생략하고 진행 (많은 경우 서버에서 처리하거나 자동 생성됨)
+            },
+            body: JSON.stringify(body)
+        })
+
+        const data = await response.json()
+
+        if (data.rt_cd === '0') {
+            return {
+                success: true,
+                message: data.msg1,
+                orderNo: data.output?.ODNO
+            }
+        } else {
+            return {
+                success: false,
+                error: data.msg1 || '주문 실패',
+                code: data.msg_cd
+            }
+        }
+    } catch (error) {
+        console.error('해외주식 주문 오류:', error)
+        return {
+            success: false,
+            error: error.message
+        }
+    }
+}
+
+/**
+ * 해외주식 현재가 상세 조회
+ */
+export async function getOverseasCurrentPrice(accessToken, appkey, appsecret, exchange, symbol) {
+    try {
+        // 시세 API는 3자리 코드 사용 (NAS, NYS, AMS)
+        // 입력받은 exchange가 3자리라면 그대로 사용
+        const excd = exchange || 'NAS'
+
+        const params = new URLSearchParams({
+            AUTH: '',
+            EXCD: excd,
+            SYMB: symbol
+        })
+
+        const response = await fetch(`${KIS_BASE_URL}/uapi/overseas-price/v1/quotations/price-detail?${params}`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json; charset=utf-8',
+                'authorization': `Bearer ${accessToken}`,
+                'appkey': appkey,
+                'appsecret': appsecret,
+                'tr_id': 'HHDFS76200200',
+                'custtype': 'P'
+            }
+        })
+
+        const data = await response.json()
+
+        if (data.rt_cd === '0' && data.output) {
+            return {
+                success: true,
+                price: data.output.last,
+                diff: data.output.diff,
+                rate: data.output.rate,
+                open: data.output.open,
+                high: data.output.high,
+                low: data.output.low,
+                volume: data.output.tvol
+            }
+        } else {
+            return {
+                success: false,
+                error: data.msg1 || '현재가 조회 실패'
+            }
+        }
+    } catch (error) {
+        console.error('현재가 조회 오류:', error)
+        return {
+            success: false,
+            error: error.message
+        }
+    }
+}

@@ -1,10 +1,16 @@
+import { useState } from "react"
 import { useStore } from "@/store/useStore"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { KISOrderDialog } from "@/components/KISOrderDialog" // Import Dialog
 
 export function AnalysisPanel() {
     const { analysisResult, isAnalyzing, setTicker, setAnalysisMode } = useStore()
+
+    // Order Dialog State
+    const [orderDialogOpen, setOrderDialogOpen] = useState(false)
+    const [orderConfig, setOrderConfig] = useState({ type: 'buy', ticker: '', price: 0 })
 
     // Loading state is handled in StatusBar
 
@@ -34,13 +40,25 @@ export function AnalysisPanel() {
         }
     }
 
+    const handleSignalClick = (e, item) => {
+        e.stopPropagation() // 행 클릭 방지
+        if (item.signal === 'BUY' || item.signal === 'SELL') {
+            setOrderConfig({
+                type: item.signal.toLowerCase(), // 'buy' or 'sell'
+                ticker: item.ticker,
+                price: item.price
+            })
+            setOrderDialogOpen(true)
+        }
+    }
+
     return (
         <div className="h-full flex flex-col bg-[#1e1e1e]">
             {/* Header */}
             <div className="p-4 border-b border-[#3e3e42] flex justify-between items-center bg-[#252526]">
                 <div>
                     <h2 className="text-lg font-bold text-[#e1e1e1]">Market Scanner Result</h2>
-                    <p className="text-xs text-[#9d9d9d]">Current signals based on active strategy & interval.</p>
+                    <p className="text-xs text-[#9d9d9d]">Click BUY/SELL signal to execute order.</p>
                 </div>
                 <div className="text-xs text-[#777]">
                     Total: {analysisResult.length} scanned
@@ -75,7 +93,8 @@ export function AnalysisPanel() {
                                 <TableCell>
                                     <Badge
                                         variant={item.signal === 'BUY' ? 'destructive' : 'secondary'}
-                                        className={`rounded-sm px-2 py-0.5 text-[10px] uppercase ${getSignalColorClass(item.signal)}`}
+                                        onClick={(e) => handleSignalClick(e, item)}
+                                        className={`rounded-sm px-2 py-0.5 text-[10px] uppercase cursor-pointer hover:scale-105 active:scale-95 transition-transform ${getSignalColorClass(item.signal)}`}
                                     >
                                         {item.signal}
                                     </Badge>
@@ -105,6 +124,14 @@ export function AnalysisPanel() {
                     </TableBody>
                 </Table>
             </ScrollArea>
+
+            <KISOrderDialog
+                open={orderDialogOpen}
+                onOpenChange={setOrderDialogOpen}
+                orderType={orderConfig.type}
+                ticker={orderConfig.ticker}
+                currentPrice={orderConfig.price}
+            />
         </div>
     )
 }

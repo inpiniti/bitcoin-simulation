@@ -139,6 +139,10 @@
 #### 시장 전체 분석 (Market Analysis / Scanner)
 *   **선택된 티커 그룹(Ticker Group)** 내 전체 종목 스캔.
 *   각 종목별 매매 신호(BUY/SELL/HOLD) 표시.
+*   **매매 실행 (Trade Execution)**:
+    *   신호 클릭 시 **KIS 주문 다이얼로그** 표시.
+    *   **실시간 현재가 자동 조회** 및 주문 단가 설정.
+    *   매수/매도 수량 및 단가 설정 후 실시간 주문 실행 (KIS API 연동).
 *   AI 감성 분석 (FinBERT) 점수 통합.
 
 ### 3. 스타일링 (VS Code Theme)

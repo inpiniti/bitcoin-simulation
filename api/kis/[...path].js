@@ -16,9 +16,13 @@ export default async function handler(req, res) {
     }
 
     try {
-        const { path } = req.query
+        // 경로 및 쿼리 파라미터 분리
+        const { path, ...queryParams } = req.query
         const targetPath = Array.isArray(path) ? path.join('/') : path || ''
-        const targetUrl = `https://openapi.koreainvestment.com:9443/${targetPath}`
+
+        // 쿼리 스트링 재구성 (GET 요청 등에 필수)
+        const queryString = new URLSearchParams(queryParams).toString()
+        const targetUrl = `https://openapi.koreainvestment.com:9443/${targetPath}${queryString ? '?' + queryString : ''}`
 
         // 요청 헤더 복사 (필요한 것만)
         const headers = {
@@ -39,7 +43,8 @@ export default async function handler(req, res) {
 
         // POST 요청인 경우 body 추가
         if (req.method === 'POST' && req.body) {
-            options.body = JSON.stringify(req.body)
+            // Vercel은 JSON body를 자동으로 파싱하여 객체로 제공할 수 있음
+            options.body = (typeof req.body === 'object') ? JSON.stringify(req.body) : req.body
         }
 
         console.log(`[KIS Proxy] ${req.method} ${targetUrl}`)
