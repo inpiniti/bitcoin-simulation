@@ -85,6 +85,10 @@ export const useStore = create(
                     strategyOptions: { ...state.strategyOptions, ...options }
                 })),
 
+                // Ticker Group Selection
+                tickerGroup: 'superinvestor', // 'superinvestor' | 'myholdings' | 'pricesurge' | 'pricedrop' | 'volumesurge'
+                setTickerGroup: (group) => set({ tickerGroup: group }),
+
                 // Korea Investment Securities (KIS) Authentication
                 kisAuth: {
                     isLoggedIn: false,
@@ -157,19 +161,39 @@ export const useStore = create(
                     })
                 },
 
+                // Group Stocks (Ticker Group Data)
+                groupStocks: [],
+                loadingGroupStocks: false,
+                setGroupStocks: (stocks) => set({ groupStocks: stocks }),
+                setLoadingGroupStocks: (loading) => set({ loadingGroupStocks: loading }),
+
                 /**
                  * 시장 전체 분석 실행 (Market Scanner)
                  */
                 runMarketAnalysis: async () => {
                     const state = get();
-                    if (state.recommendedStocks.length === 0) {
-                        await state.loadRecommendedTickers();
+                    let stocks = [];
+
+                    // tickerGroup에 따라 분석 대상 결정
+                    if (state.tickerGroup === 'superinvestor') {
+                        if (state.recommendedStocks.length === 0) {
+                            await state.loadRecommendedTickers();
+                        }
+                        stocks = get().recommendedStocks;
+                    } else {
+                        // 'myholdings', 'pricedrop' 등은 TitleBar에서 이미 로드된 groupStocks 사용
+                        stocks = state.groupStocks;
                     }
-                    const stocks = get().recommendedStocks;
+
                     if (stocks.length === 0) {
-                        get().setGlobalError('분석할 추천 종목 데이터가 없습니다.');
+                        get().setGlobalError('분석할 종목 데이터가 없습니다. 종목이 로드되었는지 확인해주세요.');
                         return;
                     }
+
+                    // 분석 실행 (Superinvestor, My Holdings 등 모두 동일 로직)
+                    // 단, Yahoo Finance/Upbit 데이터가 아닌 KIS 데이터 기반으로 분석하려면 로직 분기가 필요할 수 있음
+                    // 현재는 모든 분석이 fetchStockShortData (Yahoo Finance) 기반으로 동작함.
+                    // KIS 종목 코드(티커)가 Yahoo Finance와 호환된다면 문제 없음.
 
                     set({
                         isAnalyzing: true,
@@ -189,6 +213,8 @@ export const useStore = create(
                             let rawData;
                             const cachedEntry = state.dataCache[stock.ticker];
 
+                            // KIS에서 가져온 티커가 Yahoo Finance 형식과 다를 수 있으므로 주의 (ex. 005930.KS)
+                            // 현재 해외 주식이므로 대부분 호환될 것으로 예상 (AAPL, TSLA...)
                             if (cachedEntry && new Date(cachedEntry.timestamp).toISOString().split('T')[0] === today) {
                                 rawData = cachedEntry.data;
                             } else {
@@ -204,16 +230,26 @@ export const useStore = create(
                                 }
                             }
 
-                            if (rawData.length < 20) {
+                            if (!rawData || rawData.length < 20) {
                                 results.push({ ticker: stock.ticker, signal: 'SKIP', reason: 'Not enough data' });
+                                processedCount++;
+                                set({ analysisProgress: { current: processedCount, total: stocks.length } });
                                 continue;
                             }
 
                             const dataWithSlope = addDerivedData(rawData);
                             const analysis = analyzeSignal(dataWithSlope, options);
 
-                            const newsHeadlines = await fetchStockNews(stock.ticker);
-                            const sentimentScore = await getSentimentScore(newsHeadlines);
+                            // 뉴스 및 감성 분석은 시간이 오래 걸리므로 비동기 또는 생략 고려
+                            // 일단 유지
+                            let sentimentScore = 0;
+                            let newsHeadlines = [];
+                            try {
+                                newsHeadlines = await fetchStockNews(stock.ticker);
+                                sentimentScore = await getSentimentScore(newsHeadlines);
+                            } catch (err) {
+                                console.warn(`News fetch failed for ${stock.ticker}`, err);
+                            }
 
                             const lastCandle = dataWithSlope[dataWithSlope.length - 1];
                             const prevCandle = dataWithSlope[dataWithSlope.length - 2];

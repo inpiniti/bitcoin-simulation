@@ -323,3 +323,121 @@ export async function getPeriodProfit(accessToken, appkey, appsecret, accountNo,
         }
     }
 }
+
+/**
+ * 해외주식 가격급등락 조회
+ * @param {string} accessToken - 접근 토큰
+ * @param {string} appkey - 앱 키
+ * @param {string} appsecret - 앱 시크릿
+ * @param {string} type - 'rise' (급등) 또는 'fall' (급락)
+ * @param {string} excd - 거래소코드 (NAS, NYS, AMS 등)
+ * @param {string} mixn - N분전 (0:1분, 3:5분, 4:10분, 7:30분, 8:60분)
+ */
+export async function getPriceFluctuation(accessToken, appkey, appsecret, type = 'fall', excd = 'NAS', mixn = '8') {
+    try {
+        const params = new URLSearchParams({
+            KEYB: '',
+            AUTH: '',
+            EXCD: excd,
+            GUBN: type === 'rise' ? '1' : '0',
+            MIXN: mixn,
+            VOL_RANG: '0' // 전체
+        })
+
+        const response = await fetch(`${KIS_BASE_URL}/uapi/overseas-stock/v1/ranking/price-fluct?${params}`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json; charset=utf-8',
+                'authorization': `Bearer ${accessToken}`,
+                'appkey': appkey,
+                'appsecret': appsecret,
+                'tr_id': 'HHDFS76260000',
+                'custtype': 'P'
+            }
+        })
+
+        const data = await response.json()
+
+        if (data.rt_cd === '0') {
+            return {
+                success: true,
+                stocks: (data.output2 || []).map(item => ({
+                    ticker: item.symb || '',
+                    name: item.knam || '',
+                    currentPrice: item.last || '0',
+                    changeRate: item.n_rate || '0',
+                    volume: item.tvol || '0'
+                }))
+            }
+        } else {
+            return {
+                success: false,
+                error: data.msg1 || '가격급등락 조회 실패'
+            }
+        }
+    } catch (error) {
+        console.error('가격급등락 조회 오류:', error)
+        return {
+            success: false,
+            error: error.message
+        }
+    }
+}
+
+/**
+ * 해외주식 거래량급증 조회
+ * @param {string} accessToken - 접근 토큰
+ * @param {string} appkey - 앱 키
+ * @param {string} appsecret - 앱 시크릿
+ * @param {string} excd - 거래소코드 (NAS, NYS, AMS 등)
+ * @param {string} mixn - N분전 (0:1분, 3:5분, 4:10분, 7:30분, 8:60분)
+ */
+export async function getVolumeSurge(accessToken, appkey, appsecret, excd = 'NAS', mixn = '8') {
+    try {
+        const params = new URLSearchParams({
+            KEYB: '',
+            AUTH: '',
+            EXCD: excd,
+            MIXN: mixn,
+            VOL_RANG: '0' // 전체
+        })
+
+        const response = await fetch(`${KIS_BASE_URL}/uapi/overseas-stock/v1/ranking/volume-surge?${params}`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json; charset=utf-8',
+                'authorization': `Bearer ${accessToken}`,
+                'appkey': appkey,
+                'appsecret': appsecret,
+                'tr_id': 'HHDFS76270000',
+                'custtype': 'P'
+            }
+        })
+
+        const data = await response.json()
+
+        if (data.rt_cd === '0') {
+            return {
+                success: true,
+                stocks: (data.output2 || []).map(item => ({
+                    ticker: item.symb || '',
+                    name: item.knam || '',
+                    currentPrice: item.last || '0',
+                    volume: item.tvol || '0',
+                    volumeRate: item.n_rate || '0'
+                }))
+            }
+        } else {
+            return {
+                success: false,
+                error: data.msg1 || '거래량급증 조회 실패'
+            }
+        }
+    } catch (error) {
+        console.error('거래량급증 조회 오류:', error)
+        return {
+            success: false,
+            error: error.message
+        }
+    }
+}

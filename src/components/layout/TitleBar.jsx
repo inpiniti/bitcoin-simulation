@@ -19,6 +19,8 @@ export function TitleBar() {
         mode, ticker, setMode, setTicker,
         recommendedStocks, loadingRecommendations, loadRecommendedTickers,
         loadDailyData, hist, loadingInterval,
+        tickerGroup, setTickerGroup,
+        groupStocks, setGroupStocks, loadingGroupStocks, setLoadingGroupStocks, // Store에서 가져옴
         kisAuth, loginKIS, logoutKIS
     } = useStore()
     const [localTicker, setLocalTicker] = useState(ticker)
@@ -54,6 +56,87 @@ export function TitleBar() {
     useEffect(() => {
         loadRecommendedTickers()
     }, [])
+
+    // 티커 그룹 변경 시 종목 리스트 로드
+    useEffect(() => {
+        loadGroupStocks()
+    }, [tickerGroup, kisAuth.isLoggedIn, recommendedStocks]) // recommendedStocks 변경 시 반영
+
+    const loadGroupStocks = async () => {
+        if (tickerGroup === 'superinvestor') {
+            if (recommendedStocks.length === 0) {
+                await loadRecommendedTickers()
+            }
+            // recommendedStocks가 비동기로 로드된 후 store가 업데이트되면
+            // useEffect([recommendedStocks])가 트리거되어 다시 이 함수가 호출되고
+            // 그때 setGroupStocks가 실행될 것임.
+            // 하지만 현재 값을 바로 setting 해주는 것도 좋음.
+            if (useStore.getState().recommendedStocks.length > 0) {
+                setGroupStocks(useStore.getState().recommendedStocks)
+            }
+            return
+        }
+
+        if (!kisAuth.isLoggedIn) {
+            setGroupStocks([])
+            return
+        }
+
+        setLoadingGroupStocks(true)
+        try {
+            const { accessToken, appkey, appsecret, accountNo, accountCode } = kisAuth
+
+            if (tickerGroup === 'myholdings') {
+                // 내 보유종목
+                const { getOverseasBalance } = await import('@/lib/kisApi')
+                const result = await getOverseasBalance(accessToken, appkey, appsecret, accountNo, accountCode)
+                if (result.success) {
+                    setGroupStocks(result.holdings.map(h => ({
+                        ticker: h.pdno,
+                        name: h.prdt_name,
+                        count: parseInt(h.ccld_qty_smtl1 || 0)
+                    })))
+                }
+            } else if (tickerGroup === 'pricedrop') {
+                // 가격 급락 (60분전 대비)
+                const { getPriceFluctuation } = await import('@/lib/kisApi')
+                const result = await getPriceFluctuation(accessToken, appkey, appsecret, 'fall', 'NAS', '8')
+                if (result.success) {
+                    setGroupStocks(result.stocks.map(s => ({
+                        ticker: s.ticker,
+                        name: s.name,
+                        count: parseFloat(s.changeRate || 0).toFixed(2) + '%'
+                    })))
+                }
+            } else if (tickerGroup === 'pricesurge') {
+                // 가격 급등 (60분전 대비)
+                const { getPriceFluctuation } = await import('@/lib/kisApi')
+                const result = await getPriceFluctuation(accessToken, appkey, appsecret, 'rise', 'NAS', '8')
+                if (result.success) {
+                    setGroupStocks(result.stocks.map(s => ({
+                        ticker: s.ticker,
+                        name: s.name,
+                        count: '+' + parseFloat(s.changeRate || 0).toFixed(2) + '%'
+                    })))
+                }
+            } else if (tickerGroup === 'volumesurge') {
+                // 거래량 급증 (60분전 대비)
+                const { getVolumeSurge } = await import('@/lib/kisApi')
+                const result = await getVolumeSurge(accessToken, appkey, appsecret, 'NAS', '8')
+                if (result.success) {
+                    setGroupStocks(result.stocks.map(s => ({
+                        ticker: s.ticker,
+                        name: s.name,
+                        count: parseFloat(s.volumeRate || 0).toFixed(0) + '%'
+                    })))
+                }
+            }
+        } catch (error) {
+            console.error('그룹 종목 로드 오류:', error)
+        } finally {
+            setLoadingGroupStocks(false)
+        }
+    }
 
     const openAlert = (title, description, onConfirm, onCancel = null) => {
         setAlertConfig({
@@ -158,6 +241,19 @@ export function TitleBar() {
             <div className="flex-1 flex justify-center items-center">
                 {mode === 'stock' && (
                     <div className="flex items-center gap-2 relative">
+                        {/* Ticker Group Selector */}
+                        <select
+                            value={tickerGroup}
+                            onChange={(e) => setTickerGroup(e.target.value)}
+                            className="bg-[#252526] text-[#cccccc] border border-[#3e3e42] rounded px-2 py-0.5 text-xs focus:border-[#007acc] focus:outline-none"
+                        >
+                            <option value="superinvestor">Superinvestor</option>
+                            <option value="myholdings" disabled={!kisAuth.isLoggedIn}>내 보유종목</option>
+                            <option value="pricedrop">급락 (60분)</option>
+                            <option value="pricesurge">급등 (60분)</option>
+                            <option value="volumesurge">거래량 급증</option>
+                        </select>
+
                         <span className="text-xs text-[#9d9d9d]">Ticker:</span>
 
                         <div className="relative group">
@@ -181,12 +277,16 @@ export function TitleBar() {
                                 </svg>
                             </div>
 
-                            {recommendedStocks.length > 0 && (
+                            {(groupStocks.length > 0 || tickerGroup === 'superinvestor') && (
                                 <div className="absolute top-full left-0 w-64 bg-[#252526] border border-[#3e3e42] shadow-lg rounded-sm mt-1 z-50 hidden group-focus-within:block max-h-80 overflow-y-auto">
                                     <div className="px-2 py-1.5 text-[10px] text-[#6a9955] bg-[#1e1e1e] font-bold sticky top-0 border-b border-[#3e3e42]">
-                                        🔥 Superinvestors' Top Picks
+                                        {tickerGroup === 'superinvestor' && '🔥 Superinvestors\' Top Picks'}
+                                        {tickerGroup === 'myholdings' && '💼 내 보유종목'}
+                                        {tickerGroup === 'pricedrop' && '📉 급락 종목 (60분)'}
+                                        {tickerGroup === 'pricesurge' && '📈 급등 종목 (60분)'}
+                                        {tickerGroup === 'volumesurge' && '📊 거래량 급증'}
                                     </div>
-                                    {recommendedStocks
+                                    {(tickerGroup === 'superinvestor' ? recommendedStocks : groupStocks)
                                         .filter(stock =>
                                             filterText === "" ||
                                             stock.ticker.toLowerCase().includes(filterText.toLowerCase()) ||
@@ -201,7 +301,7 @@ export function TitleBar() {
                                                     if (ticker !== stock.ticker) {
                                                         openAlert(
                                                             "종목 변경",
-                                                            `'${stock.ticker}' (${stock.count} holders) 로 변경하시겠습니까?`,
+                                                            `'${stock.ticker}' ${stock.name ? `(${stock.name})` : ''} 로 변경하시겠습니까?`,
                                                             () => {
                                                                 setTicker(stock.ticker)
                                                                 setLocalTicker(stock.ticker)
@@ -219,13 +319,13 @@ export function TitleBar() {
                                                 </span>
                                             </button>
                                         ))}
-                                    {recommendedStocks.filter(stock =>
+                                    {(tickerGroup === 'superinvestor' ? recommendedStocks : groupStocks).filter(stock =>
                                         filterText === "" ||
                                         stock.ticker.toLowerCase().includes(filterText.toLowerCase()) ||
                                         stock.name.toLowerCase().includes(filterText.toLowerCase())
                                     ).length === 0 && (
                                             <div className="px-2 py-2 text-[10px] text-[#666] text-center italic">
-                                                No matching stocks found
+                                                {loadingGroupStocks ? 'Loading...' : 'No matching stocks found'}
                                             </div>
                                         )}
                                 </div>
