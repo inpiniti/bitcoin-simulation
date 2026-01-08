@@ -38,7 +38,10 @@ export function KISAccountDialog({ open, onOpenChange, kisAuth, onLogout }) {
             if (activeMenu === 'balance' || activeMenu === 'account') {
                 const result = await getOverseasBalance(accessToken, appkey, appsecret, accountNo, accountCode)
                 if (result.success) {
-                    setData(prev => ({ ...prev, balance: result }))
+                    const filteredHoldings = (result.holdings || []).filter(h =>
+                        Number(h.ccld_qty_smtl1) > 0 && parseFloat(h.frcr_evlu_amt2) > 0
+                    )
+                    setData(prev => ({ ...prev, balance: { ...result, holdings: filteredHoldings } }))
                 }
             } else if (activeMenu === 'orders') {
                 const result = await getUnfilledOrders(accessToken, appkey, appsecret, accountNo, accountCode)
@@ -161,6 +164,9 @@ export function KISAccountDialog({ open, onOpenChange, kisAuth, onLogout }) {
         if (!data.balance) return <div className="text-[#888888] text-xs">데이터를 불러오는 중...</div>
 
         const { holdings, summary } = data.balance
+
+
+
         return (
             <div className="flex flex-col h-full">
                 {/* 요약 정보 */}

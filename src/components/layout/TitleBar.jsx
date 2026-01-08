@@ -91,12 +91,14 @@ export function TitleBar() {
                 const { getOverseasBalance } = await import('@/lib/kisApi')
                 const result = await getOverseasBalance(accessToken, appkey, appsecret, accountNo, accountCode)
                 if (result.success) {
-                    setGroupStocks(result.holdings.map(h => ({
-                        ticker: h.pdno,
-                        name: h.prdt_name,
-                        count: parseInt(h.ccld_qty_smtl1 || 0),
-                        exchange: h.ovrs_excg_cd
-                    })))
+                    setGroupStocks(result.holdings
+                        .filter(h => Number(h.ccld_qty_smtl1) > 0 && parseFloat(h.frcr_evlu_amt2) > 0)
+                        .map(h => ({
+                            ticker: h.pdno,
+                            name: h.prdt_name,
+                            count: parseInt(h.ccld_qty_smtl1 || 0),
+                            exchange: h.ovrs_excg_cd
+                        })))
                 }
             } else if (tickerGroup === 'pricedrop') {
                 // 가격 급락 (60분전 대비)
