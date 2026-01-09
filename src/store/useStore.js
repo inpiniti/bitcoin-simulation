@@ -178,25 +178,17 @@ export const useStore = create(
                     let stocks = [];
 
                     // tickerGroup에 따라 분석 대상 결정
-                    if (state.tickerGroup === 'superinvestor') {
-                        if (state.recommendedStocks.length === 0) {
-                            await state.loadRecommendedTickers();
-                        }
-                        stocks = get().recommendedStocks;
-                    } else {
-                        // 'myholdings', 'pricedrop' 등은 TitleBar에서 이미 로드된 groupStocks 사용
-                        stocks = state.groupStocks;
-                    }
+                    // 모든 그룹(superinvestor 포함)은 TitleBar 등에서 이미 groupStocks로 로드되어 있어야 함.
+                    stocks = state.groupStocks;
 
                     if (stocks.length === 0) {
                         get().setGlobalError('분석할 종목 데이터가 없습니다. 종목이 로드되었는지 확인해주세요.');
                         return;
                     }
 
-                    // 분석 실행 (Superinvestor, My Holdings 등 모두 동일 로직)
-                    // 단, Yahoo Finance/Upbit 데이터가 아닌 KIS 데이터 기반으로 분석하려면 로직 분기가 필요할 수 있음
-                    // 현재는 모든 분석이 fetchStockShortData (Yahoo Finance) 기반으로 동작함.
-                    // KIS 종목 코드(티커)가 Yahoo Finance와 호환된다면 문제 없음.
+                    // 분석 실행
+                    // KIS 데이터, Dataroma 데이터 모두 groupStocks에 { ticker, name, count, exchange? } 형태로 있음
+                    // 거래소 정보는 상세 데이터 조회 시(fetchStockShortData) Yahoo Finance 메타데이터로 보정됨.
 
                     set({
                         isAnalyzing: true,

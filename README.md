@@ -162,3 +162,11 @@
 *   기존의 복잡한 간격별 집계 로직 제거.
 *   Store에서 `hist['1d']`만 관리.
 *   모드 전환은 `viewMode` 상태로 관리.
+    
+    #### 데이터 구조 & 교차 검증 (Data Structuring)
+    *   **Group Management**:
+        *   `groupStocks`: 현재 선택된 그룹의 종목 리스트 (Source of Truth).
+        *   `recommendedStocks`: `Superinvestor` 그룹 데이터 캐싱용 (24h). 'Superinvestor' 그룹 선택 시 `recommendedStocks` 복사본이 `groupStocks`로 이동.
+    *   **Exchange Standardization**:
+        *   API별 상이한 거래소 코드(NYQ, NMS 등)를 표준 코드(NYS, NAS 등)로 매핑.
+        *   초기 리스트 로딩 시(DataRoma 등) 거래소 정보가 없어도, 분석 단계에서 상세 데이터(Yahoo Finance) 조회 시 거래소 정보를 동적으로 보정 및 업데이트.

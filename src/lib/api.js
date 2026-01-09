@@ -89,7 +89,17 @@ export async function fetchStockData(ticker, interval = '1d', range = '365d') {
 
     // 메타 정보 추가 (거래소 정보 등)
     if (result.meta) {
-        normalized.exchange = result.meta.exchangeName;
+        let exchangeName = result.meta.exchangeName || result.meta.fullExchangeName;
+
+        // Yahoo Finance 거래소 코드 매핑 표준화
+        if (exchangeName === 'NYQ') exchangeName = 'NYS';       // NYSE
+        else if (exchangeName === 'NMS') exchangeName = 'NAS';  // NasdaqGS
+        else if (exchangeName === 'NGM') exchangeName = 'NAS';  // NasdaqGM
+        else if (exchangeName === 'NCM') exchangeName = 'NAS';  // NasdaqCM
+        else if (exchangeName === 'ASE') exchangeName = 'AMS';  // AMEX
+        else if (exchangeName === 'PNK') exchangeName = 'OTC';  // Pink Sheets
+
+        normalized.exchange = exchangeName;
     }
 
     console.log(`[API] Stock data loaded: ${normalized.length} items for ${ticker} (${range})`);
