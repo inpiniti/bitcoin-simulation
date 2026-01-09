@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils"
 import { useStore } from "@/store/useStore"
-import { Play, Table2, LineChart, Search, Loader2 } from "lucide-react"
+import { Play, Table2, LineChart, Search, Loader2, MessageSquare } from "lucide-react"
 import {
     Tooltip,
     TooltipContent,
@@ -13,6 +13,7 @@ const VIEW_MODES = [
     { key: 'dataView', label: '데이터 뷰', icon: Table2 },
     { key: 'chartView', label: '차트 뷰', icon: LineChart },
     { key: 'analyze', label: '분석', icon: Search },
+    { key: 'discussion', label: '종목 토론', icon: MessageSquare },
 ]
 
 export function ActivityBar() {

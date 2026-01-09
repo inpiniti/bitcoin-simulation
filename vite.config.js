@@ -66,6 +66,47 @@ export default defineConfig({
                 secure: false,
                 rewrite: (path) => path.replace(/^\/api\/kis/, ''),
             },
+            '/api/naver': {
+                target: 'https://m.stock.naver.com',
+                changeOrigin: true,
+                secure: false,
+                rewrite: (path) => path.replace(/^\/api\/naver/, '/front-api'),
+            },
+            '/api/stocktwits': {
+                target: 'https://api.stocktwits.com/api/2',
+                changeOrigin: true,
+                secure: false,
+                rewrite: (path) => path.replace(/^\/api\/stocktwits/, ''),
+                configure: (proxy, _options) => {
+                    proxy.on('proxyReq', (proxyReq, req, _res) => {
+                        proxyReq.setHeader('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+                        proxyReq.setHeader('Referer', 'https://stocktwits.com/');
+                    });
+                },
+            },
+            '/api/reddit': {
+                target: 'https://www.reddit.com',
+                changeOrigin: true,
+                secure: false,
+                rewrite: (path) => path.replace(/^\/api\/reddit/, ''),
+                configure: (proxy, _options) => {
+                    proxy.on('proxyReq', (proxyReq, req, _res) => {
+                        proxyReq.setHeader('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+                    });
+                },
+            },
+            '/api/yahoo-conversation': {
+                target: 'https://api-v2.spot.im',
+                changeOrigin: true,
+                secure: false,
+                rewrite: (path) => path.replace(/^\/api\/yahoo-conversation/, ''),
+                configure: (proxy, _options) => {
+                    proxy.on('proxyReq', (proxyReq, req, _res) => {
+                        proxyReq.setHeader('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+                        proxyReq.setHeader('Origin', 'https://finance.yahoo.com');
+                    });
+                },
+            },
         },
     },
 })

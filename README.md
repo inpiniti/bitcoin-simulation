@@ -35,6 +35,7 @@
 - 📊 데이터 뷰 (Data View): 날짜별 상세 데이터 테이블
 - 📈 차트 뷰 (Chart View): 가격 차트 + AI 예측
 - 🔍 분석 (Analyze): 전체 종목 스캔 및 매매 신호
+- 💬 종목 토론 (Discussion): Naver/Stocktwits 실시간 토론
 ```
 
 ## 주요 기능 (Features)
@@ -105,6 +106,7 @@
     *   📋 **데이터 뷰 (Data View)**: 날짜별 상세 데이터 테이블
     *   📈 **차트 뷰 (Chart View)**: 가격 라인 차트 + AI 예측
     *   🔍 **분석 (Analyze)**: 전체 종목 스캔 및 매매 신호
+    *   💬 **종목 토론 (Discussion)**: Naver/Stocktwits 실시간 토론
 
 #### 상단 컨트롤 (Top Controls)
 *   **자산 토글 (Toggle)**: `Coin` / `Stock` 선택. 변경 시 데이터 초기화 후 일봉 로드.
@@ -124,6 +126,7 @@
     *   **데이터 뷰 모드**: 날짜별 가격/지표 테이블
     *   **차트 뷰 모드**: Recharts 라인 차트 + AI 예측 (점선)
     *   **분석 모드**: 전체 종목 스캔 결과 테이블
+    *   **토론 모드**: Naver/Stocktwits 종목 토론 게시글 리스트
 
 #### 데이터 뷰어 (Data Viewer)
 *   **테이블 모드**: `날짜` | `가격 (Median)` | `기울기 (Slope)` | `BB Status` 등.

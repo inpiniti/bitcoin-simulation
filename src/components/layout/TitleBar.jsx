@@ -253,7 +253,7 @@ export function TitleBar() {
                             onChange={(e) => setTickerGroup(e.target.value)}
                             className="bg-[#252526] text-[#cccccc] border border-[#3e3e42] rounded px-2 py-0.5 text-xs focus:border-[#007acc] focus:outline-none"
                         >
-                            <option value="superinvestor">Superinvestor</option>
+                            <option value="superinvestor">투자그루</option>
                             <option value="myholdings" disabled={!kisAuth.isLoggedIn}>내 보유종목</option>
                             <option value="pricedrop">급락 (60분)</option>
                             <option value="pricesurge">급등 (60분)</option>
@@ -286,7 +286,7 @@ export function TitleBar() {
                             {(groupStocks.length > 0 || tickerGroup === 'superinvestor') && (
                                 <div className="absolute top-full left-0 w-64 bg-[#252526] border border-[#3e3e42] shadow-lg rounded-sm mt-1 z-50 hidden group-focus-within:block max-h-80 overflow-y-auto">
                                     <div className="px-2 py-1.5 text-[10px] text-[#6a9955] bg-[#1e1e1e] font-bold sticky top-0 border-b border-[#3e3e42]">
-                                        {tickerGroup === 'superinvestor' && '🔥 Superinvestors\' Top Picks'}
+                                        {tickerGroup === 'superinvestor' && '🔥 투자그루 Top Picks'}
                                         {tickerGroup === 'myholdings' && '💼 내 보유종목'}
                                         {tickerGroup === 'pricedrop' && '📉 급락 종목 (60분)'}
                                         {tickerGroup === 'pricesurge' && '📈 급등 종목 (60분)'}

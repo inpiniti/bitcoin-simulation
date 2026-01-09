@@ -40,6 +40,10 @@ const API_BASE_URL = 'https://external-api.com'
 - **Yahoo Finance**: `/api/yahoo` → `https://query1.finance.yahoo.com`
 - **DataRoma**: `/api/dataroma` → `https://www.dataroma.com`
 - **한국투자증권 (KIS)**: `/api/kis` → `https://openapi.koreainvestment.com:9443`
+- **Naver Finance**: `/api/naver` → `https://m.stock.naver.com`
+- **Stocktwits**: `/api/stocktwits` → `https://api.stocktwits.com`
+- **Reddit**: `/api/reddit` → `https://www.reddit.com`
+- **Yahoo (OpenWeb)**: `/api/yahoo-conversation` → `https://api-v2.spot.im`
 
 ### 5. 새로운 외부 API 추가 시
 1. `vite.config.js`에 프록시 설정 추가

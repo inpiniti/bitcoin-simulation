@@ -14,6 +14,7 @@ import {
 import { FileCode, X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, LineChart as LineChartIcon, TableIcon, Play } from "lucide-react"
 import { ChartView } from "../ChartView"
 import { AnalysisPanel } from "../AnalysisPanel"
+import { StockDiscussionPanel } from "../StockDiscussionPanel"
 
 // 페이지당 거래 수
 const ITEMS_PER_PAGE = 50
@@ -53,6 +54,11 @@ export function EditorArea() {
     // Analysis Mode
     if (viewMode === 'analyze') {
         return <AnalysisPanel />
+    }
+
+    // Discussion View Mode
+    if (viewMode === 'discussion') {
+        return <StockDiscussionPanel />
     }
 
     // Chart View Mode
