@@ -47,7 +47,6 @@ export default defineConfig(({ mode }) => {
                         }
                     });
 
-                    // S&P 500 Wikipedia Scraper
                     server.middlewares.use('/api/sp500', async (req, res, next) => {
                         try {
                             const cheerio = await import('cheerio');
@@ -89,6 +88,54 @@ export default defineConfig(({ mode }) => {
                                         name,
                                         count: actualSector,
                                         exchange: 'NYS/NAS'
+                                    });
+                                }
+                            });
+
+                            res.setHeader('Content-Type', 'application/json');
+                            res.end(JSON.stringify(stocks));
+                        } catch (e) {
+                            console.error(e);
+                            res.statusCode = 500;
+                            res.end(JSON.stringify({ error: e.message }));
+                        }
+                    });
+
+                    // Nasdaq 100 Wikipedia Scraper
+                    server.middlewares.use('/api/qqq', async (req, res, next) => {
+                        try {
+                            const cheerio = await import('cheerio');
+                            const fetch = (await import('node-fetch')).default || global.fetch;
+
+                            const TARGET_URL = 'https://en.wikipedia.org/wiki/Nasdaq-100';
+                            console.log(`[Vite Dev] Fetching Nasdaq 100 from Wikipedia: ${TARGET_URL}`);
+
+                            const apiResponse = await fetch(TARGET_URL);
+                            if (!apiResponse.ok) throw new Error(apiResponse.statusText);
+
+                            const html = await apiResponse.text();
+                            const $ = cheerio.load(html);
+                            const stocks = [];
+
+                            // Wikipedia table id="constituents"
+                            $('#constituents tbody tr').each((i, el) => {
+                                const tds = $(el).find('td');
+                                if (tds.length === 0) return;
+
+                                // For Nasdaq 100: Company (0), Ticker (1), Sector (2), Sub-Industry (3)
+                                let name = $(tds[0]).text().trim();
+                                let ticker = $(tds[1]).text().trim();
+                                let sector = $(tds[2]).text().trim();
+
+                                // Clean up
+                                ticker = ticker.replace(/\n/g, '').trim();
+
+                                if (ticker) {
+                                    stocks.push({
+                                        ticker: ticker.replace(/\./g, '-'),
+                                        name,
+                                        count: sector,
+                                        exchange: 'NAS'
                                     });
                                 }
                             });

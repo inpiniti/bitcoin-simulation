@@ -202,6 +202,21 @@ export const useStore = create(
                         return;
                     }
 
+                    if (tickerGroup === 'qqq') {
+                        setLoadingGroupStocks(true);
+                        try {
+                            const { fetchQQQTickers } = await import('@/lib/qqqData');
+                            const stocks = await fetchQQQTickers();
+                            setGroupStocks(stocks);
+                        } catch (e) {
+                            console.error('Nasdaq 100 fetch error', e);
+                            setGroupStocks([]);
+                        } finally {
+                            setLoadingGroupStocks(false);
+                        }
+                        return;
+                    }
+
                     if (!kisAuth.isLoggedIn) {
                         setGroupStocks([]);
                         return;

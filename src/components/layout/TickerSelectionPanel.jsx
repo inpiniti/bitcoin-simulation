@@ -36,6 +36,7 @@ export function TickerSelectionPanel() {
                 >
                     <option value="superinvestor">🔥 투자그루 Top Picks</option>
                     <option value="sp500">🇺🇸 S&P 500</option>
+                    <option value="qqq">🇺🇸 Nasdaq 100 (QQQ)</option>
                     <option value="myholdings" disabled={!kisAuth.isLoggedIn}>💼 내 보유종목</option>
                     <option value="pricedrop">📉 급락 (60분)</option>
                     <option value="pricesurge">📈 급등 (60분)</option>
