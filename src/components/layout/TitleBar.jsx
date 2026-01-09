@@ -57,92 +57,12 @@ export function TitleBar() {
         loadRecommendedTickers()
     }, [])
 
+    const { fetchGroupStocks } = useStore()
+
     // 티커 그룹 변경 시 종목 리스트 로드
     useEffect(() => {
-        loadGroupStocks()
+        fetchGroupStocks()
     }, [tickerGroup, kisAuth.isLoggedIn, recommendedStocks]) // recommendedStocks 변경 시 반영
-
-    const loadGroupStocks = async () => {
-        if (tickerGroup === 'superinvestor') {
-            if (recommendedStocks.length === 0) {
-                await loadRecommendedTickers()
-            }
-            // recommendedStocks가 비동기로 로드된 후 store가 업데이트되면
-            // useEffect([recommendedStocks])가 트리거되어 다시 이 함수가 호출되고
-            // 그때 setGroupStocks가 실행될 것임.
-            // 하지만 현재 값을 바로 setting 해주는 것도 좋음.
-            if (useStore.getState().recommendedStocks.length > 0) {
-                setGroupStocks(useStore.getState().recommendedStocks)
-            }
-            return
-        }
-
-        if (!kisAuth.isLoggedIn) {
-            setGroupStocks([])
-            return
-        }
-
-        setLoadingGroupStocks(true)
-        try {
-            const { accessToken, appkey, appsecret, accountNo, accountCode } = kisAuth
-
-            if (tickerGroup === 'myholdings') {
-                // 내 보유종목
-                const { getOverseasBalance } = await import('@/lib/kisApi')
-                const result = await getOverseasBalance(accessToken, appkey, appsecret, accountNo, accountCode)
-                if (result.success) {
-                    setGroupStocks(result.holdings
-                        .filter(h => Number(h.ccld_qty_smtl1) > 0 && parseFloat(h.frcr_evlu_amt2) > 0)
-                        .map(h => ({
-                            ticker: h.pdno,
-                            name: h.prdt_name,
-                            count: parseInt(h.ccld_qty_smtl1 || 0),
-                            exchange: h.ovrs_excg_cd
-                        })))
-                }
-            } else if (tickerGroup === 'pricedrop') {
-                // 가격 급락 (60분전 대비)
-                const { getPriceFluctuation } = await import('@/lib/kisApi')
-                const result = await getPriceFluctuation(accessToken, appkey, appsecret, 'fall', 'NAS', '8')
-                if (result.success) {
-                    setGroupStocks(result.stocks.map(s => ({
-                        ticker: s.ticker,
-                        name: s.name,
-                        count: parseFloat(s.changeRate || 0).toFixed(2) + '%',
-                        exchange: 'NAS'
-                    })))
-                }
-            } else if (tickerGroup === 'pricesurge') {
-                // 가격 급등 (60분전 대비)
-                const { getPriceFluctuation } = await import('@/lib/kisApi')
-                const result = await getPriceFluctuation(accessToken, appkey, appsecret, 'rise', 'NAS', '8')
-                if (result.success) {
-                    setGroupStocks(result.stocks.map(s => ({
-                        ticker: s.ticker,
-                        name: s.name,
-                        count: '+' + parseFloat(s.changeRate || 0).toFixed(2) + '%',
-                        exchange: 'NAS'
-                    })))
-                }
-            } else if (tickerGroup === 'volumesurge') {
-                // 거래량 급증 (60분전 대비)
-                const { getVolumeSurge } = await import('@/lib/kisApi')
-                const result = await getVolumeSurge(accessToken, appkey, appsecret, 'NAS', '8')
-                if (result.success) {
-                    setGroupStocks(result.stocks.map(s => ({
-                        ticker: s.ticker,
-                        name: s.name,
-                        count: parseFloat(s.volumeRate || 0).toFixed(0) + '%',
-                        exchange: 'NAS'
-                    })))
-                }
-            }
-        } catch (error) {
-            console.error('그룹 종목 로드 오류:', error)
-        } finally {
-            setLoadingGroupStocks(false)
-        }
-    }
 
     const openAlert = (title, description, onConfirm, onCancel = null) => {
         setAlertConfig({

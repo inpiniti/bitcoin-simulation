@@ -167,6 +167,89 @@ export const useStore = create(
                 setGroupStocks: (stocks) => set({ groupStocks: stocks }),
                 setLoadingGroupStocks: (loading) => set({ loadingGroupStocks: loading }),
 
+                /**
+                 * 그룹 종목 데이터 로드 (TitleBar, Sidebar 공통 사용)
+                 */
+                fetchGroupStocks: async () => {
+                    const state = get();
+                    const { tickerGroup, kisAuth, recommendedStocks, loadRecommendedTickers, setGroupStocks, setLoadingGroupStocks } = state;
+
+                    if (tickerGroup === 'superinvestor') {
+                        if (recommendedStocks.length === 0) {
+                            await loadRecommendedTickers();
+                        }
+                        // loadRecommendedTickers가 비동기 완료 후 store 업데이트 이미 함.
+                        // 다시 get() 해서 최신 상태 확인
+                        const currentRecommended = get().recommendedStocks;
+                        if (currentRecommended.length > 0) {
+                            setGroupStocks(currentRecommended);
+                        }
+                        return;
+                    }
+
+                    if (!kisAuth.isLoggedIn) {
+                        setGroupStocks([]);
+                        return;
+                    }
+
+                    setLoadingGroupStocks(true);
+                    try {
+                        const { accessToken, appkey, appsecret, accountNo, accountCode } = kisAuth;
+
+                        if (tickerGroup === 'myholdings') {
+                            const { getOverseasBalance } = await import('@/lib/kisApi');
+                            const result = await getOverseasBalance(accessToken, appkey, appsecret, accountNo, accountCode);
+                            if (result.success) {
+                                setGroupStocks(result.holdings
+                                    .filter(h => Number(h.ccld_qty_smtl1) > 0 && parseFloat(h.frcr_evlu_amt2) > 0)
+                                    .map(h => ({
+                                        ticker: h.pdno,
+                                        name: h.prdt_name,
+                                        count: parseInt(h.ccld_qty_smtl1 || 0),
+                                        exchange: h.ovrs_excg_cd
+                                    })));
+                            }
+                        } else if (tickerGroup === 'pricedrop') {
+                            const { getPriceFluctuation } = await import('@/lib/kisApi');
+                            const result = await getPriceFluctuation(accessToken, appkey, appsecret, 'fall', 'NAS', '8');
+                            if (result.success) {
+                                setGroupStocks(result.stocks.map(s => ({
+                                    ticker: s.ticker,
+                                    name: s.name,
+                                    count: parseFloat(s.changeRate || 0).toFixed(2) + '%',
+                                    exchange: 'NAS'
+                                })));
+                            }
+                        } else if (tickerGroup === 'pricesurge') {
+                            const { getPriceFluctuation } = await import('@/lib/kisApi');
+                            const result = await getPriceFluctuation(accessToken, appkey, appsecret, 'rise', 'NAS', '8');
+                            if (result.success) {
+                                setGroupStocks(result.stocks.map(s => ({
+                                    ticker: s.ticker,
+                                    name: s.name,
+                                    count: '+' + parseFloat(s.changeRate || 0).toFixed(2) + '%',
+                                    exchange: 'NAS'
+                                })));
+                            }
+                        } else if (tickerGroup === 'volumesurge') {
+                            const { getVolumeSurge } = await import('@/lib/kisApi');
+                            const result = await getVolumeSurge(accessToken, appkey, appsecret, 'NAS', '8');
+                            if (result.success) {
+                                setGroupStocks(result.stocks.map(s => ({
+                                    ticker: s.ticker,
+                                    name: s.name,
+                                    count: parseFloat(s.volumeRate || 0).toFixed(0) + '%',
+                                    exchange: 'NAS'
+                                })));
+                            }
+                        }
+                    } catch (error) {
+                        console.error('그룹 종목 로드 오류:', error);
+                    } finally {
+                        setLoadingGroupStocks(false);
+                    }
+                },
+
                 // 분석 중지
                 stopAnalysis: () => set({ isAnalyzing: false }),
 
