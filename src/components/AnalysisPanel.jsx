@@ -74,7 +74,7 @@ export function AnalysisPanel() {
                             <TableHead className="text-[#9d9d9d] w-[100px]">Signal</TableHead>
                             <TableHead className="text-[#9d9d9d] text-right">Price</TableHead>
                             <TableHead className="text-[#9d9d9d] text-right">Change (24h)</TableHead>
-                            {/* <TableHead className="text-[#9d9d9d] text-center w-[120px]">AI Sentiment</TableHead> */}
+                            <TableHead className="text-[#9d9d9d] text-center w-[120px]">AI Sentiment</TableHead>
                             <TableHead className="text-[#9d9d9d]">Reason / Status</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -106,7 +106,15 @@ export function AnalysisPanel() {
                                 <TableCell className={`text-right font-mono font-medium ${item.changeRate > 0 ? 'text-[#f23645]' : item.changeRate < 0 ? 'text-[#089981]' : 'text-[#9d9d9d]'}`}>
                                     {item.changeRate ? `${item.changeRate > 0 ? '+' : ''}${item.changeRate.toFixed(2)}%` : '-'}
                                 </TableCell>
-                                {/* Sentiment Column Removed */}
+                                <TableCell className="text-center">
+                                    {item.news && item.news.length > 0 ? (
+                                        <Badge variant="outline" className={`text-[10px] h-5 ${item.sentiment > 0 ? 'text-[#089981] border-[#089981]' : item.sentiment < 0 ? 'text-[#f23645] border-[#f23645]' : 'text-[#9d9d9d] border-[#555]'}`}>
+                                            {item.sentiment > 0 ? 'POS' : item.sentiment < 0 ? 'NEG' : 'NEU'} ({item.sentiment.toFixed(2)})
+                                        </Badge>
+                                    ) : (
+                                        <span className="text-[#555] text-[10px]">-</span>
+                                    )}
+                                </TableCell>
                                 <TableCell className="text-[#9d9d9d] text-xs">
                                     {item.reason}
                                 </TableCell>

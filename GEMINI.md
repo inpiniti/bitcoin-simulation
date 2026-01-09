@@ -12,6 +12,14 @@ kis폴더쪽에 API 의 상세 정보가 적혀 있는 마크다운문서가 있
 # 언어
 한국어를 사용해서 답변을 부탁드립니다.
 
+# 프로젝트 핵심 규칙 (Project Core Rules)
+
+## 1. 감성 분석 포함 (Sentiment Analysis Mandatory)
+- 시장 분석(Market Analysis) 기능에는 반드시 **뉴스 기반 감성 분석 (FinBERT)** 기능이 포함되어야 합니다.
+- API 호출 시간이나 성능 문제로 인해 해당 기능을 삭제하거나 주석 처리하지 마세요.
+- 성능 이슈가 발생할 경우, **병렬 처리(Promise.all)**, **캐싱(Caching)**, **백그라운드 처리** 등의 기술적 방법으로 해결해야 합니다.
+
+
 # 외부 API 호출 규칙 (External API Call Rules)
 
 ## CORS 문제 해결
