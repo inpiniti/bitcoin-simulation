@@ -167,104 +167,11 @@ export function TitleBar() {
             <div className="flex-1 flex justify-center items-center">
                 {mode === 'stock' && (
                     <div className="flex items-center gap-2 relative">
-                        {/* Ticker Group Selector */}
-                        <select
-                            value={tickerGroup}
-                            onChange={(e) => setTickerGroup(e.target.value)}
-                            className="bg-[#252526] text-[#cccccc] border border-[#3e3e42] rounded px-2 py-0.5 text-xs focus:border-[#007acc] focus:outline-none"
-                        >
-                            <option value="superinvestor">투자그루</option>
-                            <option value="myholdings" disabled={!kisAuth.isLoggedIn}>내 보유종목</option>
-                            <option value="pricedrop">급락 (60분)</option>
-                            <option value="pricesurge">급등 (60분)</option>
-                            <option value="volumesurge">거래량 급증</option>
-                        </select>
-
-                        <span className="text-xs text-[#9d9d9d]">Ticker:</span>
-
-                        <div className="relative group">
-                            <input
-                                type="text"
-                                className="bg-[#252526] text-[#cccccc] border border-[#3e3e42] rounded px-2 py-0.5 text-xs focus:border-[#007acc] focus:outline-none w-32 text-center uppercase pr-6"
-                                value={localTicker}
-                                onChange={(e) => {
-                                    const val = e.target.value.toUpperCase()
-                                    setLocalTicker(val)
-                                    setFilterText(val) // 입력 시에만 필터 적용
-                                }}
-                                onKeyDown={handleTickerSubmit}
-                                onBlur={handleTickerBlur}
-                                onFocus={() => setFilterText('')} // 포커스 시 필터 초기화 (전체 보기)
-                                placeholder="AAPL"
-                            />
-                            <div className="absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none text-[#666]">
-                                <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
-                                    <path d="M7 10l5 5 5-5z" />
-                                </svg>
-                            </div>
-
-                            {(groupStocks.length > 0 || tickerGroup === 'superinvestor') && (
-                                <div className="absolute top-full left-0 w-64 bg-[#252526] border border-[#3e3e42] shadow-lg rounded-sm mt-1 z-50 hidden group-focus-within:block max-h-80 overflow-y-auto">
-                                    <div className="px-2 py-1.5 text-[10px] text-[#6a9955] bg-[#1e1e1e] font-bold sticky top-0 border-b border-[#3e3e42]">
-                                        {tickerGroup === 'superinvestor' && '🔥 투자그루 Top Picks'}
-                                        {tickerGroup === 'myholdings' && '💼 내 보유종목'}
-                                        {tickerGroup === 'pricedrop' && '📉 급락 종목 (60분)'}
-                                        {tickerGroup === 'pricesurge' && '📈 급등 종목 (60분)'}
-                                        {tickerGroup === 'volumesurge' && '📊 거래량 급증'}
-                                    </div>
-                                    {(tickerGroup === 'superinvestor' ? recommendedStocks : groupStocks)
-                                        .filter(stock =>
-                                            filterText === "" ||
-                                            stock.ticker.toLowerCase().includes(filterText.toLowerCase()) ||
-                                            stock.name.toLowerCase().includes(filterText.toLowerCase())
-                                        )
-                                        .map((stock) => (
-                                            <button
-                                                key={stock.ticker}
-                                                className="w-full text-left px-2 py-1.5 hover:bg-[#094771] hover:text-white flex items-center justify-between group/item"
-                                                onMouseDown={(e) => {
-                                                    e.preventDefault();
-                                                    if (ticker !== stock.ticker) {
-                                                        openAlert(
-                                                            "종목 변경",
-                                                            `'${stock.ticker}' ${stock.name ? `(${stock.name})` : ''} 로 변경하시겠습니까?`,
-                                                            () => {
-                                                                setTicker(stock.ticker)
-                                                                setLocalTicker(stock.ticker)
-                                                            }
-                                                        )
-                                                    }
-                                                }}
-                                            >
-                                                <div>
-                                                    <span className="text-xs font-bold text-[#d4d4d4] w-12 inline-block">{stock.ticker}</span>
-                                                    <span className="text-[10px] text-[#9d9d9d] group-hover/item:text-[#cccccc] truncate max-w-[120px] inline-block align-bottom">{stock.name}</span>
-                                                </div>
-                                                <span className="text-[10px] bg-[#3c3c3c] text-[#cccccc] px-1 rounded-sm group-hover/item:bg-[#1e1e1e]">
-                                                    {stock.count}
-                                                </span>
-                                            </button>
-                                        ))}
-                                    {(tickerGroup === 'superinvestor' ? recommendedStocks : groupStocks).filter(stock =>
-                                        filterText === "" ||
-                                        stock.ticker.toLowerCase().includes(filterText.toLowerCase()) ||
-                                        stock.name.toLowerCase().includes(filterText.toLowerCase())
-                                    ).length === 0 && (
-                                            <div className="px-2 py-2 text-[10px] text-[#666] text-center italic">
-                                                {loadingGroupStocks ? 'Loading...' : 'No matching stocks found'}
-                                            </div>
-                                        )}
-                                </div>
-                            )}
-                        </div>
-
-                        {loadingRecommendations && (
-                            <span className="text-[10px] text-[#007acc] animate-pulse">Loading...</span>
-                        )}
-                        {!loadingRecommendations && (
-                            <span className="text-[10px] text-[#6d6d6d]">(Select or Input)</span>
-                        )}
+                        <span className="text-xs font-bold text-[#e1e1e1]">{ticker}</span>
                     </div>
+                )}
+                {mode === 'coin' && (
+                    <span className="text-xs text-[#6d6d6d]">KRW-BTC (Daily)</span>
                 )}
                 {mode === 'coin' && (
                     <span className="text-xs text-[#6d6d6d]">KRW-BTC (Daily)</span>

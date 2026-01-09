@@ -187,6 +187,21 @@ export const useStore = create(
                         return;
                     }
 
+                    if (tickerGroup === 'sp500') {
+                        setLoadingGroupStocks(true);
+                        try {
+                            const { fetchSP500Tickers } = await import('@/lib/sp500Data');
+                            const stocks = await fetchSP500Tickers();
+                            setGroupStocks(stocks);
+                        } catch (e) {
+                            console.error('S&P 500 fetch error', e);
+                            setGroupStocks([]);
+                        } finally {
+                            setLoadingGroupStocks(false);
+                        }
+                        return;
+                    }
+
                     if (!kisAuth.isLoggedIn) {
                         setGroupStocks([]);
                         return;
@@ -195,6 +210,9 @@ export const useStore = create(
                     setLoadingGroupStocks(true);
                     try {
                         const { accessToken, appkey, appsecret, accountNo, accountCode } = kisAuth;
+
+
+
 
                         if (tickerGroup === 'myholdings') {
                             const { getOverseasBalance } = await import('@/lib/kisApi');

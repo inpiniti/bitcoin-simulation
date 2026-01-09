@@ -44,6 +44,61 @@ export default defineConfig({
                         res.end(JSON.stringify({ error: e.message }));
                     }
                 });
+
+                // S&P 500 Wikipedia Scraper
+                server.middlewares.use('/api/sp500', async (req, res, next) => {
+                    try {
+                        const cheerio = await import('cheerio');
+                        const fetch = (await import('node-fetch')).default || global.fetch;
+
+                        const TARGET_URL = 'https://en.wikipedia.org/wiki/List_of_S%26P_500_companies';
+                        console.log(`[Vite Dev] Fetching S&P 500 from Wikipedia: ${TARGET_URL}`);
+
+                        const apiResponse = await fetch(TARGET_URL);
+                        if (!apiResponse.ok) throw new Error(apiResponse.statusText);
+
+                        const html = await apiResponse.text();
+                        const $ = cheerio.load(html);
+                        const stocks = [];
+
+                        // Wikipedia table id="constituents"
+                        $('#constituents tbody tr').each((i, el) => {
+                            const tds = $(el).find('td');
+                            if (tds.length === 0) return;
+
+                            // 1st column: Symbol, 2nd column: Security (Name), 3rd: GICS Sector
+                            let ticker = $(tds[0]).text().trim();
+                            const name = $(tds[1]).text().trim();
+                            const sector = $(tds[3]).text().trim(); // 4th column is Sector usually? Let's verify. 
+                            // Wikipedia columns: Symbol, Security, GICS Sector, GICS Sub-Industry...
+                            // So Sector is index 2 (3rd column).
+                            const actualSector = $(tds[2]).text().trim();
+
+                            // Fix ticker format (BF.B -> BF-B for Yahoo)
+                            // Wikipedia uses dot, Yahoo uses hyphen.
+                            // But usually Wikipedia links might have text. .text() gets it.
+
+                            // Handle \n or extra spaces
+                            ticker = ticker.replace(/\n/g, '').trim();
+
+                            if (ticker) {
+                                stocks.push({
+                                    ticker: ticker.replace(/\./g, '-'), // Exchange compatibility
+                                    name,
+                                    count: actualSector,
+                                    exchange: 'NYS/NAS'
+                                });
+                            }
+                        });
+
+                        res.setHeader('Content-Type', 'application/json');
+                        res.end(JSON.stringify(stocks));
+                    } catch (e) {
+                        console.error(e);
+                        res.statusCode = 500;
+                        res.end(JSON.stringify({ error: e.message }));
+                    }
+                });
             }
         }
     ],
@@ -107,6 +162,7 @@ export default defineConfig({
                     });
                 },
             },
+
         },
     },
 })

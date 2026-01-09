@@ -35,6 +35,7 @@ export function TickerSelectionPanel() {
                     className="w-full bg-[#3c3c3c] border border-[#555555] text-[12px] text-[#cccccc] p-1.5 rounded focus:outline-none focus:border-[#007acc]"
                 >
                     <option value="superinvestor">🔥 투자그루 Top Picks</option>
+                    <option value="sp500">🇺🇸 S&P 500</option>
                     <option value="myholdings" disabled={!kisAuth.isLoggedIn}>💼 내 보유종목</option>
                     <option value="pricedrop">📉 급락 (60분)</option>
                     <option value="pricesurge">📈 급등 (60분)</option>
