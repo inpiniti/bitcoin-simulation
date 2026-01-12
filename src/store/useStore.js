@@ -469,26 +469,89 @@ export const useStore = create(
                     }
                 },
 
+                // Ticker Tab Management
+                activeTickers: [], // ['AAPL', 'TSLA', ...]
+
+                openTicker: (ticker) => {
+                    const state = get();
+                    // 이미 있으면 활성화만
+                    if (!state.activeTickers.includes(ticker)) {
+                        set({ activeTickers: [...state.activeTickers, ticker] });
+                    }
+                    get().setTicker(ticker);
+                },
+
+                closeTicker: (tickerToClose) => {
+                    const state = get();
+                    const newTickers = state.activeTickers.filter(t => t !== tickerToClose);
+                    set({ activeTickers: newTickers });
+
+                    // 만약 닫은 티커가 현재 활성 티커라면 다른 티커로 전환
+                    if (state.ticker === tickerToClose) {
+                        if (newTickers.length > 0) {
+                            // 마지막 티커 or 바로 앞 티커 등으로 전환
+                            get().setTicker(newTickers[newTickers.length - 1]);
+                        } else {
+                            // 다 닫았으면 초기화? 혹은 빈 상태
+                            // set({ ticker: '' }); // 빈 상태 처리는 UI에서 대응 필요
+                        }
+                    }
+                },
+
                 /**
                  * 일봉 데이터 로드 (Coin/Stock 공통)
                  */
                 loadDailyData: async () => {
                     const state = get();
-                    if (state.hist['1d'].length > 5) return;
+                    const ticker = state.ticker;
+
+                    // 티커가 없으면 중단
+                    if (!ticker) return;
+
+                    // 이미 데이터가 있고(length > 5), 현재 티커 데이터가 맞으면(확인 필요하지만 여기선 hist['1d']가 현재 티커꺼라고 가정) 리턴?
+                    // 하지만 탭 전환 시 hist['1d']를 갈아끼워야 하므로 무조건 실행해야 함.
 
                     set((s) => ({ loadingInterval: { ...s.loadingInterval, '1d': true } }));
 
                     try {
-                        let rawData;
+                        const now = Date.now();
+                        const today = new Date().toISOString().split('T')[0];
+                        let rawData = null;
 
-                        if (state.mode === 'coin') {
-                            rawData = await fetchCoinDailyData();
-                        } else {
-                            rawData = await fetchStockOneYearData(state.ticker);
+                        // 1. 캐시 확인 (Stock 모드일 때만)
+                        if (state.mode === 'stock') {
+                            const cachedEntry = state.dataCache[ticker];
+                            if (cachedEntry && new Date(cachedEntry.timestamp).toISOString().split('T')[0] === today) {
+                                console.log(`[Store] Using cached data for ${ticker}`);
+                                rawData = cachedEntry.data;
+                            }
                         }
 
-                        if (rawData.length <= 5) {
-                            console.warn(`[Warning] Fetched data count is too low (${rawData.length}).`);
+                        // 2. 캐시 없으면 API 호출
+                        if (!rawData) {
+                            if (state.mode === 'coin') {
+                                rawData = await fetchCoinDailyData();
+                            } else {
+                                rawData = await fetchStockOneYearData(ticker);
+                            }
+
+                            // 캐시 저장 (Stock만)
+                            if (state.mode === 'stock' && rawData && rawData.length > 0) {
+                                set(s => ({
+                                    dataCache: {
+                                        ...s.dataCache,
+                                        [ticker]: {
+                                            timestamp: now,
+                                            data: rawData,
+                                            // exchange 정보는 fetchStockShortData에서만 옴. 여기선 일단 패스하거나 보주 
+                                        }
+                                    }
+                                }));
+                            }
+                        }
+
+                        if (!rawData || rawData.length <= 5) {
+                            console.warn(`[Warning] Fetched data count is too low (${rawData?.length}).`);
                         }
 
                         const dataWithSlope = addDerivedData(rawData);
@@ -567,6 +630,7 @@ export const useStore = create(
                 partialize: (state) => ({
                     mode: state.mode,
                     ticker: state.ticker,
+                    activeTickers: state.activeTickers, // Persist active tabs
                     hist: state.hist,
                     simul: state.simul,
                     viewMode: state.viewMode,

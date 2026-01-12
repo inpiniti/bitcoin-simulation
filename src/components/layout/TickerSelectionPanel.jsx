@@ -7,6 +7,7 @@ export function TickerSelectionPanel() {
     const {
         ticker,
         setTicker,
+        openTicker, // 멀티 탭 지원을 위해 추가
         tickerGroup,
         setTickerGroup,
         groupStocks,
@@ -74,7 +75,7 @@ export function TickerSelectionPanel() {
                             return (
                                 <button
                                     key={stock.ticker}
-                                    onClick={() => setTicker(stock.ticker)}
+                                    onClick={() => openTicker(stock.ticker)}
                                     className={cn(
                                         "flex items-center justify-between px-3 py-2 text-left transition-colors border-l-2",
                                         isActive

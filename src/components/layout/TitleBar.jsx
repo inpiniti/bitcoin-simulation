@@ -16,7 +16,7 @@ import { KISAccountDialog } from "@/components/KISAccountDialog"
 
 export function TitleBar() {
     const {
-        mode, ticker, setMode, setTicker,
+        mode, ticker, setMode, setTicker, openTicker,
         recommendedStocks, loadingRecommendations, loadRecommendedTickers,
         loadDailyData, hist, loadingInterval,
         tickerGroup, setTickerGroup,

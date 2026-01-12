@@ -15,6 +15,7 @@ import { FileCode, X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Li
 import { ChartView } from "../ChartView"
 import { AnalysisPanel } from "../AnalysisPanel"
 import { StockDiscussionPanel } from "../StockDiscussionPanel"
+import { TickerTabBar } from "./TickerTabBar"
 
 // 페이지당 거래 수
 const ITEMS_PER_PAGE = 50
@@ -41,7 +42,7 @@ function formatBtcPrice(price) {
 }
 
 export function EditorArea() {
-    const { selectedResult, setSelectedResult, viewMode, hist } = useStore()
+    const { selectedResult, setSelectedResult, viewMode, hist, ticker, activeTickers, openTicker } = useStore()
     const [currentPage, setCurrentPage] = useState(1)
 
     // 페이지네이션 초기화
@@ -49,199 +50,191 @@ export function EditorArea() {
         setCurrentPage(1)
     }, [viewMode, selectedResult])
 
+    // 안전장치: 현재 티커가 있는데 탭 목록에 없으면 추가 (새로고침 직후 등 대비)
+    useEffect(() => {
+        if (ticker && activeTickers && !activeTickers.includes(ticker)) {
+            openTicker(ticker)
+        }
+    }, [ticker, activeTickers, openTicker])
+
     const data = hist['1d'] || []
 
-    // Analysis Mode
-    if (viewMode === 'analyze') {
-        return <AnalysisPanel />
-    }
+    const renderContent = () => {
+        // Analysis Mode
+        if (viewMode === 'analyze') {
+            return <AnalysisPanel />
+        }
 
-    // Discussion View Mode
-    if (viewMode === 'discussion') {
-        return <StockDiscussionPanel />
-    }
+        // Discussion View Mode
+        if (viewMode === 'discussion') {
+            return <StockDiscussionPanel />
+        }
 
-    // Chart View Mode
-    if (viewMode === 'chartView') {
-        return <ChartView />
-    }
+        // Chart View Mode
+        if (viewMode === 'chartView') {
+            return <ChartView />
+        }
 
-    // Data View Mode
-    if (viewMode === 'dataView') {
-        if (!data || data.length === 0) {
+        // Data View Mode
+        if (viewMode === 'dataView') {
+            if (!data || data.length === 0) {
+                return (
+                    <div className="flex-1 bg-[#1e1e1e] flex items-center justify-center">
+                        <div className="text-center text-[#5a5a5a]">
+                            <FileCode className="w-16 h-16 mx-auto mb-4 opacity-30" />
+                            <p className="text-sm">데이터가 없습니다.</p>
+                            <p className="text-xs mt-2 text-[#4a4a4a]">
+                                상단에서 Coin/Stock 모드를 선택하면 자동으로 데이터가 로드됩니다.
+                            </p>
+                        </div>
+                    </div>
+                )
+            }
+
+            const sortedData = [...data].reverse()
+            const totalItems = sortedData.length
+            const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE)
+            const validPage = Math.min(Math.max(1, currentPage), totalPages)
+            const startIndex = (validPage - 1) * ITEMS_PER_PAGE
+            const endIndex = startIndex + ITEMS_PER_PAGE
+            const currentItems = sortedData.slice(startIndex, endIndex)
+
+            const goToPage = (page) => {
+                if (page >= 1 && page <= totalPages) {
+                    setCurrentPage(page)
+                }
+            }
+
+            return (
+                <div className="flex-1 bg-[#1e1e1e] flex flex-col h-full overflow-hidden">
+                    <div className="h-9 bg-[#252526] flex items-center border-b border-[#3c3c3c] px-4 justify-between shrink-0">
+                        <div className="flex items-center gap-2 text-[13px] text-[#cccccc]">
+                            <TableIcon className="w-4 h-4 text-[#569cd6]" />
+                            <span>DATA VIEW: 1d ({totalItems.toLocaleString()} rows)</span>
+                        </div>
+                    </div>
+
+                    <div className="flex-1 overflow-auto">
+                        <Table>
+                            <TableHeader>
+                                <TableRow className="border-[#3c3c3c] hover:bg-transparent">
+                                    <TableHead className="text-[#569cd6] text-[11px] h-8 sticky top-0 bg-[#1e1e1e]">날짜 (Date)</TableHead>
+                                    <TableHead className="text-[#569cd6] text-[11px] h-8 text-right sticky top-0 bg-[#1e1e1e]">Open</TableHead>
+                                    <TableHead className="text-[#569cd6] text-[11px] h-8 text-right sticky top-0 bg-[#1e1e1e]">Close</TableHead>
+                                    <TableHead className="text-[#569cd6] text-[11px] h-8 text-right sticky top-0 bg-[#1e1e1e] bg-[#252526]">Median</TableHead>
+                                    <TableHead className="text-[#569cd6] text-[11px] h-8 text-right sticky top-0 bg-[#1e1e1e]">Slope</TableHead>
+                                    <TableHead className="text-[#569cd6] text-[11px] h-8 text-right sticky top-0 bg-[#1e1e1e]">RSI(14)</TableHead>
+                                    <TableHead className="text-[#569cd6] text-[11px] h-8 text-right sticky top-0 bg-[#1e1e1e]">MA50</TableHead>
+                                    <TableHead className="text-[#569cd6] text-[11px] h-8 text-center sticky top-0 bg-[#1e1e1e]">BB Status</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {currentItems.map((item, idx) => {
+                                    let bbText = "-";
+                                    let bbColor = "text-[#808080]";
+                                    if (item.bbStatus === 2) { bbText = "Upper Break"; bbColor = "text-[#f14c4c]"; }
+                                    else if (item.bbStatus === 1) { bbText = "Upper Zone"; bbColor = "text-[#ce9178]"; }
+                                    else if (item.bbStatus === -1) { bbText = "Lower Zone"; bbColor = "text-[#9cdcfe]"; }
+                                    else if (item.bbStatus === -2) { bbText = "Lower Break"; bbColor = "text-[#4ec9b0]"; }
+                                    else if (item.bbStatus === 0) { bbText = "Mean"; }
+
+                                    return (
+                                        <TableRow key={idx} className="border-[#3c3c3c] hover:bg-[#2a2a2a]">
+                                            <TableCell className="font-mono text-[#4fc1ff] text-xs py-1.5">
+                                                {formatDateTime(item.timestamp)}
+                                            </TableCell>
+                                            <TableCell className="font-mono text-[#d4d4d4] text-xs text-right py-1.5">
+                                                {item.open?.toLocaleString()}
+                                            </TableCell>
+                                            <TableCell className="font-mono text-[#dcdcaa] text-xs text-right py-1.5">
+                                                {item.close?.toLocaleString()}
+                                            </TableCell>
+                                            <TableCell className="font-mono text-[#dcdcaa] text-xs text-right py-1.5 font-bold bg-[#252526]/50">
+                                                {item.median?.toLocaleString()}
+                                            </TableCell>
+                                            <TableCell className={cn(
+                                                "font-mono text-xs text-right py-1.5",
+                                                item.slope > 0 ? "text-[#4ec9b0]" : item.slope < 0 ? "text-[#f14c4c]" : "text-[#808080]"
+                                            )}>
+                                                {item.slope > 0 ? '+' : ''}{item.slope?.toLocaleString()}
+                                            </TableCell>
+                                            <TableCell className="font-mono text-[#ce9178] text-xs text-right py-1.5">
+                                                {item.rsi?.toFixed(1) || '-'}
+                                            </TableCell>
+                                            <TableCell className="font-mono text-[#d4d4d4] text-xs text-right py-1.5">
+                                                {item.ma50?.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '-'}
+                                            </TableCell>
+                                            <TableCell className={cn("font-mono text-xs text-center py-1.5 font-medium", bbColor)}>
+                                                {bbText} <span className="text-[10px] opacity-70">({item.bbStatus})</span>
+                                            </TableCell>
+                                        </TableRow>
+                                    );
+                                })}
+                            </TableBody>
+                        </Table>
+                    </div>
+
+                    {/* Pagination */}
+                    {totalPages > 1 && (
+                        <div className="px-4 py-2 border-t border-[#3c3c3c] flex items-center justify-between bg-[#1e1e1e] shrink-0">
+                            <div className="text-[11px] text-[#6a6a6a]">
+                                {startIndex + 1} - {Math.min(endIndex, totalItems)} / {totalItems} rows
+                            </div>
+                            <div className="flex items-center gap-1">
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-[#cccccc] hover:bg-[#3c3c3c] disabled:opacity-30" onClick={() => goToPage(1)} disabled={validPage === 1}>
+                                    <ChevronsLeft className="h-4 w-4" />
+                                </Button>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-[#cccccc] hover:bg-[#3c3c3c] disabled:opacity-30" onClick={() => goToPage(validPage - 1)} disabled={validPage === 1}>
+                                    <ChevronLeft className="h-4 w-4" />
+                                </Button>
+                                <div className="text-[11px] text-[#cccccc] px-2 min-w-[3rem] text-center">
+                                    {validPage} / {totalPages}
+                                </div>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-[#cccccc] hover:bg-[#3c3c3c] disabled:opacity-30" onClick={() => goToPage(validPage + 1)} disabled={validPage === totalPages}>
+                                    <ChevronRight className="h-4 w-4" />
+                                </Button>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-[#cccccc] hover:bg-[#3c3c3c] disabled:opacity-30" onClick={() => goToPage(totalPages)} disabled={validPage === totalPages}>
+                                    <ChevronsRight className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )
+        }
+
+        // Simulation Mode (Default)
+        if (!selectedResult) {
             return (
                 <div className="flex-1 bg-[#1e1e1e] flex items-center justify-center">
                     <div className="text-center text-[#5a5a5a]">
-                        <FileCode className="w-16 h-16 mx-auto mb-4 opacity-30" />
-                        <p className="text-sm">데이터가 없습니다.</p>
+                        <Play className="w-16 h-16 mx-auto mb-4 opacity-30" />
+                        <p className="text-sm">시뮬레이션 결과가 없습니다.</p>
                         <p className="text-xs mt-2 text-[#4a4a4a]">
-                            상단에서 Coin/Stock 모드를 선택하면 자동으로 데이터가 로드됩니다.
+                            1. 데이터가 로드되면<br />
+                            2. Sidebar에서 전략 설정 후 실행
                         </p>
                     </div>
                 </div>
             )
         }
 
-        const sortedData = [...data].reverse()
-        const totalItems = sortedData.length
-        const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE)
-        const validPage = Math.min(Math.max(1, currentPage), totalPages)
-        const startIndex = (validPage - 1) * ITEMS_PER_PAGE
-        const endIndex = startIndex + ITEMS_PER_PAGE
-        const currentItems = sortedData.slice(startIndex, endIndex)
+        const { key, summary, trades } = selectedResult
 
-        const goToPage = (page) => {
+        // 페이징 계산
+        const totalItems = trades?.length || 0
+        const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE)
+        const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
+        const endIndex = startIndex + ITEMS_PER_PAGE
+        const currentTrades = trades?.slice(startIndex, endIndex) || []
+
+        const handlePageChange = (page) => {
             if (page >= 1 && page <= totalPages) {
                 setCurrentPage(page)
             }
         }
 
         return (
-            <div className="flex-1 bg-[#1e1e1e] flex flex-col">
-                <div className="h-9 bg-[#252526] flex items-center border-b border-[#3c3c3c] px-4 justify-between">
-                    <div className="flex items-center gap-2 text-[13px] text-[#cccccc]">
-                        <TableIcon className="w-4 h-4 text-[#569cd6]" />
-                        <span>DATA VIEW: 1d ({totalItems.toLocaleString()} rows)</span>
-                    </div>
-                </div>
-
-                <ScrollArea className="flex-1">
-                    <Table>
-                        <TableHeader>
-                            <TableRow className="border-[#3c3c3c] hover:bg-transparent">
-                                <TableHead className="text-[#569cd6] text-[11px] h-8 sticky top-0 bg-[#1e1e1e]">날짜 (Date)</TableHead>
-                                <TableHead className="text-[#569cd6] text-[11px] h-8 text-right sticky top-0 bg-[#1e1e1e]">Open</TableHead>
-                                <TableHead className="text-[#569cd6] text-[11px] h-8 text-right sticky top-0 bg-[#1e1e1e]">Close</TableHead>
-                                <TableHead className="text-[#569cd6] text-[11px] h-8 text-right sticky top-0 bg-[#1e1e1e] bg-[#252526]">Median</TableHead>
-                                <TableHead className="text-[#569cd6] text-[11px] h-8 text-right sticky top-0 bg-[#1e1e1e]">Slope</TableHead>
-                                <TableHead className="text-[#569cd6] text-[11px] h-8 text-right sticky top-0 bg-[#1e1e1e]">RSI(14)</TableHead>
-                                <TableHead className="text-[#569cd6] text-[11px] h-8 text-right sticky top-0 bg-[#1e1e1e]">MA50</TableHead>
-                                <TableHead className="text-[#569cd6] text-[11px] h-8 text-center sticky top-0 bg-[#1e1e1e]">BB Status</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {currentItems.map((item, idx) => {
-                                let bbText = "-";
-                                let bbColor = "text-[#808080]";
-                                if (item.bbStatus === 2) { bbText = "Upper Break"; bbColor = "text-[#f14c4c]"; }
-                                else if (item.bbStatus === 1) { bbText = "Upper Zone"; bbColor = "text-[#ce9178]"; }
-                                else if (item.bbStatus === -1) { bbText = "Lower Zone"; bbColor = "text-[#9cdcfe]"; }
-                                else if (item.bbStatus === -2) { bbText = "Lower Break"; bbColor = "text-[#4ec9b0]"; }
-                                else if (item.bbStatus === 0) { bbText = "Mean"; }
-
-                                return (
-                                    <TableRow key={idx} className="border-[#3c3c3c] hover:bg-[#2a2a2a]">
-                                        <TableCell className="font-mono text-[#4fc1ff] text-xs py-1.5">
-                                            {formatDateTime(item.timestamp)}
-                                        </TableCell>
-                                        <TableCell className="font-mono text-[#d4d4d4] text-xs text-right py-1.5">
-                                            {item.open?.toLocaleString()}
-                                        </TableCell>
-                                        <TableCell className="font-mono text-[#dcdcaa] text-xs text-right py-1.5">
-                                            {item.close?.toLocaleString()}
-                                        </TableCell>
-                                        <TableCell className="font-mono text-[#dcdcaa] text-xs text-right py-1.5 font-bold bg-[#252526]/50">
-                                            {item.median?.toLocaleString()}
-                                        </TableCell>
-                                        <TableCell className={cn(
-                                            "font-mono text-xs text-right py-1.5",
-                                            item.slope > 0 ? "text-[#4ec9b0]" : item.slope < 0 ? "text-[#f14c4c]" : "text-[#808080]"
-                                        )}>
-                                            {item.slope > 0 ? '+' : ''}{item.slope?.toLocaleString()}
-                                        </TableCell>
-                                        <TableCell className="font-mono text-[#ce9178] text-xs text-right py-1.5">
-                                            {item.rsi?.toFixed(1) || '-'}
-                                        </TableCell>
-                                        <TableCell className="font-mono text-[#d4d4d4] text-xs text-right py-1.5">
-                                            {item.ma50?.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '-'}
-                                        </TableCell>
-                                        <TableCell className={cn("font-mono text-xs text-center py-1.5 font-medium", bbColor)}>
-                                            {bbText} <span className="text-[10px] opacity-70">({item.bbStatus})</span>
-                                        </TableCell>
-                                    </TableRow>
-                                );
-                            })}
-                        </TableBody>
-                    </Table>
-                </ScrollArea>
-
-                {/* Pagination */}
-                {totalPages > 1 && (
-                    <div className="px-4 py-2 border-t border-[#3c3c3c] flex items-center justify-between bg-[#1e1e1e]">
-                        <div className="text-[11px] text-[#6a6a6a]">
-                            {startIndex + 1} - {Math.min(endIndex, totalItems)} / {totalItems} rows
-                        </div>
-                        <div className="flex items-center gap-1">
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-[#cccccc] hover:bg-[#3c3c3c] disabled:opacity-30" onClick={() => goToPage(1)} disabled={validPage === 1}>
-                                <ChevronsLeft className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-[#cccccc] hover:bg-[#3c3c3c] disabled:opacity-30" onClick={() => goToPage(validPage - 1)} disabled={validPage === 1}>
-                                <ChevronLeft className="h-4 w-4" />
-                            </Button>
-                            <div className="text-[11px] text-[#cccccc] px-2 min-w-[3rem] text-center">
-                                {validPage} / {totalPages}
-                            </div>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-[#cccccc] hover:bg-[#3c3c3c] disabled:opacity-30" onClick={() => goToPage(validPage + 1)} disabled={validPage === totalPages}>
-                                <ChevronRight className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-[#cccccc] hover:bg-[#3c3c3c] disabled:opacity-30" onClick={() => goToPage(totalPages)} disabled={validPage === totalPages}>
-                                <ChevronsRight className="h-4 w-4" />
-                            </Button>
-                        </div>
-                    </div>
-                )}
-            </div>
-        )
-    }
-
-    // Simulation Mode (Default)
-    if (!selectedResult) {
-        return (
-            <div className="flex-1 bg-[#1e1e1e] flex items-center justify-center">
-                <div className="text-center text-[#5a5a5a]">
-                    <Play className="w-16 h-16 mx-auto mb-4 opacity-30" />
-                    <p className="text-sm">시뮬레이션 결과가 없습니다.</p>
-                    <p className="text-xs mt-2 text-[#4a4a4a]">
-                        1. 데이터가 로드되면<br />
-                        2. Sidebar에서 전략 설정 후 실행
-                    </p>
-                </div>
-            </div>
-        )
-    }
-
-    const { key, summary, trades } = selectedResult
-
-    // 페이징 계산
-    const totalItems = trades?.length || 0
-    const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE)
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
-    const endIndex = startIndex + ITEMS_PER_PAGE
-    const currentTrades = trades?.slice(startIndex, endIndex) || []
-
-    const goToPage = (page) => {
-        if (page >= 1 && page <= totalPages) {
-            setCurrentPage(page)
-        }
-    }
-
-    return (
-        <div className="flex-1 bg-[#1e1e1e] flex flex-col">
-            {/* Tab Bar */}
-            <div className="h-9 bg-[#252526] flex items-center border-b border-[#3c3c3c]">
-                <div className="flex items-center gap-2 px-4 h-full bg-[#1e1e1e] border-r border-[#3c3c3c] text-[13px] text-[#cccccc]">
-                    <Play className="w-4 h-4 text-[#4ec9b0]" />
-                    simulation.result
-                    <button
-                        onClick={() => setSelectedResult(null)}
-                        className="ml-2 hover:bg-[#3c3c3c] rounded p-0.5"
-                    >
-                        <X className="w-3 h-3" />
-                    </button>
-                </div>
-            </div>
-
-            {/* Content */}
             <div className="flex-1 flex overflow-hidden">
                 {/* Summary Panel */}
                 <div className="w-72 border-r border-[#3c3c3c] p-4 overflow-auto">
@@ -370,28 +363,41 @@ export function EditorArea() {
 
                     {/* 페이징 컨트롤 */}
                     {totalPages > 1 && (
-                        <div className="px-4 py-2 border-t border-[#3c3c3c] flex items-center justify-between">
+                        <div className="px-4 py-2 border-t border-[#3c3c3c] flex items-center justify-between shrink-0">
                             <div className="text-[11px] text-[#6a6a6a]">
                                 {startIndex + 1} - {Math.min(endIndex, totalItems)} / {totalItems}건
                             </div>
                             <div className="flex items-center gap-1">
-                                <Button variant="ghost" size="icon" className="h-7 w-7 text-[#cccccc] hover:bg-[#3c3c3c] disabled:opacity-30" onClick={() => goToPage(1)} disabled={currentPage === 1}>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-[#cccccc] hover:bg-[#3c3c3c] disabled:opacity-30" onClick={() => handlePageChange(1)} disabled={currentPage === 1}>
                                     <ChevronsLeft className="h-4 w-4" />
                                 </Button>
-                                <Button variant="ghost" size="icon" className="h-7 w-7 text-[#cccccc] hover:bg-[#3c3c3c] disabled:opacity-30" onClick={() => goToPage(currentPage - 1)} disabled={currentPage === 1}>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-[#cccccc] hover:bg-[#3c3c3c] disabled:opacity-30" onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1}>
                                     <ChevronLeft className="h-4 w-4" />
                                 </Button>
                                 <div className="text-[11px] text-[#cccccc] px-2">{currentPage} / {totalPages}</div>
-                                <Button variant="ghost" size="icon" className="h-7 w-7 text-[#cccccc] hover:bg-[#3c3c3c] disabled:opacity-30" onClick={() => goToPage(currentPage + 1)} disabled={currentPage === totalPages}>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-[#cccccc] hover:bg-[#3c3c3c] disabled:opacity-30" onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === totalPages}>
                                     <ChevronRight className="h-4 w-4" />
                                 </Button>
-                                <Button variant="ghost" size="icon" className="h-7 w-7 text-[#cccccc] hover:bg-[#3c3c3c] disabled:opacity-30" onClick={() => goToPage(totalPages)} disabled={currentPage === totalPages}>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-[#cccccc] hover:bg-[#3c3c3c] disabled:opacity-30" onClick={() => handlePageChange(totalPages)} disabled={currentPage === totalPages}>
                                     <ChevronsRight className="h-4 w-4" />
                                 </Button>
                             </div>
                         </div>
                     )}
                 </div>
+            </div>
+        )
+    }
+
+
+
+    return (
+        <div className="flex-1 bg-[#1e1e1e] flex flex-col h-full overflow-hidden">
+            {/* 항상 표시되는 탭 바 */}
+            <TickerTabBar />
+
+            <div className="flex-1 flex flex-col overflow-hidden relative">
+                {renderContent()}
             </div>
         </div>
     )
