@@ -33,11 +33,8 @@ export function AnalysisPanel() {
     }
 
     const handleRowClick = (ticker) => {
-        // 클릭 시 시뮬레이션으로 이동 (Confirm)
-        if (confirm(`'${ticker}' 종목으로 이동하여 상세 시뮬레이션을 보시겠습니까?`)) {
-            setTicker(ticker);
-            setAnalysisMode(false);
-        }
+        setTicker(ticker);
+        setAnalysisMode(false);
     }
 
     const handleSignalClick = (e, item) => {
