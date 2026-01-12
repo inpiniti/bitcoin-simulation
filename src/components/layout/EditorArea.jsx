@@ -16,6 +16,7 @@ import { ChartView } from "../ChartView"
 import { AnalysisPanel } from "../AnalysisPanel"
 import { StockDiscussionPanel } from "../StockDiscussionPanel"
 import { OverviewPanel } from "../OverviewPanel"
+import { NewsPanel } from "../NewsPanel"
 import { TickerTabBar } from "./TickerTabBar"
 
 // 페이지당 거래 수
@@ -64,6 +65,11 @@ export function EditorArea() {
         // Overview Mode
         if (viewMode === 'overview') {
             return <OverviewPanel />
+        }
+
+        // News Mode
+        if (viewMode === 'news') {
+            return <NewsPanel />
         }
 
         // Analysis Mode
