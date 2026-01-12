@@ -236,3 +236,52 @@ export async function fetchForecast(symbol, interval = 'day') {
         return null;
     }
 }
+/**
+ * 기업 개요 및 재무 정보 조회 (Hybrid: Double Scraper)
+ * Yahoo Finance API v10/v7 모두 차단 시, Profile과 Quote 페이지를 각각 스크래핑합니다.
+ * @param {string} ticker
+ */
+export async function fetchStockOverview(ticker) {
+    const formattedTicker = ticker.replace(/\./g, '-');
+
+    try {
+        // 병렬 호출 (둘 다 로컬 미들웨어 스크래퍼)
+        const [profileRes, quoteRes] = await Promise.all([
+            fetch(`/api/company-profile?ticker=${formattedTicker}`),
+            fetch(`/api/company-quote?ticker=${formattedTicker}`)
+        ]);
+
+        const profileData = profileRes.ok ? await profileRes.json() : null;
+        const quoteData = quoteRes.ok ? await quoteRes.json() : null; // { marketCap, trailingPE, ... }
+
+        // 스크래퍼 데이터는 이미 문자열이거나 null임. 포맷팅 불필요하나 구조 맞춤.
+        const fmt = (val) => ({ fmt: val || '-' });
+
+        return {
+            profile: profileData?.assetProfile || {},
+            financials: {
+                marketCap: fmt(quoteData?.marketCap),
+                currentPrice: fmt(quoteData?.regularMarketPrice),
+                targetMeanPrice: fmt('-'),
+                recommendationKey: '-', // 스크래핑 복잡도 높음
+                returnOnAssets: fmt(quoteData?.eps ? `EPS: ${quoteData.eps}` : '-'), // EPS를 임시로 보여줌
+                returnOnEquity: fmt('-'),
+            },
+            stats: {
+                enterpriseValue: fmt('-'),
+                trailingPE: fmt(quoteData?.trailingPE),
+                forwardPE: fmt('-'),
+                priceToBook: fmt('-'),
+                beta: fmt(quoteData?.beta),
+                profitMargins: fmt('-'),
+                operatingMargins: fmt('-')
+            },
+            recommendation: [],
+            earnings: { financialsChart: { yearly: [], quarterly: [] } }
+        };
+    } catch (e) {
+        console.error(`Overview fetch failed for ${ticker}:`, e);
+        return null;
+    }
+}
+

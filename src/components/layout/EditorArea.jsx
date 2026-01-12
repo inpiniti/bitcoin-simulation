@@ -15,6 +15,7 @@ import { FileCode, X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Li
 import { ChartView } from "../ChartView"
 import { AnalysisPanel } from "../AnalysisPanel"
 import { StockDiscussionPanel } from "../StockDiscussionPanel"
+import { OverviewPanel } from "../OverviewPanel"
 import { TickerTabBar } from "./TickerTabBar"
 
 // 페이지당 거래 수
@@ -60,6 +61,11 @@ export function EditorArea() {
     const data = hist['1d'] || []
 
     const renderContent = () => {
+        // Overview Mode
+        if (viewMode === 'overview') {
+            return <OverviewPanel />
+        }
+
         // Analysis Mode
         if (viewMode === 'analyze') {
             return <AnalysisPanel />
