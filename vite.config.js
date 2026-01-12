@@ -194,7 +194,7 @@ export default defineConfig(({ mode }) => {
                         }
                     });
 
-                    // Company Profile Scraper (Using Wikipedia for reliability)
+                    // Company Profile Scraper (Yahoo + Wikipedia)
                     server.middlewares.use('/api/company-profile', async (req, res, next) => {
                         try {
                             const urlObj = new URL(req.originalUrl || req.url, `http://${req.headers.host}`);
@@ -209,63 +209,60 @@ export default defineConfig(({ mode }) => {
                             const cheerio = await import('cheerio');
                             const fetch = (await import('node-fetch')).default || global.fetch;
 
-                            // 티커로 회사명 매핑 (일반적인 티커)
-                            const tickerToCompany = {
-                                'AAPL': 'Apple_Inc.',
-                                'MSFT': 'Microsoft',
-                                'GOOGL': 'Alphabet_Inc.',
-                                'GOOG': 'Alphabet_Inc.',
-                                'AMZN': 'Amazon_(company)',
-                                'META': 'Meta_Platforms',
-                                'NVDA': 'Nvidia',
-                                'TSLA': 'Tesla,_Inc.',
-                                'BRK-B': 'Berkshire_Hathaway',
-                                'JPM': 'JPMorgan_Chase',
-                                'V': 'Visa_Inc.',
-                                'JNJ': 'Johnson_%26_Johnson',
-                                'WMT': 'Walmart',
-                                'PG': 'Procter_%26_Gamble',
-                                'MA': 'Mastercard',
-                                'UNH': 'UnitedHealth_Group',
-                                'HD': 'The_Home_Depot',
-                                'DIS': 'The_Walt_Disney_Company',
-                                'PYPL': 'PayPal',
-                                'NFLX': 'Netflix',
-                                'ADBE': 'Adobe_Inc.',
-                                'CRM': 'Salesforce',
-                                'INTC': 'Intel',
-                                'AMD': 'Advanced_Micro_Devices',
-                                'CSCO': 'Cisco',
-                                'ORCL': 'Oracle_Corporation',
-                                'IBM': 'IBM',
-                                'QCOM': 'Qualcomm',
-                                'TXN': 'Texas_Instruments',
-                                'AVGO': 'Broadcom_Inc.',
-                                'COST': 'Costco',
-                                'PEP': 'PepsiCo',
-                                'KO': 'The_Coca-Cola_Company',
-                                'MCD': 'McDonald%27s',
-                                'NKE': 'Nike,_Inc.',
-                                'SBUX': 'Starbucks',
-                            };
+                            // Step 1: Yahoo Finance에서 회사 이름 가져오기
+                            const yahooUrl = `https://finance.yahoo.com/quote/${ticker}`;
+                            console.log(`[Company Profile] Fetching company name from Yahoo: ${yahooUrl}`);
 
-                            const companyPage = tickerToCompany[ticker.toUpperCase()] || ticker;
-                            const TARGET_URL = `https://en.wikipedia.org/wiki/${companyPage}`;
-                            console.log(`[Vite Dev] Scraping Wikipedia: ${TARGET_URL}`);
-
-                            const response = await fetch(TARGET_URL, {
+                            const yahooResponse = await fetch(yahooUrl, {
                                 headers: {
-                                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
                                 }
                             });
 
-                            if (!response.ok) {
-                                // Wikipedia 페이지가 없으면 기본 응답
-                                console.log(`[Wikipedia] Page not found for ${ticker}, returning minimal data`);
+                            let companyName = ticker;
+
+                            if (yahooResponse.ok) {
+                                const yahooHtml = await yahooResponse.text();
+                                const $yahoo = cheerio.load(yahooHtml);
+
+                                // 페이지 타이틀에서 회사명 추출
+                                const title = $yahoo('title').text();
+                                const titleMatch = title.match(/^(.+?)\s*\(/);
+                                if (titleMatch) {
+                                    companyName = titleMatch[1].trim();
+                                }
+
+                                if (companyName === ticker) {
+                                    const h1Text = $yahoo('h1').first().text();
+                                    if (h1Text && h1Text.length > ticker.length) {
+                                        companyName = h1Text.replace(/\(.*?\)/g, '').trim();
+                                    }
+                                }
+                            }
+
+                            console.log(`[Company Profile] Found company name: ${companyName}`);
+
+                            // Step 2: Wikipedia Search API로 회사 페이지 찾기
+                            const searchQuery = encodeURIComponent(companyName);
+                            const searchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${searchQuery}&format=json&srlimit=3`;
+
+                            const searchResponse = await fetch(searchUrl, {
+                                headers: { 'User-Agent': 'Mozilla/5.0 (compatible; StockSimulator/1.0)' }
+                            });
+
+                            if (!searchResponse.ok) {
+                                throw new Error('Wikipedia search failed');
+                            }
+
+                            const searchData = await searchResponse.json();
+                            const searchResults = searchData.query?.search || [];
+
+                            if (searchResults.length === 0) {
+                                console.log(`[Wikipedia] No results for: ${companyName}`);
                                 res.setHeader('Content-Type', 'application/json');
                                 res.end(JSON.stringify({
                                     assetProfile: {
-                                        longBusinessSummary: `${ticker} 기업 정보를 불러올 수 없습니다.`,
+                                        longBusinessSummary: `${companyName} (${ticker})에 대한 Wikipedia 정보를 찾을 수 없습니다.`,
                                         sector: '-',
                                         industry: '-',
                                         website: '',
@@ -276,46 +273,86 @@ export default defineConfig(({ mode }) => {
                                 return;
                             }
 
-                            const html = await response.text();
+                            // 첫 번째 검색 결과 사용
+                            const pageTitle = searchResults[0].title;
+                            const encodedTitle = encodeURIComponent(pageTitle);
+                            const wikiUrl = `https://en.wikipedia.org/wiki/${encodedTitle}`;
+
+                            console.log(`[Wikipedia] Found page: ${pageTitle}`);
+
+                            // Step 3: Wikipedia 페이지 스크래핑
+                            const wikiResponse = await fetch(wikiUrl, {
+                                headers: { 'User-Agent': 'Mozilla/5.0 (compatible; StockSimulator/1.0)' }
+                            });
+
+                            if (!wikiResponse.ok) {
+                                throw new Error('Wikipedia page fetch failed');
+                            }
+
+                            const html = await wikiResponse.text();
                             const $ = cheerio.load(html);
 
-                            // Wikipedia 첫 번째 문단 (요약) 추출
-                            // 일반적으로 .mw-parser-output > p 에 있음
+                            // 첫 번째 문단 (요약) 추출
                             let summary = '';
                             $('.mw-parser-output > p').each((i, el) => {
                                 const text = $(el).text().trim();
-                                // 너무 짧은 문단, 좌표 정보, 발음 기호 등은 건너뜀
-                                if (text.length > 50 && !text.startsWith('Coordinates:')) {
+                                if (text.length > 50 && !text.startsWith('Coordinates:') && !text.includes('may refer to:')) {
                                     if (!summary) {
                                         summary = text;
                                     }
                                 }
                             });
 
-                            // Infobox에서 정보 추출 시도
+                            // Infobox에서 정보 추출
                             let industry = '';
                             let website = '';
+                            let products = '';
+                            let services = '';
+                            let founded = '';
+                            let headquarters = '';
 
                             $('table.infobox tr').each((i, el) => {
                                 const th = $(el).find('th').text().trim().toLowerCase();
-                                const td = $(el).find('td').text().trim();
+                                // Clone td and remove style/script tags before getting text
+                                const tdClone = $(el).find('td').clone();
+                                tdClone.find('style, script').remove();
+                                const td = tdClone.text().trim();
 
                                 if (th.includes('industry')) {
                                     industry = td.replace(/\[.*?\]/g, '').trim();
+                                }
+                                if (th.includes('products')) {
+                                    products = td.replace(/\[.*?\]/g, '').trim();
+                                }
+                                if (th.includes('services')) {
+                                    services = td.replace(/\[.*?\]/g, '').trim();
+                                }
+                                if (th.includes('founded')) {
+                                    founded = td.replace(/\[.*?\]/g, '').trim();
+                                }
+                                if (th.includes('headquarters') || th.includes('hq')) {
+                                    headquarters = td.replace(/\[.*?\]/g, '').trim();
                                 }
                                 if (th.includes('website')) {
                                     website = $(el).find('td a').attr('href') || td;
                                 }
                             });
 
+                            // 참조 표시 제거
+                            summary = summary.replace(/\[\d+\]/g, '').trim();
+
                             const data = {
                                 assetProfile: {
-                                    longBusinessSummary: summary || `${ticker}에 대한 정보입니다.`,
-                                    sector: '-', // Wikipedia에서 Sector 구분 어려움
+                                    longBusinessSummary: summary || `${companyName} (${ticker})에 대한 정보입니다.`,
+                                    sector: '-',
                                     industry: industry || '-',
+                                    products: products || '-',
+                                    services: services || '-',
+                                    founded: founded || '-',
+                                    headquarters: headquarters || '-',
                                     website: website,
                                     country: 'US',
-                                    companyOfficers: [] // Wikipedia에서 임원 정보 추출 복잡
+                                    companyOfficers: []
                                 }
                             };
 

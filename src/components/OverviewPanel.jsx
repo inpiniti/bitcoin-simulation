@@ -107,6 +107,41 @@ export function OverviewPanel() {
                             </CardContent>
                         </Card>
 
+                        {/* 제품/서비스 정보 */}
+                        <Card className="bg-[#252526] border-[#3c3c3c]">
+                            <CardHeader>
+                                <CardTitle className="text-sm font-bold text-[#cccccc]">Company Info</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                                {profile.products && profile.products !== '-' && (
+                                    <div>
+                                        <span className="text-xs text-[#888888] uppercase">Products</span>
+                                        <p className="text-sm text-[#d4d4d4] mt-1">{profile.products}</p>
+                                    </div>
+                                )}
+                                {profile.services && profile.services !== '-' && (
+                                    <div>
+                                        <span className="text-xs text-[#888888] uppercase">Services</span>
+                                        <p className="text-sm text-[#d4d4d4] mt-1">{profile.services}</p>
+                                    </div>
+                                )}
+                                <div className="grid grid-cols-2 gap-4 pt-2 border-t border-[#3c3c3c]">
+                                    {profile.founded && profile.founded !== '-' && (
+                                        <div>
+                                            <span className="text-xs text-[#888888] uppercase">Founded</span>
+                                            <p className="text-sm text-[#e1e1e1]">{profile.founded}</p>
+                                        </div>
+                                    )}
+                                    {profile.headquarters && profile.headquarters !== '-' && (
+                                        <div>
+                                            <span className="text-xs text-[#888888] uppercase">Headquarters</span>
+                                            <p className="text-sm text-[#e1e1e1]">{profile.headquarters}</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </CardContent>
+                        </Card>
+
                         {/* 주요 임원 */}
                         {profile.companyOfficers?.length > 0 && (
                             <Card className="bg-[#252526] border-[#3c3c3c]">
