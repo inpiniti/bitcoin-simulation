@@ -217,6 +217,22 @@ export const useStore = create(
                         return;
                     }
 
+                    if (tickerGroup === 'indices') {
+                        setGroupStocks([
+                            { ticker: '^GSPC', name: 'S&P 500', exchange: 'SNP' },
+                            { ticker: '^NDX', name: 'Nasdaq 100', exchange: 'NAS' },
+                            { ticker: '^IXIC', name: 'Nasdaq Composite', exchange: 'NAS' },
+                            { ticker: '^DJI', name: 'Dow Jones Industrial Average', exchange: 'DJI' },
+                            { ticker: '^RUT', name: 'Russell 2000', exchange: 'RUS' },
+                            { ticker: '^VIX', name: 'CBOE Volatility Index', exchange: 'CBOE' },
+                            { ticker: '^SOX', name: 'PHLX Semiconductor Sector', exchange: 'PHI' },
+                            { ticker: 'GC=F', name: 'Gold Futures', exchange: 'COMEX' },
+                            { ticker: 'CL=F', name: 'Crude Oil Futures', exchange: 'NYM' },
+                            { ticker: 'BTC-USD', name: 'Bitcoin USD', exchange: 'CRYPTO' },
+                        ]);
+                        return;
+                    }
+
                     if (!kisAuth.isLoggedIn) {
                         setGroupStocks([]);
                         return;

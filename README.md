@@ -112,10 +112,11 @@
 *   **자산 토글 (Toggle)**: `Coin` / `Stock` 선택. 변경 시 데이터 초기화 후 일봉 로드.
 *   **티커 그룹 선택 (Ticker Group)**:
     *   **Superinvestor**: DataRoma 기반 거물 투자자 포트폴리오.
-    *   **S&P 500**: Wikipedia Scraper 기반 종목 리스트.
-    *   **Nasdaq 100**: Wikipedia Scraper 기반 종목 리스트.
+    *   **Indices**: 주요 지수 (S&P 500, Nasdaq 100, VIX, etc.) 직접 분석.
+    *   **S&P 500**: Wikipedia Scraper 기반 구성 종목 리스트.
+    *   **Nasdaq 100**: Wikipedia Scraper 기반 구성 종목 리스트.
     *   **내 보유종목**: KIS API 연동 실시간 계좌 잔고.
-    *   **급락/급등/거래량급증 (60분)**: KIS API 기반 실시간 랭킹 데이터.
+    *   **거래량 급증 (60분)**: KIS API 기반 실시간 랭킹 데이터.
 *   **스마트 티커 선택 (Smart Ticker Selection)**: 선택된 그룹 내 종목 리스트 제공 및 검색.
 
 #### Sidebar (전략 설정)
