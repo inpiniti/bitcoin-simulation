@@ -122,9 +122,9 @@ export default defineConfig(({ mode }) => {
                                 const tds = $(el).find('td');
                                 if (tds.length === 0) return;
 
-                                // For Nasdaq 100: Company (0), Ticker (1), Sector (2), Sub-Industry (3)
-                                let name = $(tds[0]).text().trim();
-                                let ticker = $(tds[1]).text().trim();
+                                // For Nasdaq 100: Company (0), Ticker (1) -> Adjusted to Ticker(0), Company(1) based on user report
+                                let ticker = $(tds[0]).text().trim();
+                                let name = $(tds[1]).text().trim();
                                 let sector = $(tds[2]).text().trim();
 
                                 // Clean up

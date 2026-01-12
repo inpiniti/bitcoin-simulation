@@ -31,10 +31,10 @@ export default async function handler(request, response) {
             if (tds.length === 0) return;
 
             // For Nasdaq 100: 
-            // 0: Company, 1: Ticker, 2: GICS Sector, 3: GICS Sub-Industry
+            // 0: Ticker, 1: Company, ... (Adjusted based on user report)
 
-            const name = $(tds[0]).text().trim();
-            let ticker = $(tds[1]).text().trim();
+            let ticker = $(tds[0]).text().trim();
+            const name = $(tds[1]).text().trim();
             const sector = $(tds[2]).text().trim();
 
             // Cleanup ticker (remove newlines, extra spaces)
