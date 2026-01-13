@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -13,6 +14,8 @@ export function AutoTradingDialog({ isOpen, onOpenChange }) {
         autoTradeStatus,
         kisAuth
     } = useStore()
+
+    const [isRunning, setIsRunning] = useState(false)
 
     // 헬퍼: 현재 설정된 값 업데이트
     const updateSetting = (key, value) => {
@@ -140,7 +143,29 @@ export function AutoTradingDialog({ isOpen, onOpenChange }) {
                     </div>
                 </div>
 
-                <div className="flex justify-end pt-2">
+                <div className="flex justify-between pt-2">
+                    <Button
+                        variant="destructive"
+                        size="sm"
+                        disabled={isRunning}
+                        className="h-8 text-[12px] bg-red-900/50 hover:bg-red-800 border border-red-800 text-red-200 disabled:opacity-50"
+                        onClick={async () => {
+                            if (!confirm('테스트 모드로 즉시 실행하시겠습니까?\n실제 매매는 발생하지 않으며(수량 0 처리), 분석 로직만 검증합니다.')) return;
+
+                            setIsRunning(true);
+                            try {
+                                const { executeAutoTrade } = await import('@/lib/autoTradeLogic');
+                                await executeAutoTrade(true); // isTest = true
+                            } catch (e) {
+                                console.error(e);
+                            } finally {
+                                setIsRunning(false);
+                            }
+                        }}
+                    >
+                        {isRunning ? "⏳ 실행 중..." : "⚡ 즉시 실행 (테스트)"}
+                    </Button>
+
                     <Button
                         variant="secondary"
                         size="sm"

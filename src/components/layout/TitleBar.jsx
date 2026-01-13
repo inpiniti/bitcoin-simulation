@@ -16,7 +16,44 @@ import { KISAccountDialog } from "@/components/KISAccountDialog"
 import { KISOrderDialog } from "@/components/KISOrderDialog"
 import { GlobalAlertDialog } from "@/components/GlobalAlertDialog"
 import { AutoTradingDialog } from "@/components/AutoTradingDialog"
-import { Search } from "lucide-react"
+import { Search, Clock } from "lucide-react"
+import { getMinutesUntilClose } from "@/lib/marketTime"
+
+function AutoTradeTimer({ executionTimeMinutes, isEnabled }) {
+    const [timeLeft, setTimeLeft] = useState("");
+
+    useEffect(() => {
+        if (!isEnabled) return;
+
+        const updateTimer = () => {
+            const minUntilClose = getMinutesUntilClose();
+            const minUntilExecution = minUntilClose - executionTimeMinutes;
+
+            if (minUntilExecution > 0) {
+                const hours = Math.floor(minUntilExecution / 60);
+                const mins = minUntilExecution % 60;
+                setTimeLeft(`${hours}h ${mins}m 후 실행`);
+            } else if (minUntilExecution > -10) {
+                setTimeLeft("실행 중/완료");
+            } else {
+                setTimeLeft("내일 실행 예정");
+            }
+        };
+
+        updateTimer();
+        const interval = setInterval(updateTimer, 60000); // 1분 갱신
+        return () => clearInterval(interval);
+    }, [executionTimeMinutes, isEnabled]);
+
+    if (!isEnabled || !timeLeft) return null;
+
+    return (
+        <div className="flex items-center gap-1 text-[10px] text-[#dac422] bg-[#3a3a2a] px-1.5 py-0.5 rounded border border-[#5a5a3a]">
+            <Clock className="w-3 h-3" />
+            <span>{timeLeft}</span>
+        </div>
+    );
+}
 
 export function TitleBar() {
     const {
@@ -176,18 +213,21 @@ export function TitleBar() {
 
                 {/* Auto Trade Button (Stock Mode Only) */}
                 {mode === 'stock' && kisAuth.isLoggedIn && (
-                    <button
-                        onClick={() => setAutoTradeDialogOpen(true)}
-                        className={`px-2 py-0.5 text-[11px] rounded flex items-center gap-1 border ${useStore.getState().autoTradeSettings.isEnabled
-                            ? "bg-[#2d2d2d] border-green-700 text-green-500 hover:bg-[#333]"
-                            : "bg-[#2d2d2d] border-[#3c3c3c] text-[#888888] hover:bg-[#333]"
-                            }`}
-                        title="자동 매매 설정"
-                    >
-                        <span>Auto Trade</span>
-                        <span className={`w-1.5 h-1.5 rounded-full ${useStore.getState().autoTradeSettings.isEnabled ? 'bg-green-500 animate-pulse' : 'bg-gray-500'
-                            }`}></span>
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <AutoTradeTimer executionTimeMinutes={useStore.getState().autoTradeSettings.executionTimeMinutes} isEnabled={useStore.getState().autoTradeSettings.isEnabled} />
+                        <button
+                            onClick={() => setAutoTradeDialogOpen(true)}
+                            className={`px-2 py-0.5 text-[11px] rounded flex items-center gap-1 border ${useStore.getState().autoTradeSettings.isEnabled
+                                ? "bg-[#2d2d2d] border-green-700 text-green-500 hover:bg-[#333]"
+                                : "bg-[#2d2d2d] border-[#3c3c3c] text-[#888888] hover:bg-[#333]"
+                                }`}
+                            title="자동 매매 설정"
+                        >
+                            <span>Auto Trade</span>
+                            <span className={`w-1.5 h-1.5 rounded-full ${useStore.getState().autoTradeSettings.isEnabled ? 'bg-green-500 animate-pulse' : 'bg-gray-500'
+                                }`}></span>
+                        </button>
+                    </div>
                 )}
 
                 {/* KIS Login/Account Button */}

@@ -8,43 +8,47 @@ import { getOverseasBalance, buyOverseasStock, sellOverseasStock, getOverseasSto
  * 자동 매매 실행 로직 (Core)
  * 1분마다 호출됨.
  */
-export async function executeAutoTrade() {
+export async function executeAutoTrade(isTest = false) {
     const store = useStore.getState();
     const { autoTradeSettings, kisAuth, strategyOptions } = store;
 
     // 1. 기본 체크
-    if (!autoTradeSettings.isEnabled) return;
+    if (!isTest && !autoTradeSettings.isEnabled) return;
     if (!kisAuth.isLoggedIn) {
         store.addAutoTradeLog("오류: KIS 로그인이 필요합니다.");
         return;
     }
 
     const todayStr = new Date().toISOString().split('T')[0];
-    if (store.autoTradeStatus.lastRunDate === todayStr) {
+    if (!isTest && store.autoTradeStatus.lastRunDate === todayStr) {
         // 이미 오늘 실행함
         return;
     }
 
     // 2. 시간 체크
     const minutesLeft = getMinutesUntilClose();
-    // 설정된 시간 (예: 30분) 이내이고, -5분 (장 마감 5분 전까지) 사이일 때만 실행
-    // 너무 임박하면 위험하므로 1분 전엔 실행 안 함 등의 안전장치
-    if (minutesLeft <= autoTradeSettings.executionTimeMinutes && minutesLeft > 1) {
+
+    // 테스트 모드이거나, 설정된 시간 범위 내일 때 실행
+    if (isTest || (minutesLeft <= autoTradeSettings.executionTimeMinutes && minutesLeft > 1)) {
         // TRIGGER
-        store.setLastRunDate(todayStr); // 실행 플래그
-        store.addAutoTradeLog(`자동 매매 시작 (장 마감 ${minutesLeft}분 전)`);
+        if (!isTest) {
+            store.setLastRunDate(todayStr); // 실행 플래그
+        }
+
+        const modeText = isTest ? "[TEST 모드]" : "";
+        store.addAutoTradeLog(`${modeText} 자동 매매 시작 (장 마감 ${minutesLeft}분 전)`);
 
         try {
-            await runAutoTradeProcess(store);
-            store.addAutoTradeLog("자동 매매 완료");
+            await runAutoTradeProcess(store, isTest);
+            store.addAutoTradeLog(`${modeText} 자동 매매 완료`);
         } catch (e) {
             console.error(e);
-            store.addAutoTradeLog(`자동 매매 실패: ${e.message}`);
+            store.addAutoTradeLog(`${modeText} 자동 매매 실패: ${e.message}`);
         }
     }
 }
 
-async function runAutoTradeProcess(store) {
+async function runAutoTradeProcess(store, isTest = false) {
     const { autoTradeSettings, kisAuth, strategyOptions } = store;
 
     // 1. 보유 종목 조회 (Holdings)
@@ -155,6 +159,14 @@ async function runAutoTradeProcess(store) {
     // 4. 매도 실행 (먼저 현금 확보)
     for (const item of sellList) {
         store.addAutoTradeLog(`[매도] ${item.ticker} (${item.reason}) 실행...`);
+
+        // [TEST 모드] API 호출 진행 (단, 수량 0으로 설정하여 실패 유도)
+        let sellQty = Number(item.qty);
+        if (isTest) {
+            sellQty = 0;
+            store.addAutoTradeLog(`[TEST] 테스트 모드: 매도 주문 전송 (수량 0으로 강제 설정)`);
+        }
+
         // 실시간 현재가 조회 (정확한 주문 위해)
         // KIS API가 없으면 Yahoo price라도 써야하지만, KIS API getPriceFluctuation 등 활용 가능.
         // 하지만 여기선 야후 가격(`item.price`)을 참고가로 하여 시장가 매도? 
@@ -164,7 +176,7 @@ async function runAutoTradeProcess(store) {
         const res = await sellOverseasStock(
             kisAuth.accessToken, kisAuth.appkey, kisAuth.appsecret, kisAuth.accountNo, kisAuth.accountCode,
             item.ticker,
-            Number(item.qty),
+            sellQty,
             0 // 0이면 시장가? 해외주식은 시장가 지원 여부 확인 필요. 보통 지정가 필수인 경우 많음.
             // 여기서는 일단 지정가(현재가)로 주문한다고 가정. 슬리피지 고려해야함.
             // 만약 지정가라면 item.price 사용.
@@ -197,7 +209,13 @@ async function runAutoTradeProcess(store) {
             }
         }
 
-        if (qty <= 0) { // 혹시나 마이너스 등 예외 처리
+        // [TEST 모드] 수량 0으로 강제 설정 (실주문 방지)
+        if (isTest) {
+            qty = 0;
+            store.addAutoTradeLog(`[TEST] 테스트 모드: 매수 수량 0으로 강제 설정하여 주문 전송 시도...`);
+        }
+
+        if (qty <= 0 && !isTest) {
             store.addAutoTradeLog(`[매수 스킵] ${item.ticker}: 수량 오류`);
             continue;
         }
