@@ -568,17 +568,40 @@ export async function getOverseasCurrentPrice(accessToken, appkey, appsecret, ex
     }
 }
 /**
+ * 거래소 코드를 모를 때, 주요 거래소(NAS, NYS, AMS)를 순회하며 현재가를 조회하고 올바른 거래소를 반환함
+ */
+export async function getOverseasStockPriceWithExchangeSearch(accessToken, appkey, appsecret, ticker) {
+    const exchanges = ['NAS', 'NYS', 'AMS']; // 나스닥, 뉴욕, 아멕스 순 시도
+
+    for (const excd of exchanges) {
+        const res = await getOverseasCurrentPrice(accessToken, appkey, appsecret, excd, ticker);
+        if (res.success) {
+            return {
+                success: true,
+                price: res.price,
+                exchange: excd, // 성공한 거래소 코드 반환
+                data: res
+            };
+        }
+        // 실패 시 다음 거래소 시도 (에러 로그는 무시하거나 내부적으로 처리)
+    }
+
+    return {
+        success: false,
+        error: "모든 거래소 조회 실패"
+    };
+}
+
+/**
  * 해외주식 매수 주문 Wrapper
  */
-export async function buyOverseasStock(accessToken, appkey, appsecret, accountNo, accountCode, ticker, qty, price) {
-    // 거래소 코드는 기본 NASD로 설정하거나, 별도 매핑 로직 필요.
-    // 여기서는 간단히 'NAS' (나스닥)로 가정하거나, 추후 확장.
-    return orderOverseasStock(accessToken, appkey, appsecret, accountNo, accountCode, 'buy', 'NAS', ticker, price, qty);
+export async function buyOverseasStock(accessToken, appkey, appsecret, accountNo, accountCode, ticker, qty, price, exchange = 'NAS') {
+    return orderOverseasStock(accessToken, appkey, appsecret, accountNo, accountCode, 'buy', exchange, ticker, price, qty);
 }
 
 /**
  * 해외주식 매도 주문 Wrapper
  */
-export async function sellOverseasStock(accessToken, appkey, appsecret, accountNo, accountCode, ticker, qty, price) {
-    return orderOverseasStock(accessToken, appkey, appsecret, accountNo, accountCode, 'sell', 'NAS', ticker, price, qty);
+export async function sellOverseasStock(accessToken, appkey, appsecret, accountNo, accountCode, ticker, qty, price, exchange = 'NAS') {
+    return orderOverseasStock(accessToken, appkey, appsecret, accountNo, accountCode, 'sell', exchange, ticker, price, qty);
 }

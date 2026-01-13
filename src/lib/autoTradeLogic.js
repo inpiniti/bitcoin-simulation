@@ -2,7 +2,7 @@ import { isUSDST, getUSMarketCloseTime, getMinutesUntilClose } from "@/lib/marke
 import { useStore } from "@/store/useStore"
 import { fetchStockOneYearData, fetchStockOverview } from "@/lib/api"
 import { addDerivedData, analyzeSignal } from "@/lib/dataProcessor"
-import { getOverseasBalance, buyOverseasStock, sellOverseasStock, getOverseasStockPrice } from "@/lib/kisApi"
+import { getOverseasBalance, buyOverseasStock, sellOverseasStock, getOverseasStockPrice, getOverseasStockPriceWithExchangeSearch } from "@/lib/kisApi"
 
 /**
  * 자동 매매 실행 로직 (Core)
@@ -173,32 +173,40 @@ async function runAutoTradeProcess(store, isTest = false) {
     for (const item of sellList) {
         store.addAutoTradeLog(`[매도] ${item.ticker} (${item.reason}) 실행...`);
 
+        // 1. 거래소 및 현재가 확인
+        const marketInfo = await getOverseasStockPriceWithExchangeSearch(kisAuth.accessToken, kisAuth.appkey, kisAuth.appsecret, item.ticker);
+
+        let tradePrice = item.price; // 기본값 (야후 데이터)
+        let exchange = 'NAS';
+
+        if (marketInfo.success) {
+            tradePrice = Number(marketInfo.price);
+            exchange = marketInfo.exchange;
+            // store.addAutoTradeLog(`[시세 확인] ${item.ticker}: $${tradePrice} (${exchange})`);
+        } else {
+            store.addAutoTradeLog(`[경고] 시세/거래소 조회 실패: ${item.ticker}, 기본값(NAS/$${tradePrice}) 사용`);
+        }
+
         // [TEST 모드] API 호출 진행 (단, 수량 0으로 설정하여 실패 유도)
         let sellQty = Number(item.qty);
         if (isTest) {
             sellQty = 0;
-            store.addAutoTradeLog(`[TEST] 테스트 모드: 매도 주문 전송 (수량 0으로 강제 설정)`);
+            store.addAutoTradeLog(`[TEST] 테스트 모드 (수량 0)`);
         }
 
-        // 실시간 현재가 조회 (정확한 주문 위해)
-        // KIS API가 없으면 Yahoo price라도 써야하지만, KIS API getPriceFluctuation 등 활용 가능.
-        // 하지만 여기선 야후 가격(`item.price`)을 참고가로 하여 시장가 매도? 
-        // 해외주식은 보통 지정가. 현재가의 -1% 정도로 매도 주문 (즉시 체결 유도)
-
-        // KIS 주문 API 호출
+        // 매도 주문 (현재가격으로 지정가 주문)
         const res = await sellOverseasStock(
             kisAuth.accessToken, kisAuth.appkey, kisAuth.appsecret, kisAuth.accountNo, kisAuth.accountCode,
             item.ticker,
             sellQty,
-            0 // 0이면 시장가? 해외주식은 시장가 지원 여부 확인 필요. 보통 지정가 필수인 경우 많음.
-            // 여기서는 일단 지정가(현재가)로 주문한다고 가정. 슬리피지 고려해야함.
-            // 만약 지정가라면 item.price 사용.
+            tradePrice, // 지정가
+            exchange
         );
 
         if (res.success) {
-            store.addAutoTradeLog(`[매도 성공] ${item.ticker} 수량: ${item.qty}`);
+            store.addAutoTradeLog(`[매도 성공] ${item.ticker} 수량: ${sellQty}, 가격: ${tradePrice}`);
         } else {
-            store.addAutoTradeLog(`[매도 실패] ${item.ticker}: ${res.message}`);
+            store.addAutoTradeLog(`[매도 실패] ${item.ticker}: ${res.error || res.message}`);
         }
     }
 
@@ -206,26 +214,38 @@ async function runAutoTradeProcess(store, isTest = false) {
     for (const item of buyList) {
         store.addAutoTradeLog(`[매수] ${item.ticker} (${item.reason}) 실행...`);
 
+        // 1. 거래소 및 현재가 확인
+        const marketInfo = await getOverseasStockPriceWithExchangeSearch(kisAuth.accessToken, kisAuth.appkey, kisAuth.appsecret, item.ticker);
+
+        let tradePrice = item.price; // 기본값 (야후 데이터)
+        let exchange = 'NAS';
+
+        if (marketInfo.success) {
+            tradePrice = Number(marketInfo.price);
+            exchange = marketInfo.exchange;
+        } else {
+            store.addAutoTradeLog(`[경고] 시세/거래소 조회 실패: ${item.ticker}, 기본값(NAS/$${tradePrice}) 사용`);
+        }
+
         // 수량 계산
         let qty = 0;
-        let price = item.price; // 분석 시점 종가 (근사치)
 
         if (autoTradeSettings.amountType === 'quantity') {
             qty = Number(autoTradeSettings.buyAmount);
         } else {
             // 금액 기준 ($)
-            qty = Math.floor(Number(autoTradeSettings.buyAmount) / price);
+            qty = Math.floor(Number(autoTradeSettings.buyAmount) / tradePrice);
             // 최소 1주 보장
             if (qty === 0) {
-                store.addAutoTradeLog(`[매수 보정] 설정금액($${autoTradeSettings.buyAmount}) < 현재가($${price}) -> 1주로 주문`);
+                store.addAutoTradeLog(`[매수 보정] 설정금액($${autoTradeSettings.buyAmount}) < 현재가($${tradePrice}) -> 1주로 주문`);
                 qty = 1;
             }
         }
 
-        // [TEST 모드] 수량 0으로 강제 설정 (실주문 방지)
+        // [TEST 모드] 수량 0으로 강제 설정
         if (isTest) {
             qty = 0;
-            store.addAutoTradeLog(`[TEST] 테스트 모드: 매수 수량 0으로 강제 설정하여 주문 전송 시도...`);
+            store.addAutoTradeLog(`[TEST] 테스트 모드 (수량 0)`);
         }
 
         if (qty <= 0 && !isTest) {
@@ -234,7 +254,7 @@ async function runAutoTradeProcess(store, isTest = false) {
         }
 
         // KIS 주문 API 호출 (지정가: 현재가의 +1%? 즉시 체결 유도)
-        const orderPrice = price * 1.01;
+        const orderPrice = tradePrice * 1.01;
         // 소수점 2자리 (미국주식)
         const finalPrice = Math.floor(orderPrice * 100) / 100;
 
@@ -242,13 +262,14 @@ async function runAutoTradeProcess(store, isTest = false) {
             kisAuth.accessToken, kisAuth.appkey, kisAuth.appsecret, kisAuth.accountNo, kisAuth.accountCode,
             item.ticker,
             qty,
-            finalPrice
+            finalPrice,
+            exchange
         );
 
         if (res.success) {
             store.addAutoTradeLog(`[매수 성공] ${item.ticker} 수량: ${qty}, 가격: ${finalPrice}`);
         } else {
-            store.addAutoTradeLog(`[매수 실패] ${item.ticker}: ${res.message}`);
+            store.addAutoTradeLog(`[매수 실패] ${item.ticker}: ${res.error || res.message}`);
         }
     }
 }
