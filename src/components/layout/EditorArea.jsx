@@ -17,6 +17,7 @@ import { AnalysisPanel } from "../AnalysisPanel"
 import { StockDiscussionPanel } from "../StockDiscussionPanel"
 import { OverviewPanel } from "../OverviewPanel"
 import { NewsPanel } from "../NewsPanel"
+import { FinancialQAPanel } from "../FinancialQAPanel"
 import { TickerTabBar } from "./TickerTabBar"
 
 // 페이지당 거래 수
@@ -80,6 +81,11 @@ export function EditorArea() {
         // Discussion View Mode
         if (viewMode === 'discussion') {
             return <StockDiscussionPanel />
+        }
+
+        // QA Mode
+        if (viewMode === 'qa') {
+            return <FinancialQAPanel />
         }
 
         // Chart View Mode
