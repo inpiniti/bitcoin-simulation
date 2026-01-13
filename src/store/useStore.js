@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { devtools, persist, createJSONStorage } from 'zustand/middleware'
 import { get as idbGet, set as idbSet, del as idbDel } from 'idb-keyval'
-import { fetchCoinDailyData, fetchStockOneYearData, fetchStockShortData, fetchStockNews, getSentimentScore } from '@/lib/api'
+import { fetchCoinDailyData, fetchStockOneYearData, fetchStockNews, getSentimentScore } from '@/lib/api'
 import { addDerivedData, generateIntegratedTrades, calculateFixedQuantityResult, calculateCumulativeResult, calculateMartingaleResult, analyzeSignal } from '@/lib/dataProcessor'
 
 // IndexedDB 스토리지 어댑터
@@ -350,7 +350,7 @@ export const useStore = create(
                                 rawData = cachedEntry.data;
                                 if (cachedEntry.exchange) exchange = cachedEntry.exchange;
                             } else {
-                                rawData = await fetchStockShortData(stock.ticker);
+                                rawData = await fetchStockOneYearData(stock.ticker);
                                 if (rawData && rawData.exchange) exchange = rawData.exchange;
 
                                 if (rawData && rawData.length > 0) {

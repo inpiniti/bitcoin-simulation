@@ -113,12 +113,7 @@ export async function fetchStockOneYearData(ticker) {
     return fetchStockData(ticker, '1d', '365d');
 }
 
-/**
- * 50일치 일봉 조회 (전체 분석용)
- */
-export async function fetchStockShortData(ticker) {
-    return fetchStockData(ticker, '1d', '60d'); // 여유있게 60일 (거래일 기준 50일 확보 위해)
-}
+
 
 
 
