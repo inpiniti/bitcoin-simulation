@@ -567,3 +567,18 @@ export async function getOverseasCurrentPrice(accessToken, appkey, appsecret, ex
         }
     }
 }
+/**
+ * 해외주식 매수 주문 Wrapper
+ */
+export async function buyOverseasStock(accessToken, appkey, appsecret, accountNo, accountCode, ticker, qty, price) {
+    // 거래소 코드는 기본 NASD로 설정하거나, 별도 매핑 로직 필요.
+    // 여기서는 간단히 'NAS' (나스닥)로 가정하거나, 추후 확장.
+    return orderOverseasStock(accessToken, appkey, appsecret, accountNo, accountCode, 'buy', 'NAS', ticker, price, qty);
+}
+
+/**
+ * 해외주식 매도 주문 Wrapper
+ */
+export async function sellOverseasStock(accessToken, appkey, appsecret, accountNo, accountCode, ticker, qty, price) {
+    return orderOverseasStock(accessToken, appkey, appsecret, accountNo, accountCode, 'sell', 'NAS', ticker, price, qty);
+}

@@ -1,8 +1,19 @@
+import { useEffect } from "react"
+import { executeAutoTrade } from "@/lib/autoTradeLogic"
 import { TitleBar, ActivityBar, Sidebar, EditorArea, StatusBar } from "@/components/layout"
 import { GlobalAlertDialog } from "@/components/GlobalAlertDialog"
 import './index.css'
 
 function App() {
+  // Auto Trade Scheduler (1분마다 체크)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      executeAutoTrade();
+    }, 60000); // 1분
+
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <div className="h-screen flex flex-col bg-[#1e1e1e] overflow-hidden">
       {/* Title Bar */}

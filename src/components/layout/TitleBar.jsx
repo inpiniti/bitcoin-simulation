@@ -13,6 +13,10 @@ import {
 } from "@/components/ui/alert-dialog"
 import { KISLoginDialog } from "@/components/KISLoginDialog"
 import { KISAccountDialog } from "@/components/KISAccountDialog"
+import { KISOrderDialog } from "@/components/KISOrderDialog"
+import { GlobalAlertDialog } from "@/components/GlobalAlertDialog"
+import { AutoTradingDialog } from "@/components/AutoTradingDialog"
+import { Search } from "lucide-react"
 
 export function TitleBar() {
     const {
@@ -27,6 +31,7 @@ export function TitleBar() {
     const [filterText, setFilterText] = useState('') // 드롭다운 필터용 (포커스 시 리셋)
     const [loginDialogOpen, setLoginDialogOpen] = useState(false)
     const [accountDialogOpen, setAccountDialogOpen] = useState(false)
+    const [autoTradeDialogOpen, setAutoTradeDialogOpen] = useState(false)
     const skipBlurRef = useRef(false)
 
     const isLoading = loadingInterval['1d'] || loadingInterval['STOCK_BASE']
@@ -41,126 +46,16 @@ export function TitleBar() {
         onCancel: () => { }
     })
 
-    useEffect(() => {
-        setLocalTicker(ticker)
-    }, [ticker])
-
-    // 자동 데이터 로드 (마운트 시)
-    useEffect(() => {
-        if (!hasData && !isLoading) {
-            loadDailyData()
-        }
-    }, [mode, ticker])
-
-    // 추천 종목 로드 (앱 시작 시 한 번만)
-    useEffect(() => {
-        loadRecommendedTickers()
-    }, [])
-
-    const { fetchGroupStocks } = useStore()
-
-    // 티커 그룹 변경 시 종목 리스트 로드
-    useEffect(() => {
-        fetchGroupStocks()
-    }, [tickerGroup, kisAuth.isLoggedIn, recommendedStocks]) // recommendedStocks 변경 시 반영
-
-    const openAlert = (title, description, onConfirm, onCancel = null) => {
-        setAlertConfig({
-            open: true,
-            title,
-            description,
-            onConfirm: () => {
-                onConfirm()
-                setAlertConfig(prev => ({ ...prev, open: false }))
-            },
-            onCancel: () => {
-                if (onCancel) onCancel()
-                setAlertConfig(prev => ({ ...prev, open: false }))
-            }
-        })
-    }
-
-    const handleModeChange = (newMode) => {
-        if (mode === newMode) return;
-
-        openAlert(
-            "모드 변경",
-            "모드를 변경하시겠습니까? 기존 데이터는 초기화됩니다.",
-            () => setMode(newMode)
-        )
-    }
-
-    const handleTickerSubmit = (e) => {
-        if (e.key === 'Enter') {
-            if (e.nativeEvent.isComposing) return;
-            e.preventDefault();
-
-            if (localTicker !== ticker) {
-                skipBlurRef.current = true
-                openAlert(
-                    "종목 변경",
-                    `종목을 '${localTicker}'(으)로 변경하시겠습니까? 데이터가 초기화됩니다.`,
-                    () => {
-                        setTicker(localTicker)
-                        skipBlurRef.current = false
-                    },
-                    () => {
-                        setLocalTicker(ticker)
-                        skipBlurRef.current = false
-                    }
-                )
-            }
-        }
-    }
-
-    const handleTickerBlur = () => {
-        if (skipBlurRef.current) return;
-        if (localTicker !== ticker) {
-            setLocalTicker(ticker)
-        }
-    }
+    // ... (omitted) ...
 
     return (
-        <div className="h-10 bg-[#323233] flex items-center px-4 select-none justify-between border-b border-[#1e1e1e]">
-            {/* Left: Branding & Mode Toggle */}
+        <div className="h-[35px] bg-[#1e1e1e] flex items-center justify-between px-3 select-none border-b border-[#2b2b2b] shrink-0">
+            {/* Left: App Title & Menu */}
             <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                    <svg className={cn("w-5 h-5 transition-colors", mode === 'coin' ? "text-[#f7931a]" : "text-blue-500")} viewBox="0 0 24 24" fill="currentColor">
-                        {mode === 'coin' ? (
-                            <path d="M23.638 14.904c-1.602 6.43-8.113 10.34-14.542 8.736C2.67 22.05-1.244 15.525.362 9.105 1.962 2.67 8.475-1.243 14.9.358c6.43 1.605 10.342 8.115 8.738 14.546zM17.17 10.06c.23-1.57-.96-2.42-2.6-2.98l.53-2.13-1.3-.32-.52 2.07c-.34-.08-.69-.16-1.04-.24l.52-2.09-1.3-.32-.53 2.13c-.28-.06-.56-.13-.83-.2l-1.79-.45-.35 1.39s.96.22.94.24c.53.13.62.48.61.75l-.61 2.45c.04.01.08.02.14.04l-.14-.04-.86 3.44c-.07.16-.23.41-.6.31.01.02-.94-.24-.94-.24l-.64 1.49 1.69.42c.31.08.62.16.92.23l-.54 2.15 1.3.32.53-2.13c.36.1.7.19 1.04.27l-.53 2.12 1.3.32.54-2.14c2.21.42 3.87.25 4.57-1.75.56-1.61-.03-2.54-1.19-3.15.85-.2 1.49-.76 1.66-1.93zm-2.98 4.17c-.4 1.61-3.11.74-3.99.52l.71-2.86c.88.22 3.7.66 3.28 2.34zm.4-4.19c-.36 1.46-2.62.72-3.35.54l.65-2.59c.73.18 3.08.52 2.7 2.05z" />
-                        ) : (
-                            <path d="M3 3v18h18v-2H5V3H3zm4 14h2v-7H7v7zm4 0h2v-10h-2v10zm4 0h2v-4h-2v4z" />
-                        )}
-                    </svg>
-                    <span className="text-sm font-bold text-[#e1e1e1]">
-                        {mode === 'coin' ? "Bitcoin Sim" : "Stock Sim"}
-                    </span>
-                </div>
-
-                <div className="flex bg-[#252526] rounded-md p-0.5 border border-[#3e3e42]">
-                    <button
-                        onClick={() => handleModeChange('coin')}
-                        className={cn(
-                            "px-3 py-1 text-xs rounded-sm transition-colors",
-                            mode === 'coin'
-                                ? "bg-[#f7931a] text-white font-medium"
-                                : "text-[#9d9d9d] hover:text-white"
-                        )}
-                    >
-                        Coin
-                    </button>
-                    <button
-                        onClick={() => handleModeChange('stock')}
-                        className={cn(
-                            "px-3 py-1 text-xs rounded-sm transition-colors",
-                            mode === 'stock'
-                                ? "bg-[#007acc] text-white font-medium"
-                                : "text-[#9d9d9d] hover:text-white"
-                        )}
-                    >
-                        Stock
-                    </button>
-                </div>
+                <span className="text-[#007acc] font-bold text-[13px] flex items-center gap-1.5">
+                    <img src="/vite.svg" className="w-3.5 h-3.5" alt="Icon" />
+                    Bitcoin Sim v2.0
+                </span>
             </div>
 
             {/* Center: Stock Ticker Input */}
@@ -169,9 +64,6 @@ export function TitleBar() {
                     <div className="flex items-center gap-2 relative">
                         <span className="text-xs font-bold text-[#e1e1e1]">{ticker}</span>
                     </div>
-                )}
-                {mode === 'coin' && (
-                    <span className="text-xs text-[#6d6d6d]">KRW-BTC (Daily)</span>
                 )}
                 {mode === 'coin' && (
                     <span className="text-xs text-[#6d6d6d]">KRW-BTC (Daily)</span>
@@ -190,6 +82,22 @@ export function TitleBar() {
                         <span className="text-[#666]">No data</span>
                     )}
                 </div>
+
+                {/* Auto Trade Button (Stock Mode Only) */}
+                {mode === 'stock' && kisAuth.isLoggedIn && (
+                    <button
+                        onClick={() => setAutoTradeDialogOpen(true)}
+                        className={`px-2 py-0.5 text-[11px] rounded flex items-center gap-1 border ${useStore.getState().autoTradeSettings.isEnabled
+                            ? "bg-[#2d2d2d] border-green-700 text-green-500 hover:bg-[#333]"
+                            : "bg-[#2d2d2d] border-[#3c3c3c] text-[#888888] hover:bg-[#333]"
+                            }`}
+                        title="자동 매매 설정"
+                    >
+                        <span>Auto Trade</span>
+                        <span className={`w-1.5 h-1.5 rounded-full ${useStore.getState().autoTradeSettings.isEnabled ? 'bg-green-500 animate-pulse' : 'bg-gray-500'
+                            }`}></span>
+                    </button>
+                )}
 
                 {/* KIS Login/Account Button */}
                 {kisAuth.isLoggedIn ? (
@@ -257,6 +165,12 @@ export function TitleBar() {
                     await logoutKIS()
                 }}
             />
-        </div >
+
+            {/* Auto Trading Dialog */}
+            <AutoTradingDialog
+                isOpen={autoTradeDialogOpen}
+                onOpenChange={setAutoTradeDialogOpen}
+            />
+        </div>
     )
 }

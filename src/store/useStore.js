@@ -72,6 +72,35 @@ export const useStore = create(
                     baseQuantity: 100000,
                 },
 
+                // Auto Trading Settings
+                autoTradeSettings: {
+                    isEnabled: false,
+                    targetGroup: 'myholdings', // 'myholdings', 'sp500', 'superinvestor', etc.
+                    amountType: 'quantity', // 'quantity' | 'amount'
+                    buyAmount: 1, // 수량(주) 또는 금액($)
+                    executionTimeMinutes: 30, // 장 마감 N분 전
+                },
+
+                autoTradeStatus: {
+                    lastRunDate: null, // YYYY-MM-DD
+                    logs: [],
+                },
+
+                setAutoTradeSettings: (settings) => set(state => ({
+                    autoTradeSettings: { ...state.autoTradeSettings, ...settings }
+                })),
+
+                addAutoTradeLog: (message) => set(state => ({
+                    autoTradeStatus: {
+                        ...state.autoTradeStatus,
+                        logs: [{ time: new Date().toISOString(), message }, ...state.autoTradeStatus.logs].slice(0, 100) // 최근 100개 유지
+                    }
+                })),
+
+                setLastRunDate: (dateStr) => set(state => ({
+                    autoTradeStatus: { ...state.autoTradeStatus, lastRunDate: dateStr }
+                })),
+
                 // Market Analysis State & Actions
                 analysisResult: [],
                 isAnalyzing: false,
@@ -654,6 +683,8 @@ export const useStore = create(
                     lastRecommendedFetch: state.lastRecommendedFetch,
                     dataCache: state.dataCache,
                     kisAuth: state.kisAuth, // KIS 로그인 상태 저장
+                    autoTradeSettings: state.autoTradeSettings,
+                    autoTradeStatus: state.autoTradeStatus,
                 }),
             }
         ),
