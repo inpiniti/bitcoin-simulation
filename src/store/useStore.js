@@ -79,6 +79,12 @@ export const useStore = create(
                     amountType: 'quantity', // 'quantity' | 'amount'
                     buyAmount: 1, // 수량(주) 또는 금액($)
                     executionTimeMinutes: 30, // 장 마감 N분 전
+                    // 전략 옵션 (자동 매매 전용)
+                    useBB: false, // 볼린저 밴드 필터
+                    useTrend: false, // 추세 필터 (MA50)
+                    useTrend20: false, // 추세 필터 (MA20)
+                    useRSI: false, // RSI 필터
+                    useVolumeFilter: false, // 거래량 필터
                 },
 
                 autoTradeStatus: {

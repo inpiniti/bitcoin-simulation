@@ -75,6 +75,61 @@ export function AutoTradingDialog({ isOpen, onOpenChange }) {
                             </Select>
                         </div>
 
+                        {/* 3. 매매 전략 설정 */}
+                        <div className="space-y-1.5">
+                            <label className="text-[12px] text-[#888888]">매매 전략 (필터)</label>
+                            <div className="grid grid-cols-2 gap-2 p-3 bg-[#2d2d2d] rounded-lg border border-[#3c3c3c]">
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={autoTradeSettings.useBB}
+                                        onChange={(e) => updateSetting('useBB', e.target.checked)}
+                                        className="w-3.5 h-3.5 accent-blue-500"
+                                    />
+                                    <span className="text-[12px]">BB (볼린저)</span>
+                                </label>
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={autoTradeSettings.useTrend}
+                                        onChange={(e) => updateSetting('useTrend', e.target.checked)}
+                                        className="w-3.5 h-3.5 accent-blue-500"
+                                    />
+                                    <span className="text-[12px]">추세 (MA50)</span>
+                                </label>
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={autoTradeSettings.useTrend20}
+                                        onChange={(e) => updateSetting('useTrend20', e.target.checked)}
+                                        className="w-3.5 h-3.5 accent-blue-500"
+                                    />
+                                    <span className="text-[12px]">추세 (MA20)</span>
+                                </label>
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={autoTradeSettings.useRSI}
+                                        onChange={(e) => updateSetting('useRSI', e.target.checked)}
+                                        className="w-3.5 h-3.5 accent-blue-500"
+                                    />
+                                    <span className="text-[12px]">RSI (과매수 방지)</span>
+                                </label>
+                                <label className="flex items-center gap-2 cursor-pointer col-span-2">
+                                    <input
+                                        type="checkbox"
+                                        checked={autoTradeSettings.useVolumeFilter}
+                                        onChange={(e) => updateSetting('useVolumeFilter', e.target.checked)}
+                                        className="w-3.5 h-3.5 accent-blue-500"
+                                    />
+                                    <span className="text-[12px]">거래량 필터 (VMA20 초과)</span>
+                                </label>
+                            </div>
+                            <p className="text-[10px] text-[#666666]">
+                                * 선택된 필터 조건을 모두 충족해야 매매 신호가 발생합니다.
+                            </p>
+                        </div>
+
                         {/* 3. 주문 수량 설정 */}
                         <div className="space-y-1.5">
                             <label className="text-[12px] text-[#888888]">매수 주문 설정</label>

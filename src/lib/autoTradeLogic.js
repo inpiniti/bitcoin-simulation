@@ -10,7 +10,7 @@ import { getOverseasBalance, buyOverseasStock, sellOverseasStock, getOverseasSto
  */
 export async function executeAutoTrade(isTest = false) {
     const store = useStore.getState();
-    const { autoTradeSettings, kisAuth, strategyOptions } = store;
+    const { autoTradeSettings, kisAuth } = store;
 
     // 1. 기본 체크
     if (!isTest && !autoTradeSettings.isEnabled) return;
@@ -49,7 +49,20 @@ export async function executeAutoTrade(isTest = false) {
 }
 
 async function runAutoTradeProcess(store, isTest = false) {
-    const { autoTradeSettings, kisAuth, strategyOptions } = store;
+    const { autoTradeSettings, kisAuth } = store;
+
+    // 자동 매매 전용 전략 옵션 구성
+    const autoTradeStrategyOptions = {
+        useBB: autoTradeSettings.useBB,
+        useTrend: autoTradeSettings.useTrend,
+        useTrend20: autoTradeSettings.useTrend20,
+        useRSI: autoTradeSettings.useRSI,
+        useVolumeFilter: autoTradeSettings.useVolumeFilter,
+        // 손절/익절은 자동 매매에서 미사용 (신호 분석용)
+        useStopLoss: false,
+        useTakeProfit: false,
+        useTrailingStop: false,
+    };
 
     // 1. 보유 종목 조회 (Holdings)
     store.addAutoTradeLog("보유 종목 조회 중...");
@@ -122,7 +135,7 @@ async function runAutoTradeProcess(store, isTest = false) {
             const data = await loadData(stock.ticker);
             if (!data) return;
 
-            const { signal, reason } = analyzeSignal(data, strategyOptions);
+            const { signal, reason } = analyzeSignal(data, autoTradeStrategyOptions);
             if (signal === 'BUY') {
                 buyList.push({ ticker: stock.ticker, reason, price: data[data.length - 1].close });
             }
@@ -145,7 +158,7 @@ async function runAutoTradeProcess(store, isTest = false) {
         const data = await loadData(ticker);
         if (!data) continue;
 
-        const { signal, reason } = analyzeSignal(data, strategyOptions);
+        const { signal, reason } = analyzeSignal(data, autoTradeStrategyOptions);
 
         // SELL 신호 발생 시 매도 리스트 추가
         if (signal === 'SELL') {
