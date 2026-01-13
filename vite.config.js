@@ -10,6 +10,316 @@ export default defineConfig(({ mode }) => {
             {
                 name: 'configure-server',
                 configureServer(server) {
+                    // 종목 토론 API 미들웨어
+                    server.middlewares.use('/api/discussion', async (req, res, next) => {
+                        try {
+                            const urlObj = new URL(req.originalUrl || req.url, `http://${req.headers.host}`);
+                            const ticker = urlObj.searchParams.get('ticker');
+                            const source = urlObj.searchParams.get('source');
+
+                            if (!ticker) {
+                                res.statusCode = 400;
+                                res.end(JSON.stringify({ error: 'Ticker required' }));
+                                return;
+                            }
+
+                            const fetch = (await import('node-fetch')).default || global.fetch;
+                            let result = [];
+
+                            // Naver 조회
+                            if (source === 'naver' || source === 'all') {
+                                try {
+                                    const itemCode = `${ticker.toUpperCase()}.O`;
+                                    const params = new URLSearchParams({
+                                        discussionType: 'foreignStock',
+                                        itemCode: itemCode,
+                                        pageSize: '50',
+                                        isHolderOnly: 'false',
+                                        excludesItemNews: 'false',
+                                        isItemNewsOnly: 'false'
+                                    });
+
+                                    const response = await fetch(`https://m.stock.naver.com/front-api/discussion/list?${params.toString()}`, {
+                                        headers: {
+                                            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15',
+                                            'Accept': 'application/json',
+                                            'Referer': 'https://m.stock.naver.com/'
+                                        }
+                                    });
+
+                                    if (response.ok) {
+                                        const json = await response.json();
+                                        if (json && json.result && Array.isArray(json.result.posts)) {
+                                            result = result.concat(json.result.posts.map(post => ({
+                                                source: 'Naver',
+                                                id: post.discussionId,
+                                                user: post.writer?.nickname || 'Anonymous',
+                                                text: (post.contentSwReplaced || post.contentSwReplacedButImg || post.contents || '').replace(/<br\s*\/?>/gi, '\n'),
+                                                date: post.writtenAt,
+                                                sentiment: null
+                                            })));
+                                        }
+                                    }
+                                } catch (e) {
+                                    console.warn('Naver fetch error:', e.message);
+                                }
+                            }
+
+                            // Stocktwits 조회
+                            if (source === 'stocktwits' || source === 'all') {
+                                try {
+                                    const symbol = ticker.toUpperCase();
+                                    const apiUrl = `https://api.stocktwits.com/api/2/streams/symbol/${symbol}.json`;
+                                    console.log('[Stocktwits] Fetching:', apiUrl);
+
+                                    const response = await fetch(apiUrl, {
+                                        headers: {
+                                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                                            'Accept': 'application/json',
+                                            'Referer': 'https://stocktwits.com/'
+                                        }
+                                    });
+
+                                    console.log('[Stocktwits] Response status:', response.status, response.statusText);
+
+                                    if (response.ok) {
+                                        const json = await response.json();
+                                        console.log('[Stocktwits] Response has messages:', !!json?.messages, 'count:', json?.messages?.length || 0);
+                                        if (json && json.messages) {
+                                            result = result.concat(json.messages.slice(0, 30).map(msg => ({
+                                                source: 'Stocktwits',
+                                                id: msg.id,
+                                                user: msg.user?.username || 'Anonymous',
+                                                text: msg.body,
+                                                date: msg.created_at,
+                                                sentiment: msg.entities?.sentiment?.basic || null
+                                            })));
+                                        }
+                                    } else {
+                                        const errorText = await response.text();
+                                        console.warn('[Stocktwits] Error response:', errorText.substring(0, 200));
+                                    }
+                                } catch (e) {
+                                    console.warn('[Stocktwits] Fetch error:', e.message);
+                                }
+                            }
+
+                            // Reddit 조회
+                            if (source === 'reddit' || source === 'all') {
+                                try {
+                                    const query = `$${ticker.toUpperCase()}`;
+                                    const response = await fetch(
+                                        `https://www.reddit.com/search.json?q=${encodeURIComponent(query)}&sort=new&limit=25`,
+                                        {
+                                            headers: {
+                                                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                                            }
+                                        }
+                                    );
+
+                                    if (response.ok) {
+                                        const json = await response.json();
+                                        if (json && json.data && Array.isArray(json.data.children)) {
+                                            result = result.concat(json.data.children.map(child => {
+                                                const post = child.data;
+                                                const date = new Date(post.created_utc * 1000).toISOString();
+                                                return {
+                                                    source: 'Reddit',
+                                                    id: post.id,
+                                                    user: post.author,
+                                                    text: `[${post.subreddit_name_prefixed}] ${post.title}\n${post.selftext ? post.selftext.substring(0, 200) : ''}`,
+                                                    date: date,
+                                                    sentiment: null
+                                                };
+                                            }));
+                                        }
+                                    }
+                                } catch (e) {
+                                    console.warn('Reddit fetch error:', e.message);
+                                }
+                            }
+
+                            // Yahoo 조회 (OpenWeb API)
+                            if (source === 'yahoo' || source === 'all') {
+                                try {
+                                    const SPOT_ID = 'sp_Dw69v66P';
+                                    const conversationId = `${SPOT_ID}_${ticker.toUpperCase()}`;
+
+                                    // OpenWeb API 엔드포인트들 (도메인이 변경될 수 있음)
+                                    const apiUrls = [
+                                        'https://open-amp.api.openweb.com/v1/messages-v2/read',
+                                        'https://api-v2.spot.im/v1/messages-v2/read',
+                                        'https://open-api.spot.im/v1/messages-v2/read'
+                                    ];
+
+                                    let success = false;
+                                    for (const apiUrl of apiUrls) {
+                                        if (success) break;
+
+                                        console.log('[Yahoo] Trying:', apiUrl, 'conversation_id:', conversationId);
+
+                                        try {
+                                            const response = await fetch(apiUrl, {
+                                                method: 'POST',
+                                                headers: {
+                                                    'Content-Type': 'application/json',
+                                                    'x-spot-id': SPOT_ID,
+                                                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                                                    'Origin': 'https://finance.yahoo.com',
+                                                    'Referer': 'https://finance.yahoo.com/'
+                                                },
+                                                body: JSON.stringify({
+                                                    conversation_id: conversationId,
+                                                    count: 20,
+                                                    sort_by: "newest"
+                                                })
+                                            });
+
+                                            console.log('[Yahoo] Response status:', response.status, response.statusText);
+
+                                            if (response.ok) {
+                                                const json = await response.json();
+                                                console.log('[Yahoo] Response has messages:', !!json?.messages, 'count:', json?.messages?.length || 0);
+                                                if (json && json.messages) {
+                                                    result = result.concat(json.messages.map(msg => {
+                                                        let text = "";
+                                                        if (msg.content && Array.isArray(msg.content)) {
+                                                            text = msg.content.map(c => c.text || "").join(" ");
+                                                        }
+                                                        return {
+                                                            source: 'Yahoo',
+                                                            id: msg.id,
+                                                            user: msg.user_name || 'Anonymous',
+                                                            text: text || 'No content',
+                                                            date: new Date(msg.written_at * 1000).toISOString(),
+                                                            sentiment: null
+                                                        };
+                                                    }));
+                                                    success = true;
+                                                }
+                                            }
+                                        } catch (urlError) {
+                                            console.warn('[Yahoo] URL error:', apiUrl, urlError.message);
+                                        }
+                                    }
+
+                                    if (!success) {
+                                        console.warn('[Yahoo] All endpoints failed for:', conversationId);
+                                    }
+                                } catch (e) {
+                                    console.warn('[Yahoo] Fetch error:', e.message);
+                                }
+                            }
+
+                            // Toss 조회 (티커 -> ISIN 변환 필요)
+                            if (source === 'toss' || source === 'all') {
+                                try {
+                                    const symbol = ticker.toUpperCase();
+
+                                    // 0단계: 주요 종목 ISIN 하드코딩 매핑
+                                    const isinMap = {
+                                        'AAPL': 'US19801212001',
+                                        'TSLA': 'US88160R1014',
+                                        'MSFT': 'US5949181045',
+                                        'AMZN': 'US0231351067',
+                                        'GOOGL': 'US02079K3059',
+                                        'NVDA': 'US67066G1040',
+                                        'INTU': 'US4612021034',
+                                        'AMD': 'US0079031078',
+                                        'QQQ': 'US46090E1038',
+                                        'SPY': 'US78462F1030',
+                                        'TQQQ': 'US74347X8314',
+                                        'SQQQ': 'US74347G4322',
+                                        'SOXL': 'US25459W4583',
+                                        'SOXS': 'US25460G5188'
+                                    };
+
+                                    let isin = isinMap[symbol];
+
+                                    if (!isin) {
+                                        // 1단계: 티커 페이지에서 리다이렉트를 통해 ISIN 확인
+                                        const pageUrl = `https://www.tossinvest.com/stocks/${symbol}`;
+                                        console.log('[Toss] Trying page redirect:', pageUrl);
+
+                                        try {
+                                            const pageResponse = await fetch(pageUrl, {
+                                                headers: {
+                                                    'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15',
+                                                    'Accept': 'text/html'
+                                                },
+                                                redirect: 'manual'
+                                            });
+
+                                            // 리다이렉트 URL에서 ISIN 추출
+                                            const location = pageResponse.headers.get('location');
+                                            if (location && location.includes('/stocks/')) {
+                                                const isinMatch = location.match(/\/stocks\/([A-Z0-9]+)/);
+                                                if (isinMatch) {
+                                                    isin = isinMatch[1];
+                                                }
+                                            }
+                                        } catch (err) {
+                                            console.warn('[Toss] Page redirect check failed:', err.message);
+                                        }
+                                    }
+
+                                    // 리다이렉트가 없으면 HTML에서 ISIN 추출 시도 (생략 - 위에서 실패 시 검색 API도 없으므로 스킵)
+
+                                    if (isin) {
+                                        console.log('[Toss] Using ISIN:', isin);
+
+                                        // ISIN으로 커뮤니티 조회
+                                        const communityUrl = `https://www.tossinvest.com/api/community/v2/securities/${isin}/posts?size=30&sort=latest`;
+                                        console.log('[Toss] Fetching community:', communityUrl);
+
+                                        const communityResponse = await fetch(communityUrl, {
+                                            headers: {
+                                                'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15',
+                                                'Accept': 'application/json',
+                                                'Referer': 'https://tossinvest.com/'
+                                            }
+                                        });
+
+                                        console.log('[Toss] Community response status:', communityResponse.status);
+
+                                        if (communityResponse.ok) {
+                                            const json = await communityResponse.json();
+                                            console.log('[Toss] Response structure:', JSON.stringify(json).substring(0, 200));
+                                            if (json && Array.isArray(json.posts)) {
+                                                result = result.concat(json.posts.slice(0, 30).map(post => ({
+                                                    source: 'Toss',
+                                                    id: post.id,
+                                                    user: post.author?.displayName || post.author?.nickname || 'Anonymous',
+                                                    text: post.content || post.body || '',
+                                                    date: post.createdAt || post.created_at,
+                                                    sentiment: null,
+                                                    likes: post.likeCount || 0,
+                                                    comments: post.commentCount || 0
+                                                })));
+                                            }
+                                        } else {
+                                            const errorText = await communityResponse.text();
+                                            console.warn('[Toss] Community error:', errorText.substring(0, 200));
+                                        }
+                                    } else {
+                                        console.warn('[Toss] Could not find ISIN for ticker:', symbol);
+                                    }
+                                } catch (e) {
+                                    console.warn('[Toss] Fetch error:', e.message);
+                                }
+                            }
+
+                            // 날짜순 정렬
+                            result.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+                            res.setHeader('Content-Type', 'application/json');
+                            res.end(JSON.stringify(result));
+                        } catch (e) {
+                            console.error('Discussion API Error:', e);
+                            res.statusCode = 500;
+                            res.end(JSON.stringify({ error: e.message }));
+                        }
+                    });
                     server.middlewares.use('/api/dataroma', async (req, res, next) => {
                         try {
                             const cheerio = await import('cheerio');

@@ -52,6 +52,7 @@ const API_BASE_URL = 'https://external-api.com'
 - **Stocktwits**: `/api/stocktwits` → `https://api.stocktwits.com`
 - **Reddit**: `/api/reddit` → `https://www.reddit.com`
 - **Yahoo (OpenWeb)**: `/api/yahoo-conversation` → `https://api-v2.spot.im`
+- **종목토론 통합 API**: `/api/discussion` → Naver/Stocktwits/Reddit/Yahoo/Toss 통합 조회
 
 ### 5. 새로운 외부 API 추가 시
 1. `vite.config.js`에 프록시 설정 추가

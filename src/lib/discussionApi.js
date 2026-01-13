@@ -1,12 +1,45 @@
+/**
+ * 종목 토론 API 클라이언트
+ * Vercel 서버리스 함수를 통해 데이터를 조회합니다.
+ * 로컬 개발 환경에서는 Vite 프록시를 사용합니다.
+ */
+
+const API_BASE = '/api/discussion';
+
+/**
+ * 통합 API 호출 함수
+ * @param {string} ticker - 종목 티커
+ * @param {string} source - 소스 ('naver' | 'stocktwits' | 'reddit' | 'yahoo' | 'toss')
+ * @returns {Promise<Array>} 토론 게시글 목록
+ */
+async function fetchDiscussionFromAPI(ticker, source) {
+    try {
+        const response = await fetch(`${API_BASE}?ticker=${encodeURIComponent(ticker)}&source=${source}`);
+
+        if (!response.ok) {
+            console.warn(`Discussion API Error (${source}): ${response.status}`);
+            return [];
+        }
+
+        const data = await response.json();
+        return Array.isArray(data) ? data : [];
+    } catch (error) {
+        console.error(`Failed to fetch ${source} discussion:`, error);
+        return [];
+    }
+}
 
 /**
  * Naver Finance (Overseas) Discussion API
- * URL: /api/naver/discussion/list
- * Method: GET
  */
 export async function fetchNaverDiscussion(ticker) {
+    // 프로덕션에서는 통합 API 사용
+    if (import.meta.env.PROD) {
+        return fetchDiscussionFromAPI(ticker, 'naver');
+    }
+
+    // 로컬 개발에서는 Vite 프록시 사용
     try {
-        // Naver uses {TICKER}.O for overseas stocks typically
         const itemCode = `${ticker.toUpperCase()}.O`;
         const params = new URLSearchParams({
             discussionType: 'foreignStock',
@@ -23,15 +56,14 @@ export async function fetchNaverDiscussion(ticker) {
         }
 
         const json = await response.json();
-        // Naver structure: result.posts[]
         if (json && json.result && Array.isArray(json.result.posts)) {
             return json.result.posts.map(post => ({
                 source: 'Naver',
                 id: post.discussionId,
                 user: post.writer?.nickname || 'Anonymous',
                 text: (post.contentSwReplaced || post.contentSwReplacedButImg || post.contents || '').replace(/<br\s*\/?>/gi, '\n'),
-                date: post.writtenAt, // ISO string likely
-                sentiment: null // Naver doesn't provide structured sentiment easily
+                date: post.writtenAt,
+                sentiment: null
             }));
         }
         return [];
@@ -43,46 +75,23 @@ export async function fetchNaverDiscussion(ticker) {
 
 /**
  * Stocktwits API
- * URL: /api/stocktwits/streams/symbol/{ticker}.json
- * Method: GET
  */
 export async function fetchStocktwitsDiscussion(ticker) {
-    try {
-        const symbol = ticker.toUpperCase();
-        const response = await fetch(`/api/stocktwits/streams/symbol/${symbol}.json`);
-
-        if (!response.ok) {
-            if (response.status === 404) return []; // Ticker not found
-            throw new Error(`Stocktwits API Error: ${response.statusText}`);
-        }
-
-        const json = await response.json();
-
-        if (json && json.messages) {
-            return json.messages.map(msg => ({
-                source: 'Stocktwits',
-                id: msg.id,
-                user: msg.user?.username || 'Anonymous',
-                text: msg.body,
-                date: msg.created_at,
-                sentiment: msg.entities?.sentiment?.basic || null // 'Bullish' | 'Bearish'
-            }));
-        }
-        return [];
-    } catch (error) {
-        console.error("Failed to fetch Stocktwits discussion:", error);
-        return [];
-    }
+    // 프로덕션과 로컬 모두 통합 API 사용 (Stocktwits는 직접 호출 불가)
+    return fetchDiscussionFromAPI(ticker, 'stocktwits');
 }
 
 /**
  * Reddit API
- * URL: /api/reddit/search.json?q={ticker}&sort=new
- * Method: GET
  */
 export async function fetchRedditDiscussion(ticker) {
+    // 프로덕션에서는 통합 API 사용
+    if (import.meta.env.PROD) {
+        return fetchDiscussionFromAPI(ticker, 'reddit');
+    }
+
+    // 로컬 개발에서는 Vite 프록시 사용
     try {
-        // Search for the ticker in recent posts
         const query = `$${ticker.toUpperCase()}`;
         const response = await fetch(`/api/reddit/search.json?q=${encodeURIComponent(query)}&sort=new&limit=25`);
 
@@ -115,57 +124,15 @@ export async function fetchRedditDiscussion(ticker) {
 
 /**
  * Yahoo Finance (OpenWeb/Spot.IM) API
- * URL: /api/yahoo-conversation/v1/messages-v2/read
- * Method: POST
  */
 export async function fetchYahooDiscussion(ticker) {
-    try {
-        // Spot ID for Yahoo Finance is constant: sp_Dw69v66P
-        const SPOT_ID = 'sp_Dw69v66P';
-        const conversationId = `${SPOT_ID}_${ticker.toUpperCase()}`;
+    // 프로덕션과 로컬 모두 통합 API 사용 (Yahoo OpenWeb은 직접 호출이 복잡함)
+    return fetchDiscussionFromAPI(ticker, 'yahoo');
+}
 
-        const response = await fetch(`/api/yahoo-conversation/v1/messages-v2/read`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-spot-id': SPOT_ID
-            },
-            body: JSON.stringify({
-                conversation_id: conversationId,
-                count: 20,
-                sort_by: "newest" // best, newest, oldest
-            })
-        });
-
-        if (!response.ok) {
-            throw new Error(`Yahoo Conversation API Error: ${response.statusText}`);
-        }
-
-        const json = await response.json();
-
-        if (json && json.messages) {
-            return json.messages.map(msg => {
-                // Yahoo comments are rich text, but usually content[0].text exists
-                let text = "";
-                if (msg.content && Array.isArray(msg.content)) {
-                    text = msg.content.map(c => c.text || "").join(" ");
-                } else {
-                    text = "No content";
-                }
-
-                return {
-                    source: 'Yahoo',
-                    id: msg.id,
-                    user: msg.user_name || 'Anonymous',
-                    text: text,
-                    date: new Date(msg.written_at * 1000).toISOString(),
-                    sentiment: null // OpenWeb sometimes has it, but it's complex to extract
-                };
-            });
-        }
-        return [];
-    } catch (error) {
-        console.error("Failed to fetch Yahoo discussion:", error);
-        return [];
-    }
+/**
+ * 토스증권 종목 토론 API
+ */
+export async function fetchTossDiscussion(ticker) {
+    return fetchDiscussionFromAPI(ticker, 'toss');
 }

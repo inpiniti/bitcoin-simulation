@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { useStore } from "@/store/useStore"
-import { fetchNaverDiscussion, fetchStocktwitsDiscussion, fetchRedditDiscussion, fetchYahooDiscussion } from "@/lib/discussionApi"
+import { fetchNaverDiscussion, fetchStocktwitsDiscussion, fetchRedditDiscussion, fetchYahooDiscussion, fetchTossDiscussion } from "@/lib/discussionApi"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Button } from "@/components/ui/button"
 import {
@@ -23,7 +23,7 @@ function formatTime(isoString) {
 
 export function StockDiscussionPanel() {
     const { ticker } = useStore()
-    const [activeTab, setActiveTab] = useState('Naver') // 'Naver' | 'Stocktwits' | 'Reddit' | 'Yahoo'
+    const [activeTab, setActiveTab] = useState('Naver') // 'Naver' | 'Stocktwits' | 'Reddit' | 'Yahoo' | 'Toss'
     const [discussions, setDiscussions] = useState([])
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState(null)
@@ -45,6 +45,8 @@ export function StockDiscussionPanel() {
                 data = await fetchRedditDiscussion(ticker);
             } else if (activeTab === 'Yahoo') {
                 data = await fetchYahooDiscussion(ticker);
+            } else if (activeTab === 'Toss') {
+                data = await fetchTossDiscussion(ticker);
             }
             // Sort by date desc
             data.sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -73,7 +75,7 @@ export function StockDiscussionPanel() {
 
                     {/* Tabs */}
                     <div className="flex items-center h-full">
-                        {['Naver', 'Stocktwits', 'Reddit', 'Yahoo'].map(tab => (
+                        {['Naver', 'Stocktwits', 'Reddit', 'Yahoo', 'Toss'].map(tab => (
                             <button
                                 key={tab}
                                 onClick={() => setActiveTab(tab)}
