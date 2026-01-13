@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { useStore } from "@/store/useStore"
-import { fetchNaverDiscussion, fetchStocktwitsDiscussion, fetchRedditDiscussion, fetchYahooDiscussion, fetchTossDiscussion } from "@/lib/discussionApi"
+import { fetchNaverDiscussion, fetchStocktwitsDiscussion } from "@/lib/discussionApi"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Button } from "@/components/ui/button"
 import {
@@ -41,12 +41,6 @@ export function StockDiscussionPanel() {
                 data = await fetchNaverDiscussion(ticker);
             } else if (activeTab === 'Stocktwits') {
                 data = await fetchStocktwitsDiscussion(ticker);
-            } else if (activeTab === 'Reddit') {
-                data = await fetchRedditDiscussion(ticker);
-            } else if (activeTab === 'Yahoo') {
-                data = await fetchYahooDiscussion(ticker);
-            } else if (activeTab === 'Toss') {
-                data = await fetchTossDiscussion(ticker);
             }
             // Sort by date desc
             data.sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -75,7 +69,7 @@ export function StockDiscussionPanel() {
 
                     {/* Tabs */}
                     <div className="flex items-center h-full">
-                        {['Naver', 'Stocktwits', 'Reddit', 'Yahoo', 'Toss'].map(tab => (
+                        {['Naver', 'Stocktwits'].map(tab => (
                             <button
                                 key={tab}
                                 onClick={() => setActiveTab(tab)}

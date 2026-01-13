@@ -292,10 +292,13 @@ async function fetchTossDiscussion(ticker) {
     }
 }
 
+// Naver와 Stocktwits만 유지
+// Reddit, Yahoo, Toss 삭제됨
+
 export default async function handler(request) {
     const url = new URL(request.url);
     const ticker = url.searchParams.get('ticker');
-    const source = url.searchParams.get('source'); // 'naver' | 'stocktwits' | 'reddit' | 'yahoo' | 'toss' | 'all'
+    const source = url.searchParams.get('source'); // 'naver' | 'stocktwits' | 'all'
 
     if (!ticker) {
         return new Response(JSON.stringify({ error: 'Ticker is required' }), {
@@ -315,21 +318,6 @@ export default async function handler(request) {
         if (source === 'stocktwits' || source === 'all') {
             const stocktwitsData = await fetchStocktwitsDiscussion(ticker);
             result = result.concat(stocktwitsData);
-        }
-
-        if (source === 'reddit' || source === 'all') {
-            const redditData = await fetchRedditDiscussion(ticker);
-            result = result.concat(redditData);
-        }
-
-        if (source === 'yahoo' || source === 'all') {
-            const yahooData = await fetchYahooDiscussion(ticker);
-            result = result.concat(yahooData);
-        }
-
-        if (source === 'toss' || source === 'all') {
-            const tossData = await fetchTossDiscussion(ticker);
-            result = result.concat(tossData);
         }
 
         // 날짜순 정렬 (최신순)
