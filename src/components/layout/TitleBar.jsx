@@ -46,7 +46,73 @@ export function TitleBar() {
         onCancel: () => { }
     })
 
-    // ... (omitted) ...
+    // 추천 종목 로드 (앱 시작 시 한 번만)
+    useEffect(() => {
+        loadRecommendedTickers()
+    }, [])
+
+    const { fetchGroupStocks } = useStore()
+
+    // 티커 그룹 변경 시 종목 리스트 로드
+    useEffect(() => {
+        fetchGroupStocks()
+    }, [tickerGroup, kisAuth.isLoggedIn, recommendedStocks]) // recommendedStocks 변경 시 반영
+
+    const openAlert = (title, description, onConfirm, onCancel = null) => {
+        setAlertConfig({
+            open: true,
+            title,
+            description,
+            onConfirm: () => {
+                onConfirm()
+                setAlertConfig(prev => ({ ...prev, open: false }))
+            },
+            onCancel: () => {
+                if (onCancel) onCancel()
+                setAlertConfig(prev => ({ ...prev, open: false }))
+            }
+        })
+    }
+
+    const handleModeChange = (newMode) => {
+        if (mode === newMode) return;
+
+        openAlert(
+            "모드 변경",
+            "모드를 변경하시겠습니까? 기존 데이터는 초기화됩니다.",
+            () => setMode(newMode)
+        )
+    }
+
+    const handleTickerSubmit = (e) => {
+        if (e.key === 'Enter') {
+            if (e.nativeEvent.isComposing) return;
+            e.preventDefault();
+
+            if (localTicker !== ticker) {
+                skipBlurRef.current = true
+                openAlert(
+                    "종목 변경",
+                    `종목을 '${localTicker}'(으)로 변경하시겠습니까? 데이터가 초기화됩니다.`,
+                    () => {
+                        setTicker(localTicker)
+                        skipBlurRef.current = false
+                    },
+                    () => {
+                        setLocalTicker(ticker)
+                        skipBlurRef.current = false
+                    }
+                )
+            }
+        }
+    }
+
+    const handleTickerBlur = () => {
+        if (skipBlurRef.current) return;
+        if (localTicker !== ticker) {
+            setLocalTicker(ticker)
+        }
+    }
 
     return (
         <div className="h-[35px] bg-[#1e1e1e] flex items-center justify-between px-3 select-none border-b border-[#2b2b2b] shrink-0">
@@ -56,6 +122,31 @@ export function TitleBar() {
                     <img src="/vite.svg" className="w-3.5 h-3.5" alt="Icon" />
                     Bitcoin Sim v2.0
                 </span>
+
+                <div className="flex bg-[#252526] rounded-md p-0.5 border border-[#3e3e42]">
+                    <button
+                        onClick={() => handleModeChange('coin')}
+                        className={cn(
+                            "px-2 py-0.5 text-[11px] rounded-sm transition-colors",
+                            mode === 'coin'
+                                ? "bg-[#f7931a] text-white font-medium shadow-sm"
+                                : "text-[#777777] hover:text-[#cccccc]"
+                        )}
+                    >
+                        Coin
+                    </button>
+                    <button
+                        onClick={() => handleModeChange('stock')}
+                        className={cn(
+                            "px-2 py-0.5 text-[11px] rounded-sm transition-colors",
+                            mode === 'stock'
+                                ? "bg-[#0e639c] text-white font-medium shadow-sm"
+                                : "text-[#777777] hover:text-[#cccccc]"
+                        )}
+                    >
+                        Stock
+                    </button>
+                </div>
             </div>
 
             {/* Center: Stock Ticker Input */}
