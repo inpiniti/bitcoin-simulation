@@ -59,18 +59,12 @@ async function runAutoTradeProcess(store) {
     const holdingTickers = new Set(holdings.map(h => h.pdno)); // 티커 목록
     store.addAutoTradeLog(`보유 종목: ${holdings.length}개`);
 
-    // 2. 분석 대상 종목 로드
-    store.addAutoTradeLog(`그룹 종목 로드 중 (${autoTradeSettings.targetGroup})...`);
-    // Store의 action을 재사용하기엔 비동기 제어가 어려우므로 직접 로직 구현 or store fetch 호출
-    // 여기서는 store.fetchGroupStocks() 가 state를 업데이트하므로, 그걸 호출하고 state를 읽음
-
-    // 주의: fetchGroupStocks는 store의 tickerGroup state를 씀.
-    // 잠시 바꿔야 할 수도 있음. 하지만 UI에 영향 주므로, 직접 fetching logic을 복사하는게 안전.
-    // 간단히: targetGroup이 'myholdings'면 위 holdings 사용.
-    // 'sp500', 'qqq' 등은 import 함수 사용.
+    // 2-1. 매수 대상 종목 로드 (Target Group)
+    store.addAutoTradeLog(`[매수 분석] 그룹 종목 로드 중 (${autoTradeSettings.targetGroup})...`);
 
     let targetStocks = [];
     if (autoTradeSettings.targetGroup === 'myholdings') {
+        // 내 보유종목을 타겟으로 하면 추가 매수 리스트는 안 나옴 (보유종목 제외 필터 때문)
         targetStocks = holdings.map(h => ({ ticker: h.pdno, name: h.prdt_name }));
     } else if (autoTradeSettings.targetGroup === 'sp500') {
         const { fetchSP500Tickers } = await import('@/lib/sp500Data');
@@ -83,54 +77,77 @@ async function runAutoTradeProcess(store) {
         targetStocks = await fetchRecommendedTickers();
     }
 
-    if (targetStocks.length === 0) {
-        store.addAutoTradeLog("분석 대상 종목이 없습니다.");
-        return;
+    // 2-2. 매도 대상 종목 준비 (My Holdings)
+    // holdings 변수 사용 (이미 조회됨)
+
+    // 로컬 데이터 캐시 (중복 조회 방지)
+    const localDataCache = {};
+
+    const loadData = async (ticker) => {
+        if (localDataCache[ticker]) return localDataCache[ticker];
+        try {
+            const data = await fetchStockOneYearData(ticker);
+            if (data && data.length >= 20) {
+                const dataWithSlope = addDerivedData(data);
+                localDataCache[ticker] = dataWithSlope;
+                return dataWithSlope;
+            }
+        } catch (e) {
+            console.warn(`Data load failed: ${ticker}`, e);
+        }
+        return null;
+    };
+
+    // 3. 매수 분석 (Target Group)
+    if (targetStocks.length > 0) {
+        store.addAutoTradeLog(`[매수 분석] ${targetStocks.length}개 종목 스캔...`);
+    } else {
+        store.addAutoTradeLog(`[매수 분석] 대상 종목 없음`);
     }
 
-    store.addAutoTradeLog(`${targetStocks.length}개 종목 분석 시작...`);
-
-    // 3. 분석 및 신호 산출
     const buyList = [];
-    const sellList = [];
 
-    // 병렬 처리 제한 (API Rate Limit 고려)
-    // 5개씩 끊어서 처리
+    // Chunk processing for Buying
     const CHUNK_SIZE = 5;
     for (let i = 0; i < targetStocks.length; i += CHUNK_SIZE) {
         const chunk = targetStocks.slice(i, i + CHUNK_SIZE);
         await Promise.all(chunk.map(async (stock) => {
-            try {
-                // 1년치 데이터 로드
-                const data = await fetchStockOneYearData(stock.ticker);
-                if (!data || data.length < 20) return;
+            // 보유 종목은 매수 대상에서 제외 (기존 로직 유지)
+            if (holdingTickers.has(stock.ticker)) return;
 
-                // 지표 계산
-                const dataWithSlope = addDerivedData(data);
+            const data = await loadData(stock.ticker);
+            if (!data) return;
 
-                // 신호 분석 using Global Strategy
-                const { signal, reason } = analyzeSignal(dataWithSlope, strategyOptions);
-
-                if (signal === 'BUY') {
-                    // 미보유 종목만 매수
-                    if (!holdingTickers.has(stock.ticker)) {
-                        buyList.push({ ticker: stock.ticker, reason, price: data[data.length - 1].close });
-                    }
-                } else if (signal === 'SELL') {
-                    // 보유 종목만 매도
-                    if (holdingTickers.has(stock.ticker)) {
-                        // 보유 수량 찾기
-                        const holding = holdings.find(h => h.pdno === stock.ticker);
-                        sellList.push({ ticker: stock.ticker, reason, qty: holding.ccld_qty_smtl1, price: data[data.length - 1].close });
-                    }
-                }
-            } catch (e) {
-                console.warn(`Analysis failed for ${stock.ticker}`, e);
+            const { signal, reason } = analyzeSignal(data, strategyOptions);
+            if (signal === 'BUY') {
+                buyList.push({ ticker: stock.ticker, reason, price: data[data.length - 1].close });
             }
         }));
-
-        // 딜레이 (Rate Limit 방지)
         await new Promise(r => setTimeout(r, 200));
+    }
+
+    // 4. 매도 분석 (My Holdings)
+    store.addAutoTradeLog(`[매도 분석] 보유 종목 ${holdings.length}개 스캔...`);
+
+    const sellList = [];
+    const buyTickers = new Set(buyList.map(item => item.ticker));
+
+    for (const holding of holdings) {
+        const ticker = holding.pdno;
+
+        // 앞 단계에서 매수 결정된 종목은 매도 대상에서 제외 (Condition)
+        if (buyTickers.has(ticker)) continue;
+
+        const data = await loadData(ticker);
+        if (!data) continue;
+
+        const { signal, reason } = analyzeSignal(data, strategyOptions);
+
+        // SELL 신호 발생 시 매도 리스트 추가
+        if (signal === 'SELL') {
+            // store.addAutoTradeLog(` -> ${ticker}: SELL (${reason})`); // 너무 많으면 로그 지저분해지므로 생략
+            sellList.push({ ticker: ticker, reason, qty: holding.ccld_qty_smtl1, price: data[data.length - 1].close });
+        }
     }
 
     store.addAutoTradeLog(`분석 완료: 매수 ${buyList.length}건, 매도 ${sellList.length}건`);
