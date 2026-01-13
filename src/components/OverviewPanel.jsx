@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useStore } from '@/store/useStore'
-import { fetchStockOverview, fetchStockNews, getSentimentScore } from '@/lib/api'
+import { fetchStockOverview, fetchStockNews, getSentimentScore, fetchWhaleAnalysis } from '@/lib/api'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Loader2, Globe, Building2, TrendingUp, TrendingDown, Minus, Users, DollarSign, Brain } from 'lucide-react'
@@ -10,6 +10,7 @@ export function OverviewPanel() {
     const { ticker } = useStore()
     const [data, setData] = useState(null)
     const [sentiment, setSentiment] = useState(null)
+    const [whaleData, setWhaleData] = useState(null)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState(null)
 
@@ -20,18 +21,24 @@ export function OverviewPanel() {
             setLoading(true)
             setError(null)
             setSentiment(null)
+            setWhaleData(null)
 
             try {
                 // 병렬로 데이터 요청
-                const [result, newsHeadlines] = await Promise.all([
+                const [result, newsHeadlines, whaleResult] = await Promise.all([
                     fetchStockOverview(ticker),
-                    fetchStockNews(ticker)
+                    fetchStockNews(ticker),
+                    fetchWhaleAnalysis(ticker)
                 ])
 
                 if (result) {
                     setData(result)
                 } else {
                     setError('데이터를 불러올 수 없습니다.')
+                }
+
+                if (whaleResult) {
+                    setWhaleData(whaleResult)
                 }
 
                 // 감정 분석 (백그라운드)
@@ -186,7 +193,7 @@ export function OverviewPanel() {
 
                     {/* 주요 지표 (오른쪽 1/3) */}
                     <div className="space-y-6">
-                        {/* AI 감정 분석 */}
+                        {/* AI 감점 분석 */}
                         <Card className="bg-[#252526] border-[#3c3c3c]">
                             <CardHeader>
                                 <CardTitle className="text-sm font-bold text-[#cccccc] flex items-center gap-2">
@@ -203,17 +210,17 @@ export function OverviewPanel() {
                                 ) : (
                                     <div className="flex items-center gap-3">
                                         <div className={`px-4 py-2 rounded-lg ${sentiment > 0.3 ? 'bg-[#22543d]' :
-                                                sentiment < -0.3 ? 'bg-[#7f1d1d]' : 'bg-[#78350f]'
+                                            sentiment < -0.3 ? 'bg-[#7f1d1d]' : 'bg-[#78350f]'
                                             }`}>
                                             <p className={`text-2xl font-bold ${sentiment > 0.3 ? 'text-[#4ade80]' :
-                                                    sentiment < -0.3 ? 'text-[#f87171]' : 'text-[#fbbf24]'
+                                                sentiment < -0.3 ? 'text-[#f87171]' : 'text-[#fbbf24]'
                                                 }`}>
                                                 {sentiment > 0 ? '+' : ''}{sentiment.toFixed(2)}
                                             </p>
                                         </div>
                                         <div>
                                             <p className={`text-sm font-medium ${sentiment > 0.3 ? 'text-[#4ade80]' :
-                                                    sentiment < -0.3 ? 'text-[#f87171]' : 'text-[#fbbf24]'
+                                                sentiment < -0.3 ? 'text-[#f87171]' : 'text-[#fbbf24]'
                                                 }`}>
                                                 {sentiment > 0.3 ? 'Bullish' : sentiment < -0.3 ? 'Bearish' : 'Neutral'}
                                             </p>
@@ -221,6 +228,66 @@ export function OverviewPanel() {
                                         </div>
                                     </div>
                                 )}
+                            </CardContent>
+                        </Card>
+
+                        {/* 세력 수급 분석 (Whale Analysis) */}
+                        <Card className="bg-[#252526] border-[#3c3c3c]">
+                            <CardHeader>
+                                <CardTitle className="text-sm font-bold text-[#cccccc] flex items-center gap-2">
+                                    <Users className="w-4 h-4 text-[#a78bfa]" />
+                                    Whale Analysis
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                {loading ? (
+                                    <div className="flex items-center gap-2 text-[#888888]">
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                        <span className="text-sm">세력 데이터 분석 중...</span>
+                                    </div>
+                                ) : (whaleData ? (
+                                    <>
+                                        <div>
+                                            <div className="flex justify-between items-baseline mb-1">
+                                                <span className="text-xs text-[#888888]">Estimated Whale Price</span>
+                                                <span className="text-base font-bold text-[#e1e1e1] font-mono">
+                                                    ${whaleData.estimatedWhalePrice?.toFixed(2)}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between items-baseline">
+                                                <span className="text-xs text-[#666666]">Diff from Current</span>
+                                                <span className={`text-xs font-mono ${whaleData.details?.vwapDiffPercent > 0 ? 'text-[#f87171]' : 'text-[#4ade80]'}`}>
+                                                    {whaleData.details?.vwapDiffPercent > 0 ? '+' : ''}{whaleData.details?.vwapDiffPercent?.toFixed(2)}%
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-[#1e1e1e] p-3 rounded-md border border-[#3c3c3c]">
+                                            <p className="text-sm text-[#d4d4d4] leading-snug">
+                                                {whaleData.summary || "데이터 없음"}
+                                            </p>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-2 pt-2 border-t border-[#3c3c3c]">
+                                            <div className="flex flex-col">
+                                                <span className="text-[10px] text-[#888888]">OBV Trend</span>
+                                                <span className={`text-xs font-medium ${whaleData.details?.obvTrend === 'up' ? 'text-[#4ade80]' :
+                                                    whaleData.details?.obvTrend === 'down' ? 'text-[#f87171]' : 'text-[#cccccc]'
+                                                    }`}>
+                                                    {whaleData.details?.obvTrend?.toUpperCase()}
+                                                </span>
+                                            </div>
+                                            <div className="flex flex-col">
+                                                <span className="text-[10px] text-[#888888]">MFI (Money Flow)</span>
+                                                <span className="text-xs font-medium text-[#e1e1e1]">
+                                                    {whaleData.details?.mfi?.toFixed(1)}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="text-sm text-[#666666]">분석 데이터가 없습니다.</div>
+                                ))}
                             </CardContent>
                         </Card>
 

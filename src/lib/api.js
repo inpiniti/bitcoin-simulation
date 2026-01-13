@@ -231,6 +231,38 @@ export async function fetchForecast(symbol, interval = 'day') {
         return null;
     }
 }
+
+/**
+ * 세력 수급 분석 API 호출 (Whale Analysis)
+ * @param {string} symbol - 종목 코드 (예: AAPL)
+ * @param {string} interval - 데이터 간격 (기본: 'day')
+ * @returns {Promise<Object|null>} 분석 결과 또는 null
+ */
+export async function fetchWhaleAnalysis(symbol, interval = 'day') {
+    try {
+        const response = await fetch('https://younginpiniti-bitcoin-ai-backend.hf.space/v1/whale', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'User-Agent': 'Motia/1.0',
+                'Accept': 'application/json',
+            },
+            body: JSON.stringify({ symbol, interval }),
+        });
+
+        if (!response.ok) {
+            console.error('Whale API Error:', response.statusText);
+            return null;
+        }
+
+        const data = await response.json();
+        console.log(`[API] Whale analysis loaded for ${symbol}`);
+        return data;
+    } catch (err) {
+        console.error('Whale API Error:', err);
+        return null;
+    }
+}
 /**
  * 기업 개요 및 재무 정보 조회 (Hybrid: Double Scraper)
  * Yahoo Finance API v10/v7 모두 차단 시, Profile과 Quote 페이지를 각각 스크래핑합니다.

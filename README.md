@@ -157,6 +157,10 @@
     *   신호 클릭 시 **KIS 주문 다이얼로그** 표시.
     *   **실시간 현재가 자동 조회** 및 주문 단가 설정.
     *   매수/매도 수량 및 단가 설정 후 실시간 주문 실행 (KIS API 연동).
+*   **세력 수급 분석 (Whale Analysis)**:
+    *   API: `POST https://younginpiniti-bitcoin-ai-backend.hf.space/v1/whale`
+    *   대량 거래량 및 VWAP 분석을 통해 세력 평단가 추정 및 매집/분산 상태 진단.
+    *   매매 신호 통합: 세력 평단가와 현재가 비교, OBV/MFI 다이버전스 체크.
 *   AI 감성 분석 (FinBERT) 점수 통합.
 
 ### 3. 스타일링 (VS Code Theme)
