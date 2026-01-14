@@ -235,5 +235,63 @@
     *   `매도 대상` 종목에 대해 KIS 매도 주문 전송 (전량 매도).
 6.  **매수 실행 (Step 7)**:
     *   `매수 대상` 종목에 대해 KIS 매수 주문 전송 (설정된 금액/수량).
-6.  **결과 로그**:
+7.  **체결 모니터링 시작 (Step 8)**:
+    *   주문 체결 확인을 위한 백그라운드 모니터링 시작.
+8.  **결과 로그**:
     *   실행 결과 및 주문 내역을 로그(Log) 창에 기록.
+
+#### 매매 히스토리 기록 (Trade History) - New
+*   **Database**: Supabase (PostgreSQL)
+*   **테이블**: `trade_history`
+*   **기록 항목**: 계좌번호, 티커, 매수일, 매수금, 매도일, 매도금, 이익률, 상태
+*   **체결 모니터링 로직**:
+    1.  **주문 추적**: 매매 주문 성공 시 추적 목록에 추가.
+    2.  **미체결 조회**: 10분 간격으로 KIS 미체결내역 API 조회 (`TTTS3018R`).
+    3.  **체결 확인**: 미체결 목록에 없으면 체결 완료로 판단.
+    4.  **DB 기록**:
+        *   **매수 체결**: `INSERT` (새 레코드, status: HOLDING)
+        *   **매도 체결**: 
+            *   기존 HOLDING 레코드 있음 → `UPDATE` (이익률 계산)
+            *   기존 레코드 없음 (프로그램 전 보유종목) → `INSERT` (매수일=당일, 매수가=잔고평균가)
+    5.  **종료 조건**:
+        *   모든 주문 체결 완료 (추적 목록 empty)
+        *   장 마감 1분 전 도달 (마지막 조회 후 종료)
+    6.  **상태 초기화**: 모니터링 종료 시 추적 목록 및 상태 초기화.
+
+#### 환경 변수 설정
+```bash
+# .env 파일에 추가
+VITE_SUPABASE_URL=https://xxxxxxxx.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJxxxxxxxxxx
+```
+
+#### Supabase 테이블 생성 쿼리
+```sql
+-- 매매 히스토리 테이블
+CREATE TABLE trade_history (
+    id BIGSERIAL PRIMARY KEY,
+    account_no VARCHAR(20) NOT NULL,           -- 계좌번호 (예: 12345678-01)
+    ticker VARCHAR(20) NOT NULL,               -- 종목코드 (예: AAPL)
+    buy_date DATE,                             -- 매수일 (YYYYMMDD)
+    buy_price DECIMAL(15, 4),                  -- 매수가 (USD)
+    buy_qty INTEGER,                           -- 매수수량
+    buy_order_no VARCHAR(20),                  -- 매수주문번호
+    sell_date DATE,                            -- 매도일 (YYYYMMDD)
+    sell_price DECIMAL(15, 4),                 -- 매도가 (USD)
+    sell_qty INTEGER,                          -- 매도수량
+    sell_order_no VARCHAR(20),                 -- 매도주문번호
+    profit_rate DECIMAL(10, 4),                -- 이익률 (%)
+    status VARCHAR(20) DEFAULT 'HOLDING',      -- 상태: HOLDING, COMPLETED
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 인덱스 생성 (조회 성능 최적화)
+CREATE INDEX idx_trade_history_account ON trade_history(account_no);
+CREATE INDEX idx_trade_history_ticker ON trade_history(account_no, ticker, status);
+CREATE INDEX idx_trade_history_status ON trade_history(status);
+
+-- RLS 정책 (API Key 인증 시 모든 접근 허용)
+ALTER TABLE trade_history ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all operations" ON trade_history FOR ALL USING (true);
+```

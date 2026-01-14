@@ -1,17 +1,19 @@
 import { cn } from "@/lib/utils"
 import { useState, useEffect } from "react"
-import { Loader2, TrendingUp, Wallet, FileText, CheckCircle2 } from "lucide-react"
+import { Loader2, TrendingUp, Wallet, FileText, CheckCircle2, History } from "lucide-react"
 import {
     getOverseasBalance,
     getUnfilledOrders,
     getPeriodProfit
 } from "@/lib/kisApi"
+import { getTradeHistory, isSupabaseConfigured } from "@/lib/tradeHistoryService"
 
 const MENU_ITEMS = [
     { id: 'account', label: '계좌정보', icon: Wallet },
     { id: 'balance', label: '잔고', icon: TrendingUp },
     { id: 'profit', label: '손익', icon: FileText },
     { id: 'orders', label: '체결', icon: CheckCircle2 },
+    { id: 'history', label: '거래내역', icon: History },
 ]
 
 export function KISAccountDialog({ open, onOpenChange, kisAuth, onLogout, onRelogin }) {
@@ -21,6 +23,7 @@ export function KISAccountDialog({ open, onOpenChange, kisAuth, onLogout, onRelo
         balance: null,
         orders: null,
         profit: null,
+        history: null,
     })
 
     // 데이터 로드
@@ -68,6 +71,11 @@ export function KISAccountDialog({ open, onOpenChange, kisAuth, onLogout, onRelo
                 if (result.success) {
                     setData(prev => ({ ...prev, profit: result }))
                 }
+            } else if (activeMenu === 'history') {
+                // 거래내역 조회 (Supabase)
+                const fullAccountNo = `${accountNo}-${accountCode}`
+                const result = await getTradeHistory(fullAccountNo, { limit: 50 })
+                setData(prev => ({ ...prev, history: result }))
             }
         } catch (error) {
             console.error('데이터 로드 오류:', error)
@@ -123,6 +131,8 @@ export function KISAccountDialog({ open, onOpenChange, kisAuth, onLogout, onRelo
                 return renderProfit()
             case 'orders':
                 return renderOrders()
+            case 'history':
+                return renderHistory()
             default:
                 return null
         }
@@ -357,6 +367,112 @@ export function KISAccountDialog({ open, onOpenChange, kisAuth, onLogout, onRelo
                         ))}
                     </div>
                 )}
+            </div>
+        )
+    }
+
+    const renderHistory = () => {
+        // Supabase 미설정 시 안내 메시지
+        if (!isSupabaseConfigured()) {
+            return (
+                <div className="flex items-center justify-center h-full">
+                    <div className="text-center text-[#888888]">
+                        <div className="text-sm mb-2">Supabase 설정이 필요합니다</div>
+                        <div className="text-xs">
+                            .env 파일에 VITE_SUPABASE_URL과<br />
+                            VITE_SUPABASE_ANON_KEY를 설정해주세요
+                        </div>
+                    </div>
+                </div>
+            )
+        }
+
+        if (!data.history) {
+            return <div className="text-[#888888] text-xs p-3">데이터를 불러오는 중...</div>
+        }
+
+        if (!data.history.success) {
+            return <div className="text-red-400 text-xs p-3">조회 실패: {data.history.error}</div>
+        }
+
+        const records = data.history.data || []
+
+        return (
+            <div className="flex flex-col h-full">
+                {/* 헤더 */}
+                <div className="p-3 border-b border-[#3c3c3c] flex-shrink-0">
+                    <div className="text-xs text-[#cccccc] font-semibold">
+                        거래내역 ({records.length}건)
+                    </div>
+                </div>
+
+                {/* 테이블 */}
+                <div className="flex-1 overflow-auto">
+                    {records.length === 0 ? (
+                        <div className="text-[#888888] text-xs p-3 text-center">거래 내역이 없습니다</div>
+                    ) : (
+                        <table className="w-full text-xs">
+                            <thead className="bg-[#2d2d2d] sticky top-0">
+                                <tr className="text-[#888888]">
+                                    <th className="px-2 py-1.5 text-left font-medium">티커</th>
+                                    <th className="px-2 py-1.5 text-left font-medium">매수일</th>
+                                    <th className="px-2 py-1.5 text-right font-medium">매수가</th>
+                                    <th className="px-2 py-1.5 text-left font-medium">매도일</th>
+                                    <th className="px-2 py-1.5 text-right font-medium">매도가</th>
+                                    <th className="px-2 py-1.5 text-right font-medium">수익률</th>
+                                    <th className="px-2 py-1.5 text-center font-medium">상태</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {records.map((record) => {
+                                    const profitColor = record.profit_rate > 0
+                                        ? 'text-[#4ec9b0]'
+                                        : record.profit_rate < 0
+                                            ? 'text-[#f14c4c]'
+                                            : 'text-[#cccccc]'
+
+                                    const statusColor = record.status === 'COMPLETED'
+                                        ? 'bg-[#4ec9b0]/20 text-[#4ec9b0]'
+                                        : 'bg-[#007acc]/20 text-[#007acc]'
+
+                                    return (
+                                        <tr
+                                            key={record.id}
+                                            className="border-b border-[#3c3c3c] hover:bg-[#2d2d2d] transition-colors"
+                                        >
+                                            <td className="px-2 py-1.5 text-[#cccccc] font-medium">
+                                                {record.ticker}
+                                            </td>
+                                            <td className="px-2 py-1.5 text-[#cccccc]">
+                                                {record.buy_date ? new Date(record.buy_date).toLocaleDateString() : '-'}
+                                            </td>
+                                            <td className="px-2 py-1.5 text-right text-[#cccccc]">
+                                                {record.buy_price ? `$${parseFloat(record.buy_price).toFixed(2)}` : '-'}
+                                            </td>
+                                            <td className="px-2 py-1.5 text-[#cccccc]">
+                                                {record.sell_date ? new Date(record.sell_date).toLocaleDateString() : '-'}
+                                            </td>
+                                            <td className="px-2 py-1.5 text-right text-[#cccccc]">
+                                                {record.sell_price ? `$${parseFloat(record.sell_price).toFixed(2)}` : '-'}
+                                            </td>
+                                            <td className={`px-2 py-1.5 text-right font-medium ${profitColor}`}>
+                                                {record.profit_rate != null
+                                                    ? `${record.profit_rate > 0 ? '+' : ''}${parseFloat(record.profit_rate).toFixed(2)}%`
+                                                    : '-'
+                                                }
+                                            </td>
+                                            <td className="px-2 py-1.5 text-center">
+                                                <span className={`px-1.5 py-0.5 rounded text-[10px] ${statusColor}`}>
+                                                    {record.status === 'COMPLETED' ? '완료' : '보유중'}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    )
+                                })}
+                            </tbody>
+                        </table>
+                    )}
+                </div>
             </div>
         )
     }

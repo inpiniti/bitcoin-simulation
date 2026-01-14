@@ -3,6 +3,7 @@ import { useStore } from "@/store/useStore"
 import { fetchStockOneYearData, fetchStockOverview } from "@/lib/api"
 import { addDerivedData, analyzeSignal } from "@/lib/dataProcessor"
 import { getOverseasBalance, buyOverseasStock, sellOverseasStock, getOverseasStockPrice, getOverseasStockPriceWithExchangeSearch } from "@/lib/kisApi"
+import { addPendingOrder, clearPendingOrders, startSettlementMonitoring, isSettlementMonitoringActive } from "@/lib/orderTracker"
 
 /**
  * 자동 매매 실행 로직 (Core)
@@ -205,6 +206,19 @@ async function runAutoTradeProcess(store, isTest = false) {
 
         if (res.success) {
             store.addAutoTradeLog(`[매도 성공] ${item.ticker} 수량: ${sellQty}, 가격: ${tradePrice}`);
+            // 주문 추적 목록에 추가 (테스트 모드 제외)
+            if (!isTest && res.orderNo) {
+                const todayStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+                addPendingOrder({
+                    ticker: item.ticker,
+                    orderNo: res.orderNo,
+                    orderType: 'sell',
+                    qty: sellQty,
+                    price: tradePrice,
+                    orderDate: todayStr,
+                    avgBuyPrice: item.avgBuyPrice || 0
+                });
+            }
         } else {
             store.addAutoTradeLog(`[매도 실패] ${item.ticker}: ${res.error || res.message}`);
         }
@@ -268,8 +282,26 @@ async function runAutoTradeProcess(store, isTest = false) {
 
         if (res.success) {
             store.addAutoTradeLog(`[매수 성공] ${item.ticker} 수량: ${qty}, 가격: ${finalPrice}`);
+            // 주문 추적 목록에 추가 (테스트 모드 제외)
+            if (!isTest && res.orderNo) {
+                const todayStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+                addPendingOrder({
+                    ticker: item.ticker,
+                    orderNo: res.orderNo,
+                    orderType: 'buy',
+                    qty: qty,
+                    price: finalPrice,
+                    orderDate: todayStr
+                });
+            }
         } else {
             store.addAutoTradeLog(`[매수 실패] ${item.ticker}: ${res.error || res.message}`);
         }
+    }
+
+    // 6. 체결 모니터링 시작 (테스트 모드 제외)
+    if (!isTest && !isSettlementMonitoringActive()) {
+        // 10분(600000ms) 간격으로 체결 확인
+        startSettlementMonitoring(kisAuth, 600000);
     }
 }

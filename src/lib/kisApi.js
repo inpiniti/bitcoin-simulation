@@ -605,3 +605,80 @@ export async function buyOverseasStock(accessToken, appkey, appsecret, accountNo
 export async function sellOverseasStock(accessToken, appkey, appsecret, accountNo, accountCode, ticker, qty, price, exchange = 'NAS') {
     return orderOverseasStock(accessToken, appkey, appsecret, accountNo, accountCode, 'sell', exchange, ticker, price, qty);
 }
+
+/**
+ * 해외주식 미체결내역 조회
+ * TR ID: TTTS3018R
+ * 
+ * @param {string} accessToken - 접근토큰
+ * @param {string} appkey - 앱키
+ * @param {string} appsecret - 앱시크릿
+ * @param {string} accountNo - 계좌번호 앞 8자리
+ * @param {string} accountCode - 계좌상품코드 뒤 2자리
+ * @param {string} [exchangeCode='NASD'] - 거래소코드 (NASD: 미국전체)
+ * @returns {Promise<{success: boolean, orders?: Array, error?: string}>}
+ */
+export async function getUnfilledOrdersWithDetails(accessToken, appkey, appsecret, accountNo, accountCode, exchangeCode = 'NASD') {
+    try {
+        const params = new URLSearchParams({
+            'CANO': accountNo,
+            'ACNT_PRDT_CD': accountCode,
+            'OVRS_EXCG_CD': exchangeCode,
+            'SORT_SQN': '',
+            'CTX_AREA_FK200': '',
+            'CTX_AREA_NK200': ''
+        })
+
+        const response = await fetch(`${KIS_BASE_URL}/uapi/overseas-stock/v1/trading/inquire-nccs?${params}`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json; charset=utf-8',
+                'authorization': `Bearer ${accessToken}`,
+                'appkey': appkey,
+                'appsecret': appsecret,
+                'tr_id': 'TTTS3018R'
+            }
+        })
+
+        const data = await response.json()
+
+        if (data.rt_cd === '0') {
+            // 미체결내역 파싱
+            const orders = (data.output || []).map(order => ({
+                orderDate: order.ord_dt,                       // 주문일자 (YYYYMMDD)
+                orderNo: order.odno,                            // 주문번호
+                ticker: order.pdno,                             // 종목코드
+                productName: order.prdt_name,                   // 종목명
+                orderType: order.sll_buy_dvsn_cd,              // 01: 매도, 02: 매수
+                orderTypeName: order.sll_buy_dvsn_cd_name,     // 매수/매도
+                orderQty: Number(order.ft_ord_qty),            // 주문수량
+                filledQty: Number(order.ft_ccld_qty),          // 체결수량
+                unfilledQty: Number(order.nccs_qty),           // 미체결수량
+                orderPrice: Number(order.ft_ord_unpr3),        // 주문가격
+                filledPrice: Number(order.ft_ccld_unpr3),      // 체결가격
+                filledAmount: Number(order.ft_ccld_amt3),      // 체결금액
+                exchangeCode: order.ovrs_excg_cd,              // 거래소코드
+                statusName: order.prcs_stat_name,              // 처리상태명
+                currency: order.tr_crcy_cd                     // 통화코드
+            }))
+
+            return {
+                success: true,
+                orders
+            }
+        } else {
+            return {
+                success: false,
+                error: data.msg1 || '미체결내역 조회 실패',
+                orders: []
+            }
+        }
+    } catch (error) {
+        console.error('미체결내역 조회 오류:', error)
+        return {
+            success: false,
+            error: error.message,
+            orders: []
+        }
+    }
+}
