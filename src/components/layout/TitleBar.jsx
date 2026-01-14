@@ -62,7 +62,7 @@ export function TitleBar() {
         loadDailyData, hist, loadingInterval,
         tickerGroup, setTickerGroup,
         groupStocks, setGroupStocks, loadingGroupStocks, setLoadingGroupStocks, // Store에서 가져옴
-        kisAuth, loginKIS, logoutKIS
+        kisAuth, loginKIS, logoutKIS, reloginKIS
     } = useStore()
     const [localTicker, setLocalTicker] = useState(ticker)
     const [filterText, setFilterText] = useState('') // 드롭다운 필터용 (포커스 시 리셋)
@@ -294,6 +294,9 @@ export function TitleBar() {
                 kisAuth={kisAuth}
                 onLogout={async () => {
                     await logoutKIS()
+                }}
+                onRelogin={async () => {
+                    return await reloginKIS()
                 }}
             />
 

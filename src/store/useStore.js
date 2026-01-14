@@ -196,6 +196,68 @@ export const useStore = create(
                     })
                 },
 
+                /**
+                 * KIS 재로그인 (토큰 폐기 후 재발급)
+                 * 기존 인증 정보(appkey, appsecret, accountNo, accountCode)를 유지하면서
+                 * 토큰만 폐기하고 새로 발급받습니다.
+                 */
+                reloginKIS: async () => {
+                    const state = get()
+                    const { appkey, appsecret, accountNo, accountCode, accessToken } = state.kisAuth
+
+                    // 인증 정보가 없으면 실패
+                    if (!appkey || !appsecret || !accountNo || !accountCode) {
+                        return { success: false, error: '저장된 인증 정보가 없습니다.' }
+                    }
+
+                    try {
+                        // 1. 기존 토큰 폐기 시도 (실패해도 계속 진행)
+                        if (accessToken) {
+                            try {
+                                const { revokeAccessToken } = await import('@/lib/kisApi')
+                                await revokeAccessToken(appkey, appsecret, accessToken)
+                                console.log('[KIS] 기존 토큰 폐기 완료')
+                            } catch (error) {
+                                console.warn('[KIS] 토큰 폐기 실패 (계속 진행):', error.message)
+                            }
+                        }
+
+                        // 2. 새 토큰 발급
+                        const { getAccessToken } = await import('@/lib/kisApi')
+                        const result = await getAccessToken(appkey, appsecret)
+
+                        if (result.success) {
+                            set({
+                                kisAuth: {
+                                    isLoggedIn: true,
+                                    appkey,
+                                    appsecret,
+                                    accountNo,
+                                    accountCode,
+                                    accessToken: result.access_token,
+                                    tokenExpiry: result.access_token_token_expired,
+                                }
+                            })
+                            console.log('[KIS] 재로그인 성공')
+                            return { success: true }
+                        } else {
+                            // 토큰 발급 실패 시 로그아웃 상태로 변경
+                            set(s => ({
+                                kisAuth: {
+                                    ...s.kisAuth,
+                                    isLoggedIn: false,
+                                    accessToken: '',
+                                    tokenExpiry: null,
+                                }
+                            }))
+                            return { success: false, error: result.error }
+                        }
+                    } catch (error) {
+                        console.error('[KIS] 재로그인 오류:', error)
+                        return { success: false, error: error.message }
+                    }
+                },
+
                 // Group Stocks (Ticker Group Data)
                 groupStocks: [],
                 loadingGroupStocks: false,

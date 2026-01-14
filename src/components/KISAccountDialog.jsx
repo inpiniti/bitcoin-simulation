@@ -14,7 +14,7 @@ const MENU_ITEMS = [
     { id: 'orders', label: '체결', icon: CheckCircle2 },
 ]
 
-export function KISAccountDialog({ open, onOpenChange, kisAuth, onLogout }) {
+export function KISAccountDialog({ open, onOpenChange, kisAuth, onLogout, onRelogin }) {
     const [activeMenu, setActiveMenu] = useState('account')
     const [loading, setLoading] = useState(false)
     const [data, setData] = useState({
@@ -80,6 +80,28 @@ export function KISAccountDialog({ open, onOpenChange, kisAuth, onLogout }) {
         if (onLogout) {
             onLogout()
             onOpenChange(false)
+        }
+    }
+
+    // 재로그인 로딩 상태
+    const [reloginLoading, setReloginLoading] = useState(false)
+
+    const handleRelogin = async () => {
+        if (onRelogin) {
+            setReloginLoading(true)
+            try {
+                const result = await onRelogin()
+                if (result.success) {
+                    // 재로그인 성공 시 데이터 다시 로드
+                    await loadData()
+                } else {
+                    console.error('재로그인 실패:', result.error)
+                }
+            } catch (error) {
+                console.error('재로그인 오류:', error)
+            } finally {
+                setReloginLoading(false)
+            }
         }
     }
 
@@ -395,8 +417,26 @@ export function KISAccountDialog({ open, onOpenChange, kisAuth, onLogout }) {
                                     })}
                                 </div>
 
-                                {/* Logout Button */}
-                                <div className="border-t border-[#3c3c3c] p-1">
+                                {/* Relogin & Logout Buttons */}
+                                <div className="border-t border-[#3c3c3c] p-1 space-y-0.5">
+                                    {/* 재로그인 버튼 */}
+                                    <button
+                                        onClick={handleRelogin}
+                                        disabled={reloginLoading}
+                                        className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-colors text-[#4ec9b0] hover:bg-[#4ec9b0]/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        {reloginLoading ? (
+                                            <Loader2 className="w-3.5 h-3.5 flex-shrink-0 animate-spin" />
+                                        ) : (
+                                            <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                <path d="M23 4v6h-6" />
+                                                <path d="M1 20v-6h6" />
+                                                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+                                            </svg>
+                                        )}
+                                        <span className="truncate">{reloginLoading ? '재로그인 중...' : '재로그인'}</span>
+                                    </button>
+                                    {/* 로그아웃 버튼 */}
                                     <button
                                         onClick={handleLogout}
                                         className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-colors text-[#f48771] hover:bg-[#f48771]/10"
