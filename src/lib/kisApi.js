@@ -498,10 +498,13 @@ export async function orderOverseasStock(accessToken, appkey, appsecret, account
                 orderNo: data.output?.ODNO
             }
         } else {
+            // 상세 에러 메시지 구성
+            const errorMsg = data.msg1 || data.msg || '주문 실패'
+            const errorCode = data.msg_cd || ''
             return {
                 success: false,
-                error: data.msg1 || '주문 실패',
-                code: data.msg_cd
+                error: errorCode ? `[${errorCode}] ${errorMsg}` : errorMsg,
+                code: errorCode
             }
         }
     } catch (error) {

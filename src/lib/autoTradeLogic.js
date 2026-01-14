@@ -183,9 +183,20 @@ async function runAutoTradeProcess(store, isTest = false) {
         if (marketInfo.success) {
             tradePrice = Number(marketInfo.price);
             exchange = marketInfo.exchange;
-            // store.addAutoTradeLog(`[시세 확인] ${item.ticker}: $${tradePrice} (${exchange})`);
         } else {
+            // 시세 조회 실패 시 야후 데이터 사용
+            if (!tradePrice || isNaN(tradePrice) || tradePrice <= 0) {
+                store.addAutoTradeLog(`[매도 스킵] ${item.ticker}: 시세 조회 실패 및 유효한 가격 없음`);
+                continue;
+            }
             store.addAutoTradeLog(`[경고] 시세/거래소 조회 실패: ${item.ticker}, 기본값(NAS/$${tradePrice}) 사용`);
+        }
+
+        // 가격 포맷팅: 소수점 2자리, 1$ 이상
+        tradePrice = Math.round(tradePrice * 100) / 100;
+        if (tradePrice < 1) {
+            store.addAutoTradeLog(`[매도 스킵] ${item.ticker}: 가격이 $1 미만 ($${tradePrice})`);
+            continue;
         }
 
         // [TEST 모드] API 호출 진행 (단, 수량 0으로 설정하여 실패 유도)
@@ -200,12 +211,12 @@ async function runAutoTradeProcess(store, isTest = false) {
             kisAuth.accessToken, kisAuth.appkey, kisAuth.appsecret, kisAuth.accountNo, kisAuth.accountCode,
             item.ticker,
             sellQty,
-            tradePrice, // 지정가
+            tradePrice, // 지정가 (소수점 2자리)
             exchange
         );
 
         if (res.success) {
-            store.addAutoTradeLog(`[매도 성공] ${item.ticker} 수량: ${sellQty}, 가격: ${tradePrice}`);
+            store.addAutoTradeLog(`[매도 성공] ${item.ticker} 수량: ${sellQty}, 가격: $${tradePrice}`);
             // 주문 추적 목록에 추가 (테스트 모드 제외)
             if (!isTest && res.orderNo) {
                 const todayStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
@@ -220,7 +231,7 @@ async function runAutoTradeProcess(store, isTest = false) {
                 });
             }
         } else {
-            store.addAutoTradeLog(`[매도 실패] ${item.ticker}: ${res.error || res.message}`);
+            store.addAutoTradeLog(`[매도 실패] ${item.ticker}: ${res.error || res.message || '알 수 없는 오류'}`);
         }
     }
 
@@ -238,7 +249,19 @@ async function runAutoTradeProcess(store, isTest = false) {
             tradePrice = Number(marketInfo.price);
             exchange = marketInfo.exchange;
         } else {
+            // 시세 조회 실패 시 야후 데이터 사용
+            if (!tradePrice || isNaN(tradePrice) || tradePrice <= 0) {
+                store.addAutoTradeLog(`[매수 스킵] ${item.ticker}: 시세 조회 실패 및 유효한 가격 없음`);
+                continue;
+            }
             store.addAutoTradeLog(`[경고] 시세/거래소 조회 실패: ${item.ticker}, 기본값(NAS/$${tradePrice}) 사용`);
+        }
+
+        // 가격 유효성 검증
+        tradePrice = Math.round(tradePrice * 100) / 100;
+        if (tradePrice < 1) {
+            store.addAutoTradeLog(`[매수 스킵] ${item.ticker}: 가격이 $1 미만 ($${tradePrice})`);
+            continue;
         }
 
         // 수량 계산
@@ -281,7 +304,7 @@ async function runAutoTradeProcess(store, isTest = false) {
         );
 
         if (res.success) {
-            store.addAutoTradeLog(`[매수 성공] ${item.ticker} 수량: ${qty}, 가격: ${finalPrice}`);
+            store.addAutoTradeLog(`[매수 성공] ${item.ticker} 수량: ${qty}, 가격: $${finalPrice}`);
             // 주문 추적 목록에 추가 (테스트 모드 제외)
             if (!isTest && res.orderNo) {
                 const todayStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
@@ -295,7 +318,7 @@ async function runAutoTradeProcess(store, isTest = false) {
                 });
             }
         } else {
-            store.addAutoTradeLog(`[매수 실패] ${item.ticker}: ${res.error || res.message}`);
+            store.addAutoTradeLog(`[매수 실패] ${item.ticker}: ${res.error || res.message || '알 수 없는 오류'}`);
         }
     }
 
