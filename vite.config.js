@@ -211,98 +211,104 @@ export default defineConfig(({ mode }) => {
                                 }
                             }
 
-                            // Toss 조회 (티커 -> ISIN 변환 필요)
+                            // Toss 조회 (검색 API -> 댓글 API)
                             if (source === 'toss' || source === 'all') {
                                 try {
                                     const symbol = ticker.toUpperCase();
+                                    const TOSS_BASE_URL = 'https://wts-cert-api.tossinvest.com/api';
 
-                                    // 0단계: 주요 종목 ISIN 하드코딩 매핑
-                                    const isinMap = {
-                                        'AAPL': 'US19801212001',
-                                        'TSLA': 'US88160R1014',
-                                        'MSFT': 'US5949181045',
-                                        'AMZN': 'US0231351067',
-                                        'GOOGL': 'US02079K3059',
-                                        'NVDA': 'US67066G1040',
-                                        'INTU': 'US4612021034',
-                                        'AMD': 'US0079031078',
-                                        'QQQ': 'US46090E1038',
-                                        'SPY': 'US78462F1030',
-                                        'TQQQ': 'US74347X8314',
-                                        'SQQQ': 'US74347G4322',
-                                        'SOXL': 'US25459W4583',
-                                        'SOXS': 'US25460G5188'
-                                    };
+                                    // Step 1: 티커로 productCode 검색
+                                    const screenerResponse = await fetch(`${TOSS_BASE_URL}/v3/search-all/wts-auto-complete`, {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json',
+                                            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15'
+                                        },
+                                        body: JSON.stringify({
+                                            query: symbol,
+                                            sections: [
+                                                { type: 'SCREENER' },
+                                                { type: 'NEWS' },
+                                                { type: 'PRODUCT', option: { addIntegratedSearchResult: true } },
+                                                { type: 'TICS' }
+                                            ]
+                                        })
+                                    });
 
-                                    let isin = isinMap[symbol];
+                                    if (!screenerResponse.ok) {
+                                        console.warn('[Toss] Screener API returned:', screenerResponse.status);
+                                    } else {
+                                        const screenerData = await screenerResponse.json();
 
-                                    if (!isin) {
-                                        // 1단계: 티커 페이지에서 리다이렉트를 통해 ISIN 확인
-                                        const pageUrl = `https://www.tossinvest.com/stocks/${symbol}`;
-                                        console.log('[Toss] Trying page redirect:', pageUrl);
-
+                                        // productCode 추출
+                                        let productCode = null;
                                         try {
-                                            const pageResponse = await fetch(pageUrl, {
+                                            if (Array.isArray(screenerData?.result)) {
+                                                for (const section of screenerData.result) {
+                                                    if (section?.type === 'PRODUCT' && section?.data?.items?.length) {
+                                                        productCode = section.data.items[0]?.productCode;
+                                                        if (productCode) break;
+                                                    }
+                                                }
+                                            } else if (screenerData?.result?.data?.items?.length) {
+                                                productCode = screenerData.result.data.items[0]?.productCode;
+                                            }
+                                        } catch (e) {
+                                            console.warn('[Toss] Error extracting productCode:', e.message);
+                                        }
+
+                                        if (productCode) {
+                                            console.log('[Toss] Found productCode:', productCode);
+
+                                            // Step 2: productCode로 댓글 조회
+                                            const communityResponse = await fetch(`${TOSS_BASE_URL}/v3/comments`, {
+                                                method: 'POST',
                                                 headers: {
-                                                    'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15',
-                                                    'Accept': 'text/html'
+                                                    'Content-Type': 'application/json',
+                                                    'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15'
                                                 },
-                                                redirect: 'manual'
+                                                body: JSON.stringify({
+                                                    subjectId: productCode,
+                                                    subjectType: 'STOCK',
+                                                    commentSortType: 'RECENT'
+                                                })
                                             });
 
-                                            // 리다이렉트 URL에서 ISIN 추출
-                                            const location = pageResponse.headers.get('location');
-                                            if (location && location.includes('/stocks/')) {
-                                                const isinMatch = location.match(/\/stocks\/([A-Z0-9]+)/);
-                                                if (isinMatch) {
-                                                    isin = isinMatch[1];
+                                            if (communityResponse.ok) {
+                                                const communityData = await communityResponse.json();
+
+                                                // 댓글 추출 (다양한 응답 구조 지원)
+                                                let comments = [];
+                                                try {
+                                                    if (Array.isArray(communityData?.result?.comments)) {
+                                                        comments = communityData.result.comments;
+                                                    } else if (Array.isArray(communityData?.result?.comments?.body)) {
+                                                        comments = communityData.result.comments.body;
+                                                    } else if (Array.isArray(communityData?.comments)) {
+                                                        comments = communityData.comments;
+                                                    } else if (Array.isArray(communityData)) {
+                                                        comments = communityData;
+                                                    }
+                                                } catch (e) {
+                                                    console.warn('[Toss] Error extracting comments:', e.message);
                                                 }
-                                            }
-                                        } catch (err) {
-                                            console.warn('[Toss] Page redirect check failed:', err.message);
-                                        }
-                                    }
 
-                                    // 리다이렉트가 없으면 HTML에서 ISIN 추출 시도 (생략 - 위에서 실패 시 검색 API도 없으므로 스킵)
+                                                console.log('[Toss] Found comments:', comments.length);
 
-                                    if (isin) {
-                                        console.log('[Toss] Using ISIN:', isin);
-
-                                        // ISIN으로 커뮤니티 조회
-                                        const communityUrl = `https://www.tossinvest.com/api/community/v2/securities/${isin}/posts?size=30&sort=latest`;
-                                        console.log('[Toss] Fetching community:', communityUrl);
-
-                                        const communityResponse = await fetch(communityUrl, {
-                                            headers: {
-                                                'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15',
-                                                'Accept': 'application/json',
-                                                'Referer': 'https://tossinvest.com/'
-                                            }
-                                        });
-
-                                        console.log('[Toss] Community response status:', communityResponse.status);
-
-                                        if (communityResponse.ok) {
-                                            const json = await communityResponse.json();
-                                            console.log('[Toss] Response structure:', JSON.stringify(json).substring(0, 200));
-                                            if (json && Array.isArray(json.posts)) {
-                                                result = result.concat(json.posts.slice(0, 30).map(post => ({
+                                                result = result.concat(comments.slice(0, 30).map(comment => ({
                                                     source: 'Toss',
-                                                    id: post.id,
-                                                    user: post.author?.displayName || post.author?.nickname || 'Anonymous',
-                                                    text: post.content || post.body || '',
-                                                    date: post.createdAt || post.created_at,
-                                                    sentiment: null,
-                                                    likes: post.likeCount || 0,
-                                                    comments: post.commentCount || 0
+                                                    id: comment.id,
+                                                    user: comment.author?.nickname || 'Anonymous',
+                                                    text: comment.message || '',
+                                                    date: comment.updatedAt || new Date().toISOString(),
+                                                    sentiment: null
                                                 })));
+                                            } else {
+                                                console.warn('[Toss] Community API Error:', communityResponse.status);
                                             }
                                         } else {
-                                            const errorText = await communityResponse.text();
-                                            console.warn('[Toss] Community error:', errorText.substring(0, 200));
+                                            console.warn('[Toss] Could not find productCode for:', symbol);
                                         }
-                                    } else {
-                                        console.warn('[Toss] Could not find ISIN for ticker:', symbol);
                                     }
                                 } catch (e) {
                                     console.warn('[Toss] Fetch error:', e.message);

@@ -81,4 +81,10 @@ export async function fetchStocktwitsDiscussion(ticker) {
     return fetchDiscussionFromAPI(ticker, 'stocktwits');
 }
 
-
+/**
+ * Toss Invest API (토스증권 종목 토론)
+ */
+export async function fetchTossDiscussion(ticker) {
+    // 프로덕션과 로컬 모두 통합 API 사용
+    return fetchDiscussionFromAPI(ticker, 'toss');
+}

@@ -204,101 +204,120 @@ async function fetchYahooDiscussion(ticker) {
 
 /**
  * 토스증권 (Toss Invest) 종목 토론 스크래핑
- */
-/**
- * 토스증권 (Toss Invest) 종목 토론 스크래핑
+ * 검색 API로 productCode 획득 후 댓글 API 호출
  */
 async function fetchTossDiscussion(ticker) {
     try {
         const symbol = ticker.toUpperCase();
+        const TOSS_BASE_URL = 'https://wts-cert-api.tossinvest.com/api';
 
-        // 0단계: 주요 종목 ISIN 하드코딩 매핑
-        const isinMap = {
-            'AAPL': 'US0378331005',
-            'TSLA': 'US88160R1014',
-            'MSFT': 'US5949181045',
-            'AMZN': 'US0231351067',
-            'GOOGL': 'US02079K3059',
-            'NVDA': 'US67066G1040',
-            'INTU': 'US4612021034',
-            'AMD': 'US0079031078',
-            'QQQ': 'US46090E1038',
-            'SPY': 'US78462F1030',
-            'TQQQ': 'US74347X8314',
-            'SQQQ': 'US74347G4322',
-            'SOXL': 'US25459W4583',
-            'SOXS': 'US25460G5188'
-        };
+        // Step 1: 티커로 productCode 검색
+        const screenerResponse = await fetch(`${TOSS_BASE_URL}/v3/search-all/wts-auto-complete`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15'
+            },
+            body: JSON.stringify({
+                query: symbol,
+                sections: [
+                    { type: 'SCREENER' },
+                    { type: 'NEWS' },
+                    { type: 'PRODUCT', option: { addIntegratedSearchResult: true } },
+                    { type: 'TICS' }
+                ]
+            })
+        });
 
-        // 1. ISIN 매핑 확인
-        let isin = isinMap[symbol];
-
-        // 2. 매핑 없으면 검색 API 시도 (하지만 현재 작동 불명확하므로 생략)
-        // 3. 리다이렉트 시도 (페이지 fetch)
-        if (!isin) {
-            try {
-                const pageUrl = `https://www.tossinvest.com/stocks/${symbol}`;
-                const pageResponse = await fetch(pageUrl, {
-                    headers: {
-                        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15',
-                        'Accept': 'text/html'
-                    },
-                    redirect: 'manual'
-                });
-                const location = pageResponse.headers.get('location');
-                if (location && location.includes('/stocks/')) {
-                    const isinMatch = location.match(/\/stocks\/([A-Z0-9]+)/);
-                    if (isinMatch) isin = isinMatch[1];
-                }
-            } catch (e) {
-                console.warn(`Toss redirect check failed: ${e.message}`);
-            }
+        if (!screenerResponse.ok) {
+            console.error(`[Toss] Screener API Error: ${screenerResponse.status}`);
+            return [];
         }
 
-        if (isin) {
-            // 토스증권 API 엔드포인트
-            const response = await fetch(`https://www.tossinvest.com/api/community/v2/securities/${isin}/posts?size=30&sort=latest`, {
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
-                    'Accept': 'application/json',
-                    'Referer': 'https://tossinvest.com/'
+        const screenerData = await screenerResponse.json();
+
+        // productCode 추출
+        let productCode = null;
+        try {
+            if (Array.isArray(screenerData?.result)) {
+                for (const section of screenerData.result) {
+                    if (section?.type === 'PRODUCT' && section?.data?.items?.length) {
+                        productCode = section.data.items[0]?.productCode;
+                        if (productCode) break;
+                    }
                 }
-            });
-
-            if (!response.ok) {
-                console.error(`Toss API Error: ${response.status}`);
-                return [];
+            } else if (screenerData?.result?.data?.items?.length) {
+                productCode = screenerData.result.data.items[0]?.productCode;
             }
-
-            const json = await response.json();
-
-            if (json && Array.isArray(json.posts)) {
-                return json.posts.slice(0, 30).map(post => ({
-                    source: 'Toss',
-                    id: post.id,
-                    user: post.author?.displayName || post.author?.nickname || 'Anonymous',
-                    text: post.content || post.body || '',
-                    date: post.createdAt || post.created_at,
-                    sentiment: null,
-                    likes: post.likeCount || 0,
-                    comments: post.commentCount || 0
-                }));
-            }
+        } catch (e) {
+            console.error('[Toss] Error extracting productCode:', e.message);
         }
-        return [];
+
+        if (!productCode) {
+            console.warn(`[Toss] Could not find productCode for: ${symbol}`);
+            return [];
+        }
+
+        console.log(`[Toss] Found productCode: ${productCode}`);
+
+        // Step 2: productCode로 댓글 조회
+        const communityResponse = await fetch(`${TOSS_BASE_URL}/v3/comments`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15'
+            },
+            body: JSON.stringify({
+                subjectId: productCode,
+                subjectType: 'STOCK',
+                commentSortType: 'RECENT'
+            })
+        });
+
+        if (!communityResponse.ok) {
+            console.error(`[Toss] Community API Error: ${communityResponse.status}`);
+            return [];
+        }
+
+        const communityData = await communityResponse.json();
+
+        // 댓글 추출 (다양한 응답 구조 지원)
+        let comments = [];
+        try {
+            if (Array.isArray(communityData?.result?.comments)) {
+                comments = communityData.result.comments;
+            } else if (Array.isArray(communityData?.result?.comments?.body)) {
+                comments = communityData.result.comments.body;
+            } else if (Array.isArray(communityData?.comments)) {
+                comments = communityData.comments;
+            } else if (Array.isArray(communityData)) {
+                comments = communityData;
+            }
+        } catch (e) {
+            console.warn('[Toss] Error extracting comments:', e.message);
+        }
+
+        return comments.slice(0, 30).map(comment => ({
+            source: 'Toss',
+            id: comment.id,
+            user: comment.author?.nickname || 'Anonymous',
+            text: comment.message || '',
+            date: comment.updatedAt || new Date().toISOString(),
+            sentiment: null
+        }));
     } catch (error) {
         console.error("Failed to fetch Toss discussion:", error);
         return [];
     }
 }
 
-// Naver와 Stocktwits만 유지
-// Reddit, Yahoo, Toss 삭제됨
+// Naver, Stocktwits, Toss 지원
+// Reddit, Yahoo 삭제됨
 
 export default async function handler(request) {
     const url = new URL(request.url);
     const ticker = url.searchParams.get('ticker');
-    const source = url.searchParams.get('source'); // 'naver' | 'stocktwits' | 'all'
+    const source = url.searchParams.get('source'); // 'naver' | 'stocktwits' | 'toss' | 'all'
 
     if (!ticker) {
         return new Response(JSON.stringify({ error: 'Ticker is required' }), {
@@ -318,6 +337,11 @@ export default async function handler(request) {
         if (source === 'stocktwits' || source === 'all') {
             const stocktwitsData = await fetchStocktwitsDiscussion(ticker);
             result = result.concat(stocktwitsData);
+        }
+
+        if (source === 'toss' || source === 'all') {
+            const tossData = await fetchTossDiscussion(ticker);
+            result = result.concat(tossData);
         }
 
         // 날짜순 정렬 (최신순)
