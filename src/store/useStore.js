@@ -23,7 +23,7 @@ export const useStore = create(
         persist(
             (set, get) => ({
                 // Global Settings
-                mode: 'stock', // 'coin' | 'stock'
+                mode: 'stock', // 'coin' | 'stock' (Default)
                 ticker: 'AAPL', // Stock ticker
 
                 // View Mode (새로운 모드 시스템)
