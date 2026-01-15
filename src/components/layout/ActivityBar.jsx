@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils"
 import { useStore } from "@/store/useStore"
-import { Play, Table2, LineChart, Search, Loader2, MessageSquare, BookOpen, Newspaper, Bot } from "lucide-react"
+import { Play, Table2, LineChart, Search, Loader2, MessageSquare, BookOpen, Newspaper, Bot, Activity } from "lucide-react"
 import {
     Tooltip,
     TooltipContent,
@@ -14,6 +14,7 @@ const VIEW_MODES = [
     { key: 'simulation', label: '시뮬레이션', icon: Play },
     { key: 'dataView', label: '데이터 뷰', icon: Table2 },
     { key: 'chartView', label: '차트 뷰', icon: LineChart },
+    { key: 'realTimeChart', label: '실시간 시뮬레이션 차트', icon: Activity },
     { key: 'analyze', label: '분석', icon: Search },
     { key: 'discussion', label: '종목 토론', icon: MessageSquare },
     { key: 'qa', label: 'AI 질문', icon: Bot },

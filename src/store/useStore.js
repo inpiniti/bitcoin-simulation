@@ -299,6 +299,21 @@ export const useStore = create(
                         return;
                     }
 
+                    if (tickerGroup === 'kospi200') {
+                        setLoadingGroupStocks(true);
+                        try {
+                            const { fetchKospi200Tickers } = await import('@/lib/api');
+                            const stocks = await fetchKospi200Tickers();
+                            setGroupStocks(stocks);
+                        } catch (e) {
+                            console.error('KOSPI 200 fetch error', e);
+                            setGroupStocks([]);
+                        } finally {
+                            setLoadingGroupStocks(false);
+                        }
+                        return;
+                    }
+
                     if (tickerGroup === 'qqq') {
                         setLoadingGroupStocks(true);
                         try {

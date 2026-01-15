@@ -105,7 +105,10 @@ export function ChartView() {
                     date: formatShortDate(pred.date),
                     fullDate: new Date(pred.date).toLocaleDateString('ko-KR'),
                     price: null,
-                    predictionPrice: pred.price,
+                    // price(정수) 대신 priceFormatted(문자열, "$458.97")를 파싱하여 소수점 반영
+                    predictionPrice: pred.priceFormatted
+                        ? parseFloat(pred.priceFormatted.replace(/[$,]/g, ''))
+                        : pred.price,
                     type: 'prediction'
                 })
             })

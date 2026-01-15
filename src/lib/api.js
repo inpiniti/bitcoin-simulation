@@ -33,14 +33,35 @@ export async function fetchCoinDailyData() {
  * @param {string} ticker - 종목 코드 (예: AAPL)
  * @param {string} interval - 데이터 간격 (기본: 1d)
  * @param {string} range - 데이터 범위 (기본: 365d)
+ * @param {boolean} includePrePost - 장전/장후 데이터 포함 여부 (기본: false)
  * @returns {Promise<Array>} 정규화된 캔들 데이터
  */
-export async function fetchStockData(ticker, interval = '1d', range = '365d') {
-    // Yahoo Finance 호환성을 위해 (.)을 (-)로 변환 (예: BRK.B -> BRK-B)
-    const formattedTicker = ticker.replace(/\./g, '-');
+/**
+ * 티커를 Yahoo Finance 호환 심볼로 변환
+ * - 6자리 숫자(한국 종목) -> XXXXXX.KS (코스피 200은 코스닥 종목이 거의 없으므로 기본 KS 적용)
+ * - 점(.) -> 하이픈(-) (미국 주식, 예: BRK.B -> BRK-B)
+ */
+function convertToYahooSymbol(ticker) {
+    if (/^\d{6}$/.test(ticker)) {
+        return `${ticker}.KS`;
+    }
+    return ticker.replace(/\./g, '-');
+}
+
+/**
+ * Yahoo Finance API를 통해 주식 데이터 조회
+ * @param {string} ticker - 종목 코드 (예: AAPL)
+ * @param {string} interval - 데이터 간격 (기본: 1d)
+ * @param {string} range - 데이터 범위 (기본: 365d)
+ * @param {boolean} includePrePost - 장전/장후 데이터 포함 여부 (기본: false)
+ * @returns {Promise<Array>} 정규화된 캔들 데이터
+ */
+export async function fetchStockData(ticker, interval = '1d', range = '365d', includePrePost = false) {
+    // Yahoo Finance 호환성을 위해 심볼 변환
+    const formattedTicker = convertToYahooSymbol(ticker);
 
     // CORS 문제를 회피하기 위해 Vite Proxy(/api/yahoo)를 사용합니다.
-    const url = `/api/yahoo/v8/finance/chart/${formattedTicker}?interval=${interval}&range=${range}`;
+    const url = `/api/yahoo/v8/finance/chart/${formattedTicker}?interval=${interval}&range=${range}&includePrePost=${includePrePost}`;
     console.log(`Fetching stock data from: ${url}`);
 
     const response = await fetch(url);
@@ -57,6 +78,9 @@ export async function fetchStockData(ticker, interval = '1d', range = '365d') {
 
     const timestamps = result.timestamp;
     const indicators = result.indicators.quote[0];
+
+    // tradingPeriods 확인 (장 운영 시간 정보) - 필요 시 사용
+    // const tradingPeriods = result.meta.tradingPeriods;
 
     const { open, high, low, close, volume } = indicators;
 
@@ -98,11 +122,13 @@ export async function fetchStockData(ticker, interval = '1d', range = '365d') {
         else if (exchangeName === 'NCM') exchangeName = 'NAS';  // NasdaqCM
         else if (exchangeName === 'ASE') exchangeName = 'AMS';  // AMEX
         else if (exchangeName === 'PNK') exchangeName = 'OTC';  // Pink Sheets
+        else if (exchangeName === 'KOE') exchangeName = 'KOSPI'; // KOSPI
+        else if (exchangeName === 'KOR') exchangeName = 'KOSPI'; // KOSPI
 
         normalized.exchange = exchangeName;
     }
 
-    console.log(`[API] Stock data loaded: ${normalized.length} items for ${ticker} (${range})`);
+    console.log(`[API] Stock data loaded: ${normalized.length} items for ${formattedTicker} (${range})`);
     return normalized;
 }
 
@@ -113,9 +139,78 @@ export async function fetchStockOneYearData(ticker) {
     return fetchStockData(ticker, '1d', '365d');
 }
 
+/**
+ * 1분봉 데이터 조회 (최근 1일치)
+ * 실시간 시뮬레이션 차트에서 사용
+ * @param {string} ticker - 종목 코드 (예: AAPL)
+ * @returns {Promise<Array>} 정규화된 1분봉 데이터
+ */
+export async function fetchStockMinuteData(ticker) {
+    // 1분봉 조회 시 장전/장후 데이터(includePrePost) 포함
+    return fetchStockData(ticker, '1m', '1d', true);
+}
 
-
-
+/**
+ * KOSPI 200 주요 종목 리스트 반환
+ * @returns {Promise<Array>} { ticker, name, count } 배열
+ */
+export async function fetchKospi200Tickers() {
+    // 주요 시가총액 상위 종목 (샘플)
+    // 실제로는 더 많은 리스트를 추가하거나 외부 소스에서 가져와야 함.
+    const kospiList = [
+        { ticker: "005930", name: "삼성전자", count: 1 },
+        { ticker: "000660", name: "SK하이닉스", count: 2 },
+        { ticker: "373220", name: "LG에너지솔루션", count: 3 },
+        { ticker: "207940", name: "삼성바이오로직스", count: 4 },
+        { ticker: "005380", name: "현대차", count: 5 },
+        { ticker: "005935", name: "삼성전자우", count: 6 },
+        { ticker: "000270", name: "기아", count: 7 },
+        { ticker: "068270", name: "셀트리온", count: 8 },
+        { ticker: "105560", name: "KB금융", count: 9 },
+        { ticker: "005490", name: "POSCO홀딩스", count: 10 },
+        { ticker: "035420", name: "NAVER", count: 11 },
+        { ticker: "055550", name: "신한지주", count: 12 },
+        { ticker: "003550", name: "LG화학", count: 13 },
+        { ticker: "051910", name: "LG화학", count: 14 },
+        { ticker: "000810", name: "삼성화재", count: 15 },
+        { ticker: "032830", name: "삼성생명", count: 16 },
+        { ticker: "015760", name: "한국전력", count: 17 },
+        { ticker: "018260", name: "삼성에스디에스", count: 18 },
+        { ticker: "034730", name: "SK", count: 19 },
+        { ticker: "003670", name: "포스코퓨처엠", count: 20 },
+        { ticker: "086790", name: "하나금융지주", count: 21 },
+        { ticker: "009150", name: "삼성전기", count: 22 },
+        { ticker: "010130", name: "고려아연", count: 23 },
+        { ticker: "017670", name: "SK텔레콤", count: 24 },
+        { ticker: "000100", name: "유한양행", count: 25 },
+        { ticker: "090430", name: "아모레퍼시픽", count: 26 },
+        { ticker: "012330", name: "현대모비스", count: 27 },
+        { ticker: "034020", name: "두산에너빌리티", count: 28 },
+        { ticker: "316140", name: "우리금융지주", count: 29 },
+        { ticker: "011200", name: "HMM", count: 30 },
+        { ticker: "009540", name: "HD한국조선해양", count: 31 },
+        { ticker: "066570", name: "LG전자", count: 32 },
+        { ticker: "259960", name: "크래프톤", count: 33 },
+        { ticker: "033780", name: "KT&G", count: 34 },
+        { ticker: "003490", name: "대한항공", count: 35 },
+        { ticker: "035720", name: "카카오", count: 36 },
+        { ticker: "323410", name: "카카오뱅크", count: 37 },
+        { ticker: "028260", name: "삼성물산", count: 38 },
+        { ticker: "010950", name: "S-Oil", count: 39 },
+        { ticker: "000720", name: "현대건설", count: 40 },
+        { ticker: "024110", name: "기업은행", count: 41 },
+        { ticker: "030200", name: "KT", count: 42 },
+        { ticker: "006400", name: "삼성SDI", count: 43 },
+        { ticker: "011170", name: "롯데케미칼", count: 44 },
+        { ticker: "326030", name: "SK바이오팜", count: 45 },
+        { ticker: "010120", name: "LS ELECTRIC", count: 46 },
+        { ticker: "096770", name: "SK이노베이션", count: 47 },
+        { ticker: "036570", name: "엔씨소프트", count: 48 },
+        { ticker: "251270", name: "넷마블", count: 49 },
+        { ticker: "352820", name: "하이브", count: 50 },
+    ];
+    return Promise.resolve(kospiList);
+}
 
 /**
  * Dataroma 크롤링 API를 통해 추천 종목 리스트 조회 (자산가 5인 이상)
@@ -208,6 +303,9 @@ export async function getSentimentScore(textList) {
  */
 export async function fetchForecast(symbol, interval = 'day') {
     try {
+        // Yahoo Finance 호환성을 위해 심볼 변환 (KOSPI .KS 처리 포함)
+        const formattedSymbol = convertToYahooSymbol(symbol);
+
         const response = await fetch('https://younginpiniti-bitcoin-ai-backend.hf.space/v1/forecast', {
             method: 'POST',
             headers: {
@@ -215,11 +313,12 @@ export async function fetchForecast(symbol, interval = 'day') {
                 'User-Agent': 'Motia/1.0',
                 'Accept': 'application/json',
             },
-            body: JSON.stringify({ symbol, interval }),
+            body: JSON.stringify({ symbol: formattedSymbol, interval }),
         });
 
         if (!response.ok) {
-            console.error('Forecast API Error:', response.statusText);
+            const errorText = await response.text();
+            console.error('Forecast API Error:', response.status, response.statusText, errorText);
             return null;
         }
 

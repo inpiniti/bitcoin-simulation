@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/table"
 import { FileCode, X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, LineChart as LineChartIcon, TableIcon, Play } from "lucide-react"
 import { ChartView } from "../ChartView"
+import { RealTimeChartView } from "../RealTimeChartView"
 import { AnalysisPanel } from "../AnalysisPanel"
 import { StockDiscussionPanel } from "../StockDiscussionPanel"
 import { OverviewPanel } from "../OverviewPanel"
@@ -91,6 +92,11 @@ export function EditorArea() {
         // Chart View Mode
         if (viewMode === 'chartView') {
             return <ChartView />
+        }
+
+        // Real-Time Chart View Mode (실시간 시뮬레이션 차트)
+        if (viewMode === 'realTimeChart') {
+            return <RealTimeChartView />
         }
 
         // Data View Mode
