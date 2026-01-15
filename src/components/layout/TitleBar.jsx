@@ -20,7 +20,9 @@ import { Search, Clock } from "lucide-react"
 import { getMinutesUntilClose } from "@/lib/marketTime"
 
 function AutoTradeTimer({ executionTimeMinutes, isEnabled }) {
+    const { reloginKIS } = useStore();
     const [timeLeft, setTimeLeft] = useState("");
+    const reloginAttemptedRef = useRef(false); // 재로그인 중복 방지 플래그
 
     useEffect(() => {
         if (!isEnabled) return;
@@ -28,6 +30,24 @@ function AutoTradeTimer({ executionTimeMinutes, isEnabled }) {
         const updateTimer = () => {
             const minUntilClose = getMinutesUntilClose();
             const minUntilExecution = minUntilClose - executionTimeMinutes;
+
+            // 자동 매매 5분 전 재로그인 (토큰 만료 방지)
+            if (minUntilExecution === 5 && !reloginAttemptedRef.current) {
+                console.log('[AutoTrade] 실행 5분 전 KIS 재로그인 시도...');
+                reloginKIS().then(result => {
+                    if (result.success) {
+                        console.log('[AutoTrade] KIS 재로그인 성공');
+                    } else {
+                        console.error('[AutoTrade] KIS 재로그인 실패:', result.error);
+                    }
+                });
+                reloginAttemptedRef.current = true;
+            }
+
+            // 재로그인 플래그 리셋 (다음 날 실행을 위해 시간이 충분히 지났을 때)
+            if (minUntilExecution > 30) {
+                reloginAttemptedRef.current = false;
+            }
 
             if (minUntilExecution > 0) {
                 const hours = Math.floor(minUntilExecution / 60);
@@ -43,7 +63,7 @@ function AutoTradeTimer({ executionTimeMinutes, isEnabled }) {
         updateTimer();
         const interval = setInterval(updateTimer, 60000); // 1분 갱신
         return () => clearInterval(interval);
-    }, [executionTimeMinutes, isEnabled]);
+    }, [executionTimeMinutes, isEnabled, reloginKIS]);
 
     if (!isEnabled || !timeLeft) return null;
 
