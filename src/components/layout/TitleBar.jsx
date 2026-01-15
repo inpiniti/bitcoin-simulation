@@ -210,7 +210,11 @@ export function TitleBar() {
             <div className="flex-1 flex justify-center items-center">
                 {mode === 'stock' && (
                     <div className="flex items-center gap-2 relative">
-                        <span className="text-xs font-bold text-[#e1e1e1]">{ticker}</span>
+                        <span className="text-xs font-bold text-[#e1e1e1]">
+                            {useStore.getState().tickerNames[ticker]
+                                ? `${useStore.getState().tickerNames[ticker]} (${ticker})`
+                                : ticker}
+                        </span>
                     </div>
                 )}
                 {mode === 'coin' && (

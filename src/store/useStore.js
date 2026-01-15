@@ -599,9 +599,21 @@ export const useStore = create(
 
                 // Ticker Tab Management
                 activeTickers: [], // ['AAPL', 'TSLA', ...]
+                tickerNames: {}, // { 'AAPL': 'Apple Inc.', ... }
 
-                openTicker: (ticker) => {
+                openTicker: (ticker, name) => {
                     const state = get();
+
+                    // 이름 정보가 있으면 저장 (또는 업데이트)
+                    if (name) {
+                        set(s => ({
+                            tickerNames: {
+                                ...s.tickerNames,
+                                [ticker]: name
+                            }
+                        }));
+                    }
+
                     // 이미 있으면 활성화만
                     if (!state.activeTickers.includes(ticker)) {
                         set({ activeTickers: [...state.activeTickers, ticker] });
@@ -612,16 +624,22 @@ export const useStore = create(
                 closeTicker: (tickerToClose) => {
                     const state = get();
                     const newTickers = state.activeTickers.filter(t => t !== tickerToClose);
+
+                    // 닫을 때 이름 정보도 지울지? -> 굳이 안 지워도 됨 (캐시처럼 사용)
+                    // const newNames = { ...state.tickerNames };
+                    // delete newNames[tickerToClose];
+
                     set({ activeTickers: newTickers });
 
-                    // 만약 닫은 티커가 현재 활성 티커라면 다른 티커로 전환
                     if (state.ticker === tickerToClose) {
+                        // 닫은 탭이 현재 활성 탭이라면
                         if (newTickers.length > 0) {
-                            // 마지막 티커 or 바로 앞 티커 등으로 전환
-                            get().setTicker(newTickers[newTickers.length - 1]);
+                            // 마지막 탭으로 이동
+                            const nextTicker = newTickers[newTickers.length - 1];
+                            get().setTicker(nextTicker);
                         } else {
-                            // 다 닫았으면 초기화? 혹은 빈 상태
-                            // set({ ticker: '' }); // 빈 상태 처리는 UI에서 대응 필요
+                            // 탭이 하나도 없으면
+                            set({ ticker: '' }); // 또는 기본값
                         }
                     }
                 },
@@ -758,6 +776,7 @@ export const useStore = create(
                     mode: state.mode,
                     ticker: state.ticker,
                     activeTickers: state.activeTickers, // Persist active tabs
+                    tickerNames: state.tickerNames, // 이름 맵 저장
                     hist: state.hist,
                     simul: state.simul,
                     viewMode: state.viewMode,

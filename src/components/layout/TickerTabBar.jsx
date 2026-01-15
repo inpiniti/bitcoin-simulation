@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils"
 import { X, FileCode2 } from "lucide-react"
 
 export function TickerTabBar() {
-    const { activeTickers, ticker: activeTicker, setTicker, closeTicker } = useStore()
+    const { activeTickers, ticker: activeTicker, setTicker, closeTicker, tickerNames } = useStore()
     const scrollContainerRef = useRef(null)
 
     // activeTicker가 변경되면 스크롤을 해당 탭으로 이동 (옵션)
@@ -44,7 +44,9 @@ export function TickerTabBar() {
                                 isActive ? "text-[#e8b56d]" : "text-[#757575]" // JS file icon color approx
                             )} />
 
-                            <span className="truncate flex-1">{t}</span>
+                            <span className="truncate flex-1" title={`${tickerNames[t] || ''} (${t})`}>
+                                {tickerNames[t] || t}
+                            </span>
 
                             <button
                                 onClick={(e) => {
