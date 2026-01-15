@@ -748,8 +748,7 @@ export const useStore = create(
                     hist: { '1d': [] },
                     simul: {},
                     selectedResult: null,
-                    recommendedStocks: [],
-                    lastRecommendedFetch: 0,
+                    // recommendedStocks는 유지 (티커 변경 시 매번 로드 방지)
                 }),
             }),
             {
