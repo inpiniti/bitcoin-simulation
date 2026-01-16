@@ -314,6 +314,21 @@ export const useStore = create(
                         return;
                     }
 
+                    if (tickerGroup === 'kosdaq150') {
+                        setLoadingGroupStocks(true);
+                        try {
+                            const { fetchKosdaq150Tickers } = await import('@/lib/api');
+                            const stocks = await fetchKosdaq150Tickers();
+                            setGroupStocks(stocks);
+                        } catch (e) {
+                            console.error('KOSDAQ 150 fetch error', e);
+                            setGroupStocks([]);
+                        } finally {
+                            setLoadingGroupStocks(false);
+                        }
+                        return;
+                    }
+
                     if (tickerGroup === 'qqq') {
                         setLoadingGroupStocks(true);
                         try {
@@ -341,6 +356,8 @@ export const useStore = create(
                             { ticker: 'GC=F', name: 'Gold Futures', exchange: 'COMEX' },
                             { ticker: 'CL=F', name: 'Crude Oil Futures', exchange: 'NYM' },
                             { ticker: 'BTC-USD', name: 'Bitcoin USD', exchange: 'CRYPTO' },
+                            { ticker: '^KS11', name: 'KOSPI Composite Index', exchange: 'KOSPI' },
+                            { ticker: '^KQ11', name: 'KOSDAQ Composite Index', exchange: 'KOSDAQ' },
                         ]);
                         return;
                     }

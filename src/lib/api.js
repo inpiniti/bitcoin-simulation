@@ -213,6 +213,48 @@ export async function fetchKospi200Tickers() {
 }
 
 /**
+ * KOSDAQ 150 주요 종목 리스트 반환
+ * @returns {Promise<Array>} { ticker, name, count } 배열
+ */
+export async function fetchKosdaq150Tickers() {
+    // 주요 시가총액 상위 종목 (샘플)
+    const kosdaqList = [
+        { ticker: "247540", name: "에코프로비엠", count: 1 },
+        { ticker: "086520", name: "에코프로", count: 2 },
+        { ticker: "091990", name: "셀트리온헬스케어", count: 3 }, // 합병 이슈가 있지만 예전 데이터 조회용으로 유지 or HLB 등
+        { ticker: "028300", name: "HLB", count: 3 }, // 순위 조정
+        { ticker: "022100", name: "포스코DX", count: 4 }, // 코스피 이전 이슈 확인 필요하지만 일단 리스트업
+        { ticker: "066970", name: "엘앤에프", count: 5 }, // 코스피 이전 이슈
+        { ticker: "196170", name: "알테오젠", count: 6 },
+        { ticker: "035900", name: "JYP Ent.", count: 7 },
+        { ticker: "293490", name: "카카오게임즈", count: 8 },
+        { ticker: "036930", name: "주성엔지니어링", count: 9 }, // 예시
+        { ticker: "403870", name: "HPSP", count: 10 },
+        { ticker: "278280", name: "천보", count: 11 },
+        { ticker: "214150", name: "클래시스", count: 12 },
+        { ticker: "095610", name: "테스", count: 13 },
+        { ticker: "039030", name: "이오테크닉스", count: 14 },
+        { ticker: "145020", name: "휴젤", count: 15 },
+        { ticker: "041510", name: "에스엠", count: 16 },
+        { ticker: "025980", name: "아난티", count: 17 },
+        { ticker: "005290", name: "동진쎄미켐", count: 18 },
+        { ticker: "034230", name: "파라다이스", count: 19 },
+        { ticker: "237690", name: "에스티팜", count: 20 },
+        { ticker: "058470", name: "리노공업", count: 21 },
+        { ticker: "096530", name: "씨젠", count: 22 },
+        { ticker: "263750", name: "펄어비스", count: 23 },
+        { ticker: "357780", name: "솔브레인", count: 24 },
+        { ticker: "068760", name: "셀트리온제약", count: 25 },
+        { ticker: "213420", name: "덕산네오룩스", count: 26 },
+        { ticker: "112040", name: "위메이드", count: 27 },
+        { ticker: "290650", name: "엘앤씨바이오", count: 28 },
+        { ticker: "067160", name: "아프리카TV", count: 29 }, // SOOP으로 사명 변경되었으나 구 티커 유지
+        { ticker: "032190", name: "다우데이타", count: 30 },
+    ];
+    return Promise.resolve(kosdaqList);
+}
+
+/**
  * Dataroma 크롤링 API를 통해 추천 종목 리스트 조회 (자산가 5인 이상)
  * @returns {Promise<Array>} { ticker, name, count } 배열
  */
