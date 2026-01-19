@@ -87,6 +87,9 @@ export const useStore = create(
                     useTrend20: false, // 추세 필터 (MA20)
                     useRSI: false, // RSI 필터
                     useVolumeFilter: false, // 거래량 필터
+                    // V-Martingale (강화 매수) 설정
+                    useVMartingale: false, // V-Martingale 활성화
+                    vMartingaleProfitCut: 2.0, // 최소 매도 수익률 (%)
                 },
 
                 autoTradeStatus: {

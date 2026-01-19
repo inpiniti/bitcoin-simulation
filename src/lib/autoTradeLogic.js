@@ -59,11 +59,17 @@ async function runAutoTradeProcess(store, isTest = false) {
         useTrend20: autoTradeSettings.useTrend20,
         useRSI: autoTradeSettings.useRSI,
         useVolumeFilter: autoTradeSettings.useVolumeFilter,
+        // V-Martingale (강화 매수) 설정
+        useVMartingale: autoTradeSettings.useVMartingale,
+        vMartingaleProfitCut: autoTradeSettings.vMartingaleProfitCut,
         // 손절/익절은 자동 매매에서 미사용 (신호 분석용)
         useStopLoss: false,
         useTakeProfit: false,
         useTrailingStop: false,
     };
+
+    // V-Martingale 매수 횟수 추적 (종목별)
+    const vMartingaleBuyCount = {};
 
     // 1. 보유 종목 조회 (Holdings)
     store.addAutoTradeLog("보유 종목 조회 중...");
@@ -130,15 +136,26 @@ async function runAutoTradeProcess(store, isTest = false) {
     for (let i = 0; i < targetStocks.length; i += CHUNK_SIZE) {
         const chunk = targetStocks.slice(i, i + CHUNK_SIZE);
         await Promise.all(chunk.map(async (stock) => {
-            // 보유 종목은 매수 대상에서 제외 (기존 로직 유지)
-            if (holdingTickers.has(stock.ticker)) return;
+            // V-Martingale 활성화 시 보유 종목도 매수 대상에 포함
+            const isHolding = holdingTickers.has(stock.ticker);
+            if (isHolding && !autoTradeSettings.useVMartingale) return;
 
             const data = await loadData(stock.ticker);
             if (!data) return;
 
             const { signal, reason } = analyzeSignal(data, autoTradeStrategyOptions);
             if (signal === 'BUY') {
-                buyList.push({ ticker: stock.ticker, reason, price: data[data.length - 1].close });
+                // V-Martingale: 보유 종목이라면 추가 매수 횟수 기록
+                const buyCount = isHolding ? (vMartingaleBuyCount[stock.ticker] || 1) : 0;
+                vMartingaleBuyCount[stock.ticker] = buyCount + 1;
+
+                buyList.push({
+                    ticker: stock.ticker,
+                    reason: isHolding ? `V-Martingale Add (#${buyCount + 1})` : reason,
+                    price: data[data.length - 1].close,
+                    isVMartingale: isHolding,
+                    vMartingaleLevel: buyCount
+                });
             }
         }));
         await new Promise(r => setTimeout(r, 200));
@@ -163,8 +180,18 @@ async function runAutoTradeProcess(store, isTest = false) {
 
         // SELL 신호 발생 시 매도 리스트 추가
         if (signal === 'SELL') {
-            // store.addAutoTradeLog(` -> ${ticker}: SELL (${reason})`); // 너무 많으면 로그 지저분해지므로 생략
-            sellList.push({ ticker: ticker, reason, qty: holding.ccld_qty_smtl1, price: data[data.length - 1].close });
+            // V-Martingale 활성화 시: 최소 수익률 체크
+            if (autoTradeSettings.useVMartingale) {
+                const avgBuyPrice = Number(holding.avg_buy_unpr3) || Number(holding.pchs_avg_pric) || 0;
+                const currentPrice = data[data.length - 1].close;
+                const profitRate = avgBuyPrice > 0 ? ((currentPrice - avgBuyPrice) / avgBuyPrice) * 100 : 0;
+
+                if (profitRate < autoTradeSettings.vMartingaleProfitCut) {
+                    store.addAutoTradeLog(`[V-Martingale 홀드] ${ticker}: 수익률 ${profitRate.toFixed(2)}% < 목표 ${autoTradeSettings.vMartingaleProfitCut}%`);
+                    continue; // 매도 리스트에서 제외
+                }
+            }
+            sellList.push({ ticker: ticker, reason, qty: holding.ccld_qty_smtl1, price: data[data.length - 1].close, avgBuyPrice: Number(holding.avg_buy_unpr3) || Number(holding.pchs_avg_pric) || 0 });
         }
     }
 
@@ -266,17 +293,27 @@ async function runAutoTradeProcess(store, isTest = false) {
 
         // 수량 계산
         let qty = 0;
+        let baseQty = 0;
 
         if (autoTradeSettings.amountType === 'quantity') {
-            qty = Number(autoTradeSettings.buyAmount);
+            baseQty = Number(autoTradeSettings.buyAmount);
         } else {
             // 금액 기준 ($)
-            qty = Math.floor(Number(autoTradeSettings.buyAmount) / tradePrice);
+            baseQty = Math.floor(Number(autoTradeSettings.buyAmount) / tradePrice);
             // 최소 1주 보장
-            if (qty === 0) {
+            if (baseQty === 0) {
                 store.addAutoTradeLog(`[매수 보정] 설정금액($${autoTradeSettings.buyAmount}) < 현재가($${tradePrice}) -> 1주로 주문`);
-                qty = 1;
+                baseQty = 1;
             }
+        }
+
+        // V-Martingale: 배수 적용 (2^n)
+        if (item.isVMartingale && autoTradeSettings.useVMartingale) {
+            const multiplier = Math.pow(2, item.vMartingaleLevel);
+            qty = baseQty * multiplier;
+            store.addAutoTradeLog(`[V-Martingale] ${item.ticker}: 레벨 ${item.vMartingaleLevel + 1}, 배수 ${multiplier}x, 수량 ${qty}주`);
+        } else {
+            qty = baseQty;
         }
 
         // [TEST 모드] 수량 0으로 강제 설정

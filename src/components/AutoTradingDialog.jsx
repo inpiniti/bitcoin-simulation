@@ -130,6 +130,44 @@ export function AutoTradingDialog({ isOpen, onOpenChange }) {
                             </p>
                         </div>
 
+                        {/* V-Martingale (강화 매수) 설정 */}
+                        <div className="space-y-1.5">
+                            <label className="text-[12px] text-[#888888]">V-Martingale (강화 매수)</label>
+                            <div className="p-3 bg-[#2d2d2d] rounded-lg border border-[#3c3c3c] space-y-3">
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={autoTradeSettings.useVMartingale}
+                                        onChange={(e) => updateSetting('useVMartingale', e.target.checked)}
+                                        className="w-3.5 h-3.5 accent-yellow-500"
+                                    />
+                                    <span className="text-[12px]">V-Martingale 활성화</span>
+                                </label>
+                                {autoTradeSettings.useVMartingale && (
+                                    <div className="flex items-center gap-2 pl-5">
+                                        <span className="text-[11px] text-[#888888]">최소 수익률</span>
+                                        <Select
+                                            value={String(autoTradeSettings.vMartingaleProfitCut)}
+                                            onValueChange={(v) => updateSetting('vMartingaleProfitCut', parseFloat(v))}
+                                        >
+                                            <SelectTrigger className="w-[80px] bg-[#3c3c3c] border-[#555555] h-7 text-[11px]">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent className="bg-[#252526] border-[#3c3c3c] text-[#cccccc]">
+                                                <SelectItem value="1">+1%</SelectItem>
+                                                <SelectItem value="2">+2%</SelectItem>
+                                                <SelectItem value="3">+3%</SelectItem>
+                                                <SelectItem value="5">+5%</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                )}
+                            </div>
+                            <p className="text-[10px] text-[#666666]">
+                                * 활성화 시 보유 종목도 V자 반등 시그널에 따라 추가 매수됩니다.
+                            </p>
+                        </div>
+
                         {/* 3. 주문 수량 설정 */}
                         <div className="space-y-1.5">
                             <label className="text-[12px] text-[#888888]">매수 주문 설정</label>
