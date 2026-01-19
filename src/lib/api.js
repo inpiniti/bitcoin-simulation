@@ -348,7 +348,7 @@ export async function fetchForecast(symbol, interval = 'day') {
         // Yahoo Finance 호환성을 위해 심볼 변환 (KOSPI .KS 처리 포함)
         const formattedSymbol = convertToYahooSymbol(symbol);
 
-        const response = await fetch('https://younginpiniti-bitcoin-ai-backend.hf.space/v1/forecast', {
+        const response = await fetch('/api/forecast', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -381,7 +381,7 @@ export async function fetchForecast(symbol, interval = 'day') {
  */
 export async function fetchWhaleAnalysis(symbol, interval = 'day') {
     try {
-        const response = await fetch('https://younginpiniti-bitcoin-ai-backend.hf.space/v1/whale', {
+        const response = await fetch('/api/whale', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
