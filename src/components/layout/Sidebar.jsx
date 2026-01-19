@@ -143,15 +143,64 @@ export function Sidebar() {
                 </div>
             </section>
 
-            {/* 4. 마틴게일 */}
+            {/* 4. V-Martingale (New) */}
             <section className="space-y-2">
                 <h3 className="text-[12px] font-bold text-[#cccccc] flex items-center gap-2">
-                    <Coins className="w-3.5 h-3.5" /> 마틴게일 배율
+                    <Zap className="w-3.5 h-3.5 text-[#ffcc00]" /> V-Martingale (강화 매수)
+                </h3>
+                <div className="space-y-3">
+                    <label className="flex items-center gap-3 group cursor-pointer">
+                        <div className="relative flex items-center">
+                            <input
+                                type="checkbox"
+                                checked={strategyOptions.useVMartingale}
+                                onChange={(e) => handleOptionChange('useVMartingale', e.target.checked)}
+                                className="sr-only"
+                            />
+                            <div className={cn(
+                                "w-4 h-4 rounded border transition-colors flex items-center justify-center",
+                                strategyOptions.useVMartingale ? "bg-[#ffcc00] border-[#ffcc00]" : "border-[#555555] group-hover:border-[#777777]"
+                            )}>
+                                {strategyOptions.useVMartingale && <div className="w-2 h-2 bg-black rounded-sm" />}
+                            </div>
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="text-[13px] text-[#cccccc]">V-Martingale 활성화</span>
+                            <span className="text-[10px] text-[#666666]">V반등 시 비중확대, 목표수익 시 매도</span>
+                        </div>
+                    </label>
+
+                    {strategyOptions.useVMartingale && (
+                        <div className="space-y-1 pl-7">
+                            <span className="text-[11px] text-[#999999]">최소 매도 수익률</span>
+                            <select
+                                value={strategyOptions.vMartingaleProfitCut}
+                                onChange={(e) => handleOptionChange('vMartingaleProfitCut', parseFloat(e.target.value))}
+                                className="w-full bg-[#3c3c3c] border border-[#555555] text-[12px] text-[#cccccc] p-1 rounded focus:outline-none focus:border-[#ffcc00]"
+                            >
+                                <option value={1.0}>+1.0% 이상</option>
+                                <option value={2.0}>+2.0% 이상 (권장)</option>
+                                <option value={3.0}>+3.0% 이상</option>
+                                <option value={5.0}>+5.0% 이상</option>
+                            </select>
+                        </div>
+                    )}
+                </div>
+            </section>
+
+            {/* 5. 마틴게일 (기존) */}
+            <section className="space-y-2">
+                <h3 className="text-[12px] font-bold text-[#cccccc] flex items-center gap-2 font-mono">
+                    <Coins className="w-3.5 h-3.5" /> 마틴게일 (패배시 배수)
                 </h3>
                 <select
+                    disabled={strategyOptions.useVMartingale}
                     value={strategyOptions.martingaleMultiplier}
                     onChange={(e) => handleOptionChange('martingaleMultiplier', parseFloat(e.target.value))}
-                    className="w-full bg-[#3c3c3c] border border-[#555555] text-[12px] text-[#cccccc] p-1.5 rounded focus:outline-none focus:border-[#007acc]"
+                    className={cn(
+                        "w-full bg-[#3c3c3c] border border-[#555555] text-[12px] text-[#cccccc] p-1.5 rounded focus:outline-none focus:border-[#007acc]",
+                        strategyOptions.useVMartingale && "opacity-50 cursor-not-allowed"
+                    )}
                 >
                     <option value={1.0}>사용 안함 (1.0x)</option>
                     <option value={1.1}>1.1배 증가</option>

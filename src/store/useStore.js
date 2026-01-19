@@ -69,6 +69,8 @@ export const useStore = create(
                     useTrailingStop: false,
                     trailingStopPcnt: -2.0,
                     martingaleMultiplier: 1.0,
+                    useVMartingale: false,
+                    vMartingaleProfitCut: 2.0,
                     baseQuantity: 100000,
                 },
 
@@ -753,7 +755,10 @@ export const useStore = create(
                     }
 
                     let result;
-                    if (options.martingaleMultiplier > 1.0) {
+                    if (options.useVMartingale) {
+                        const { calculateVMartingaleResult } = await import('@/lib/dataProcessor');
+                        result = calculateVMartingaleResult(trades, options.baseQuantity);
+                    } else if (options.martingaleMultiplier > 1.0) {
                         result = calculateMartingaleResult(trades, options.baseQuantity, options.martingaleMultiplier);
                     } else if (options.moneyManagement === 'cumulative') {
                         result = calculateCumulativeResult(trades, options.baseQuantity);
