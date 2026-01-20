@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense, lazy } from "react"
 import { cn } from "@/lib/utils"
 import { useStore } from "@/store/useStore"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -11,15 +11,17 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table"
-import { FileCode, X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, LineChart as LineChartIcon, TableIcon, Play } from "lucide-react"
-import { ChartView } from "../ChartView"
-import { RealTimeChartView } from "../RealTimeChartView"
-import { AnalysisPanel } from "../AnalysisPanel"
-import { StockDiscussionPanel } from "../StockDiscussionPanel"
-import { OverviewPanel } from "../OverviewPanel"
-import { NewsPanel } from "../NewsPanel"
-import { FinancialQAPanel } from "../FinancialQAPanel"
+import { FileCode, X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, LineChart as LineChartIcon, TableIcon, Play, Loader2 } from "lucide-react"
 import { TickerTabBar } from "./TickerTabBar"
+
+// 패널들을 지연 로딩(Lazy Loading)으로 전환하여 초기 번들 크기 최적화
+const ChartView = lazy(() => import("../ChartView").then(m => ({ default: m.ChartView })))
+const RealTimeChartView = lazy(() => import("../RealTimeChartView").then(m => ({ default: m.RealTimeChartView })))
+const AnalysisPanel = lazy(() => import("../AnalysisPanel").then(m => ({ default: m.AnalysisPanel })))
+const StockDiscussionPanel = lazy(() => import("../StockDiscussionPanel").then(m => ({ default: m.StockDiscussionPanel })))
+const OverviewPanel = lazy(() => import("../OverviewPanel").then(m => ({ default: m.OverviewPanel })))
+const NewsPanel = lazy(() => import("../NewsPanel").then(m => ({ default: m.NewsPanel })))
+const FinancialQAPanel = lazy(() => import("../FinancialQAPanel").then(m => ({ default: m.FinancialQAPanel })))
 
 // 페이지당 거래 수
 const ITEMS_PER_PAGE = 50
@@ -421,7 +423,13 @@ export function EditorArea() {
             <TickerTabBar />
 
             <div className="flex-1 flex flex-col overflow-hidden relative">
-                {renderContent()}
+                <Suspense fallback={
+                    <div className="flex-1 flex items-center justify-center bg-[#1e1e1e]">
+                        <Loader2 className="w-8 h-8 animate-spin text-[#007acc]" />
+                    </div>
+                }>
+                    {renderContent()}
+                </Suspense>
             </div>
         </div>
     )
