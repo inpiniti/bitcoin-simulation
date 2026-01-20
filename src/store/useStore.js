@@ -18,6 +18,22 @@ const indexedDBStorage = {
     },
 }
 
+/**
+ * 시뮬레이션 및 상용 거래를 위한 중앙 상태 관리 스토어 (Zustand)
+ * 
+ * @typedef {Object} StoreState
+ * @property {string} mode - 현재 모드 ('stock' 또는 'coin')
+ * @property {string} ticker - 현재 선택된 종목 코드
+ * @property {string} viewMode - 현재 뷰 모드 ('simulation', 'dataView', 'chartView', 'analyze')
+ * @property {Object} hist - 일봉 데이터 저장소
+ * @property {Object} simul - 시뮬레이션 결과 저장소
+ * @property {Object} dataCache - 티커별 데이터 캐시
+ * @property {Object} strategyOptions - 매매 전략 설정
+ * @property {Object} autoTradeSettings - 자동 매매 설정
+ * @property {Object} kisAuth - 한국투자증권 인증 정보
+ * 
+ * @returns {StoreState} Zustand 스토어 객체
+ */
 export const useStore = create(
     devtools(
         persist(
@@ -141,7 +157,13 @@ export const useStore = create(
                 },
 
                 /**
-                 * KIS 로그인
+                 * 한국투자증권(KIS) 로그인 및 액세스 토큰 발급
+                 * 
+                 * @param {string} appkey - KIS API 앱키
+                 * @param {string} appsecret - KIS API 앱시크릿
+                 * @param {string} accountNo - 계좌번호 (8자리)
+                 * @param {string} accountCode - 계좌상품코드 (2자리)
+                 * @returns {Promise<{success: boolean, error?: string}>} 로그인 성공 여부
                  */
                 loginKIS: async (appkey, appsecret, accountNo, accountCode) => {
                     try {
@@ -171,7 +193,8 @@ export const useStore = create(
                 },
 
                 /**
-                 * KIS 로그아웃
+                 * KIS 로그아웃 및 액세스 토큰 폐기
+                 * @returns {Promise<void>}
                  */
                 logoutKIS: async () => {
                     const state = get()
@@ -202,9 +225,8 @@ export const useStore = create(
                 },
 
                 /**
-                 * KIS 재로그인 (토큰 폐기 후 재발급)
-                 * 기존 인증 정보(appkey, appsecret, accountNo, accountCode)를 유지하면서
-                 * 토큰만 폐기하고 새로 발급받습니다.
+                 * KIS 재로그인 (기존 세션을 유지하며 토큰만 재발급)
+                 * @returns {Promise<{success: boolean, error?: string}>} 재로그인 성공 여부
                  */
                 reloginKIS: async () => {
                     const state = get()
@@ -437,7 +459,8 @@ export const useStore = create(
                 stopAnalysis: () => set({ isAnalyzing: false }),
 
                 /**
-                 * 시장 전체 분석 실행 (Market Scanner)
+                 * 시장 스캐너 실행: 현재 로드된 모든 종목에 대해 전략 분석 수행
+                 * @returns {Promise<void>}
                  */
                 runMarketAnalysis: async () => {
                     const state = get();
@@ -667,7 +690,8 @@ export const useStore = create(
                 },
 
                 /**
-                 * 일봉 데이터 로드 (Coin/Stock 공통)
+                 * 선택된 종목의 일봉 데이터를 로드합니다 (캐시 또는 API).
+                 * @returns {Promise<void>}
                  */
                 loadDailyData: async () => {
                     const state = get();
@@ -737,7 +761,8 @@ export const useStore = create(
                 },
 
                 /**
-                 * 통합 시뮬레이션 실행
+                 * 설정된 전략 옵션에 따라 통합 시뮬레이션을 실행합니다.
+                 * @returns {Promise<void>}
                  */
                 runSimulation: async () => {
                     const state = get();

@@ -7,6 +7,16 @@ import { Switch } from "@/components/ui/switch"
 import { useStore } from "@/store/useStore"
 import { Check, Clock, PlayCircle, ShieldAlert } from "lucide-react"
 
+/**
+ * 자동 매매 설정을 위한 다이얼로그 컴포넌트입니다.
+ * 매매 활성화 여부, 대상 그룹, 전략 필터, 주문 수량 및 실행 시점 등을 설정할 수 있습니다.
+ * 
+ * @component
+ * @param {Object} props - 컴포넌트 props
+ * @param {boolean} props.isOpen - 다이얼로그 열림 상태
+ * @param {function} props.onOpenChange - 다이얼로그 상태 변경 핸들러
+ * @returns {JSX.Element} 자동 매매 설정 다이얼로그
+ */
 export function AutoTradingDialog({ isOpen, onOpenChange }) {
     const {
         autoTradeSettings,

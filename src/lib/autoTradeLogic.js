@@ -7,7 +7,10 @@ import { addPendingOrder, clearPendingOrders, startSettlementMonitoring, isSettl
 
 /**
  * 자동 매매 실행 로직 (Core)
- * 1분마다 호출됨.
+ * 1분마다 호출되어 장 마감 시간을 체크하고, 조건 충족 시 매매 프로세스를 실행합니다.
+ * 
+ * @param {boolean} [isTest=false] - 테스트 모드 여부 (true일 경우 수량 0으로 즉시 실행)
+ * @returns {Promise<void>}
  */
 export async function executeAutoTrade(isTest = false) {
     const store = useStore.getState();

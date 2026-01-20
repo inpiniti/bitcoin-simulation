@@ -108,6 +108,9 @@ export function aggregateToInterval(data1min, intervalMinutes) {
 
 /**
  * RSI (Relative Strength Index) 계산
+ * @param {Array<Object>} data - 캔들 데이터 배열
+ * @param {number} [period=14] - 계산 기간
+ * @returns {Array<Object>} RSI가 포함된 데이터 배열
  */
 export function calculateRSI(data, period = 14) {
     if (data.length <= period) return data.map(d => ({ ...d, rsi: undefined }));
@@ -155,6 +158,10 @@ export function calculateRSI(data, period = 14) {
 
 /**
  * MA (Moving Average) 계산
+ * @param {Array<Object>} data - 캔들 데이터 배열
+ * @param {number} [period=50] - 계산 기간
+ * @param {string} [key='close'] - 계산할 필드명
+ * @returns {Array<Object>} 이평선 데이터가 포함된 배열
  */
 export function calculateMA(data, period = 50, key = 'close') {
     return data.map((item, index) => {
@@ -167,7 +174,9 @@ export function calculateMA(data, period = 50, key = 'close') {
 }
 
 /**
- * 데이터에 모든 파생 지표 추가
+ * 데이터에 모든 파생 지표(RSI, MA, Bollinger Bands, Slope)를 추가합니다.
+ * @param {Array<Object>} data - 원본 캔들 데이터 배열
+ * @returns {Array<Object>} 지표가 추가된 데이터 배열
  */
 export function addDerivedData(data) {
     let processed = data.map((item, index) => {
@@ -213,8 +222,12 @@ export function addSlopeData(data) {
     return addDerivedData(data);
 }
 
+
 /**
- * 통합 매매 엔진: 다양한 필터 및 손절/익절 조건 적용
+ * 통합 매매 엔진: 다양한 필터 및 손절/익절 조건을 적용하여 매매 내역을 생성합니다.
+ * @param {Array<Object>} data - 지표가 포함된 캔들 데이터
+ * @param {Object} options - 매매 전략 옵션
+ * @returns {Array<Object>} 생성된 매매 내역 배열
  */
 export function generateIntegratedTrades(data, options = {}) {
     const {
@@ -398,6 +411,13 @@ function applyTradingCosts(price, quantity, type, costs = TRADING_COSTS) {
     }
 }
 
+/**
+ * 고정 수량 방식의 시뮬레이션 결과를 계산합니다.
+ * @param {Array<Object>} trades - 매매 내역
+ * @param {number} [quantity=100000] - 1회 매수 금액/수량
+ * @param {Object} [costs=TRADING_COSTS] - 수수료 설정
+ * @returns {Object} 시뮬레이션 결과 요약 및 상세 내역
+ */
 export function calculateFixedQuantityResult(trades, quantity = 100000, costs = TRADING_COSTS) {
     let totalProfit = 0;
     let totalFees = 0;
@@ -462,6 +482,13 @@ export function calculateFixedQuantityResult(trades, quantity = 100000, costs = 
     };
 }
 
+/**
+ * 복리(누적) 방식의 시뮬레이션 결과를 계산합니다.
+ * @param {Array<Object>} trades - 매매 내역
+ * @param {number} [initialCapital=100000] - 초기 자본금
+ * @param {Object} [costs=TRADING_COSTS] - 수수료 설정
+ * @returns {Object} 시뮬레이션 결과 요약 및 상세 내역
+ */
 export function calculateCumulativeResult(trades, initialCapital = 100000, costs = TRADING_COSTS) {
     let currentCapital = initialCapital;
     let totalFees = 0;
@@ -547,6 +574,14 @@ export function calculateCumulativeResult(trades, initialCapital = 100000, costs
     };
 }
 
+/**
+ * 마틴게일 방식의 시뮬레이션 결과를 계산합니다.
+ * @param {Array<Object>} trades - 매매 내역
+ * @param {number} [baseQuantity=100000] - 기본 매수 단위
+ * @param {number} [multiplier=1.5] - 손실 시 배수
+ * @param {Object} [costs=TRADING_COSTS] - 수수료 설정
+ * @returns {Object} 시뮬레이션 결과 요약 및 상세 내역
+ */
 export function calculateMartingaleResult(trades, baseQuantity = 100000, multiplier = 1.5, costs = TRADING_COSTS) {
     let totalProfit = 0;
     let totalFees = 0;
@@ -621,6 +656,13 @@ export function calculateMartingaleResult(trades, baseQuantity = 100000, multipl
     };
 }
 
+/**
+ * V-Martingale(변동성 기반 분할 매수) 방식의 시뮬레이션 결과를 계산합니다.
+ * @param {Array<Object>} trades - 매매 내역 (다회 매수 포함)
+ * @param {number} [baseQuantity=100000] - 기본 매수 단위
+ * @param {Object} [costs=TRADING_COSTS] - 수수료 설정
+ * @returns {Object} 시뮬레이션 결과 요약 및 상세 내역
+ */
 export function calculateVMartingaleResult(trades, baseQuantity = 100000, costs = TRADING_COSTS) {
     let totalProfit = 0;
     let totalFees = 0;
@@ -696,6 +738,12 @@ export function calculateVMartingaleResult(trades, baseQuantity = 100000, costs 
     };
 }
 
+/**
+ * 현재 데이터와 전략 옵션에 따른 실시간 매매 신호를 분석합니다.
+ * @param {Array<Object>} dataWithSlope - 지표가 포함된 캔들 데이터
+ * @param {Object} options - 매매 전략 옵션
+ * @returns {Object} 분석 결과 (signal: 'BUY'|'SELL'|'HOLD', reason: string)
+ */
 export function analyzeSignal(dataWithSlope, options = {}) {
     const {
         useBB = false,

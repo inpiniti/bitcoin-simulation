@@ -28,14 +28,7 @@ export async function fetchCoinDailyData() {
 }
 
 
-/**
- * Yahoo Finance API를 통해 주식 데이터 조회
- * @param {string} ticker - 종목 코드 (예: AAPL)
- * @param {string} interval - 데이터 간격 (기본: 1d)
- * @param {string} range - 데이터 범위 (기본: 365d)
- * @param {boolean} includePrePost - 장전/장후 데이터 포함 여부 (기본: false)
- * @returns {Promise<Array>} 정규화된 캔들 데이터
- */
+
 /**
  * 티커를 Yahoo Finance 호환 심볼로 변환
  * - 6자리 숫자(한국 종목) -> XXXXXX.KS (코스피 200은 코스닥 종목이 거의 없으므로 기본 KS 적용)

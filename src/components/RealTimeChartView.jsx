@@ -56,6 +56,13 @@ function CustomTooltip({ active, payload, label }) {
     )
 }
 
+/**
+ * 실시간 주식 가격(1분봉)과 AI 예측 데이터를 표시하는 컴포넌트입니다.
+ * 1분마다 데이터를 자동으로 갱신하며, 현재가와 변동률을 실시간으로 추적합니다.
+ * 
+ * @component
+ * @returns {JSX.Element} 실시간 차트 뷰 컴포넌트
+ */
 export function RealTimeChartView() {
     const { ticker, mode } = useStore()
     const [minuteData, setMinuteData] = useState([])

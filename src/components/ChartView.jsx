@@ -51,6 +51,13 @@ function CustomTooltip({ active, payload, label }) {
     )
 }
 
+/**
+ * 주식 또는 코인의 가격 히스토리와 AI 예측 데이터를 시각화하는 차트 컴포넌트입니다.
+ * Recharts를 사용하여 선 그래프를 그리며, AI 예측 데이터(TimesFM)를 점선으로 표시합니다.
+ * 
+ * @component
+ * @returns {JSX.Element} 차트 뷰 컴포넌트
+ */
 export function ChartView() {
     const { hist, ticker, mode } = useStore()
     const [isLoadingForecast, setIsLoadingForecast] = useState(false)

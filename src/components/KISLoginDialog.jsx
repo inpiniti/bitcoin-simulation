@@ -13,6 +13,17 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Loader2, LogIn, LogOut } from "lucide-react"
 
+/**
+ * 한국투자증권 API 로그인을 위한 다이얼로그 컴포넌트입니다.
+ * 앱키, 앱시크릿, 계좌번호, 상품코드를 입력받아 액세스 토큰을 발급받습니다.
+ * 
+ * @component
+ * @param {Object} props - 컴포넌트 props
+ * @param {boolean} props.open - 다이얼로그 열림 상태
+ * @param {function} props.onOpenChange - 다이얼로그 상태 변경 핸들러
+ * @param {function} props.onLogin - 로그인 처리 함수
+ * @returns {JSX.Element} KIS 로그인 다이얼로그
+ */
 export function KISLoginDialog({ open, onOpenChange, onLogin }) {
     const [appkey, setAppkey] = useState('')
     const [appsecret, setAppsecret] = useState('')

@@ -5,6 +5,13 @@ import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { KISOrderDialog } from "@/components/KISOrderDialog" // Import Dialog
 
+/**
+ * 시장 스캔 결과를 표 형태로 표시하는 컴포넌트입니다.
+ * 종목별 매매 신호, 현재가, 24시간 변동률, AI 감성 분석 결과를 보여줍니다.
+ * 
+ * @component
+ * @returns {JSX.Element} 시장 분석 결과 패널
+ */
 export function AnalysisPanel() {
     const { analysisResult, isAnalyzing, setTicker, setAnalysisMode } = useStore()
 
