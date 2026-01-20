@@ -48,7 +48,7 @@ function formatBtcPrice(price) {
 }
 
 export function EditorArea() {
-    const { selectedResult, setSelectedResult, viewMode, hist, ticker, activeTickers, openTicker } = useStore()
+    const { selectedResult, viewMode, hist, ticker, activeTickers, openTicker } = useStore()
     const [currentPage, setCurrentPage] = useState(1)
 
     // 페이지네이션 초기화
@@ -245,7 +245,7 @@ export function EditorArea() {
             )
         }
 
-        const { key, summary, trades } = selectedResult
+        const { summary, trades } = selectedResult
 
         // 페이징 계산
         const totalItems = trades?.length || 0
