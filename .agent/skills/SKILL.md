@@ -81,9 +81,26 @@ description: 비트코인/주식 시뮬레이션 프로젝트의 마스터 스�
 | 명령어 | 설명 |
 |--------|------|
 | `/feature-dev` | 새 기능 개발 워크플로우 실행 |
+| `/strategy-dev` | **새 매매 전략 개발 워크플로우** |
+| `/bug-fix` | **버그 수정 및 디버깅 워크플로우** |
 | `/sync-rules` | 규칙/설계도 동기화 |
 | `/code-review` | 코드 리뷰 실행 |
+| `/docs` | JSDoc 문서화 작업 |
+| `/performance` | 성능 분석 및 최적화 |
 | `/deploy` | 배포 워크플로우 실행 |
+| `/security` | 보안 취약점 검사 |
+| `/commit-push` | 커밋 및 푸시 |
+
+## 📚 스킬 파일 목록
+
+| 스킬 | 파일 | 용도 |
+|------|------|------|
+| 마스터 허브 | `SKILL.md` | 중앙 컨트롤 포인트 |
+| KIS API 참조 | `kis-api.md` | 한국투자증권 API 빠른 참조 |
+| **매매 전략** | `trading-logic.md` | 보조지표 공식 및 전략 가이드 |
+| **AI 모델** | `ai-models.md` | TimesFM, FinBERT 활용 가이드 |
+| **디자인 시스템** | `design-system.md` | VS Code 테마 UI 가이드 |
+
 
 ## 🧠 서브에이전트 활용 시나리오
 
