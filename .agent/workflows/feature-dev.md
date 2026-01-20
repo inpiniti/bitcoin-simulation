@@ -41,8 +41,10 @@ description: 새로운 기능 개발 워크플로우 (Feature Development Workfl
 ```powershell
 npm run dev
 ```
-- 브라우저에서 기능 동작 확인
+- "서버가 정상적으로 시작되었습니다" 메시지 확인
+- **주의: 브라우저 자동 테스트(`browser_subagent`)는 사용자가 명시적으로 요청한 경우에만 수행합니다.**
 - 콘솔 오류 없는지 확인
+
 
 ## 완료 단계 (Completion Phase)
 

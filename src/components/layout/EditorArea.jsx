@@ -22,6 +22,8 @@ const StockDiscussionPanel = lazy(() => import("../StockDiscussionPanel").then(m
 const OverviewPanel = lazy(() => import("../OverviewPanel").then(m => ({ default: m.OverviewPanel })))
 const NewsPanel = lazy(() => import("../NewsPanel").then(m => ({ default: m.NewsPanel })))
 const FinancialQAPanel = lazy(() => import("../FinancialQAPanel").then(m => ({ default: m.FinancialQAPanel })))
+const PortfolioDashboard = lazy(() => import("../PortfolioDashboard").then(m => ({ default: m.PortfolioDashboard })))
+
 
 // 페이지당 거래 수
 const ITEMS_PER_PAGE = 50
@@ -90,6 +92,12 @@ export function EditorArea() {
         if (viewMode === 'qa') {
             return <FinancialQAPanel />
         }
+
+        // Portfolio Dashboard Mode
+        if (viewMode === 'portfolio') {
+            return <PortfolioDashboard />
+        }
+
 
         // Chart View Mode
         if (viewMode === 'chartView') {

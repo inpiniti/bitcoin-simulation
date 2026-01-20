@@ -126,11 +126,16 @@ export async function fetchStockData(ticker, interval = '1d', range = '365d', in
 }
 
 /**
- * 1년치 일봉 조회 (하위 호환 및 기본 사용)
+ * 주식 과거 데이터 조회 (일봉)
+ * @param {string} ticker - 종목 코드
+ * @param {number|string} days - 조회 기간 (일 단위 또는 Yahoo range 형식)
+ * @returns {Promise<Array>} 정규화된 캔들 데이터
  */
-export async function fetchStockOneYearData(ticker) {
-    return fetchStockData(ticker, '1d', '365d');
+export async function fetchStockHistory(ticker, days = 365) {
+    const range = typeof days === 'number' ? `${days}d` : days;
+    return fetchStockData(ticker, '1d', range);
 }
+
 
 /**
  * 1분봉 데이터 조회 (최근 1일치)

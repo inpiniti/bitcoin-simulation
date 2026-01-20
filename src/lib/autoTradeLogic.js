@@ -1,6 +1,6 @@
 import { isUSDST, getUSMarketCloseTime, getMinutesUntilClose } from "@/lib/marketTime"
 import { useStore } from "@/store/useStore"
-import { fetchStockOneYearData, fetchStockOverview } from "@/lib/api"
+import { fetchStockHistory, fetchStockOverview } from "@/lib/api"
 import { addDerivedData, analyzeSignal } from "@/lib/dataProcessor"
 import { getOverseasBalance, buyOverseasStock, sellOverseasStock, getOverseasStockPrice, getOverseasStockPriceWithExchangeSearch } from "@/lib/kisApi"
 import { addPendingOrder, clearPendingOrders, startSettlementMonitoring, isSettlementMonitoringActive } from "@/lib/orderTracker"
@@ -113,7 +113,7 @@ async function runAutoTradeProcess(store, isTest = false) {
     const loadData = async (ticker) => {
         if (localDataCache[ticker]) return localDataCache[ticker];
         try {
-            const data = await fetchStockOneYearData(ticker);
+            const data = await fetchStockHistory(ticker);
             if (data && data.length >= 20) {
                 const dataWithSlope = addDerivedData(data);
                 localDataCache[ticker] = dataWithSlope;
