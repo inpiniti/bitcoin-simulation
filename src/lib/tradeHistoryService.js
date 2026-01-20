@@ -8,15 +8,16 @@ import { getSupabaseClient, isSupabaseConfigured } from './supabaseClient'
 export { isSupabaseConfigured }
 
 /**
- * 매수 기록 추가 (INSERT)
- * @param {Object} params
+ * 새로운 매수 기록을 데이터베이스에 추가합니다.
+ * 
+ * @param {Object} params - 매수 정보
  * @param {string} params.accountNo - 계좌번호 (예: 12345678-01)
  * @param {string} params.ticker - 종목코드
  * @param {string} params.buyDate - 매수일 (YYYYMMDD)
  * @param {number} params.buyPrice - 매수가
  * @param {number} params.buyQty - 매수수량
  * @param {string} params.buyOrderNo - 매수주문번호
- * @returns {Promise<{success: boolean, data?: any, error?: string}>}
+ * @returns {Promise<Object>} 성공 여부와 데이터 또는 에러 정보를 포함하는 객체
  */
 export async function insertBuyRecord({ accountNo, ticker, buyDate, buyPrice, buyQty, buyOrderNo }) {
     if (!isSupabaseConfigured()) {
@@ -57,19 +58,18 @@ export async function insertBuyRecord({ accountNo, ticker, buyDate, buyPrice, bu
 }
 
 /**
- * 매도 기록 업데이트 또는 삽입 (UPSERT)
- * - 기존에 HOLDING 상태인 동일 티커 레코드가 있으면 UPDATE
- * - 없으면 INSERT (프로그램 사용 전 보유 종목)
+ * 매도 기록을 업데이트하거나 새로 삽입합니다.
+ * 기존에 'HOLDING' 상태인 동일 티커가 있으면 업데이트하고, 없으면 새로 삽입합니다.
  * 
- * @param {Object} params
+ * @param {Object} params - 매도 정보
  * @param {string} params.accountNo - 계좌번호
  * @param {string} params.ticker - 종목코드
  * @param {string} params.sellDate - 매도일 (YYYYMMDD)
  * @param {number} params.sellPrice - 매도가
  * @param {number} params.sellQty - 매도수량
  * @param {string} params.sellOrderNo - 매도주문번호
- * @param {number} [params.avgBuyPrice] - 평균 매수가 (기존 보유종목용)
- * @returns {Promise<{success: boolean, data?: any, error?: string}>}
+ * @param {number} [params.avgBuyPrice] - 평균 매수가 (프로그램 외부에서 매수한 종목인 경우 사용)
+ * @returns {Promise<Object>} 성공 여부와 데이터 또는 에러 정보를 포함하는 객체
  */
 export async function upsertSellRecord({ accountNo, ticker, sellDate, sellPrice, sellQty, sellOrderNo, avgBuyPrice }) {
     if (!isSupabaseConfigured()) {
@@ -175,12 +175,13 @@ export async function upsertSellRecord({ accountNo, ticker, sellDate, sellPrice,
 }
 
 /**
- * 매매 히스토리 조회
+ * 특정 계좌의 매매 히스토리를 조회합니다.
+ * 
  * @param {string} accountNo - 계좌번호
- * @param {Object} [options]
- * @param {string} [options.status] - 상태 필터 (HOLDING, COMPLETED)
- * @param {number} [options.limit] - 조회 건수
- * @returns {Promise<{success: boolean, data?: Array, error?: string}>}
+ * @param {Object} [options] - 조회 옵션
+ * @param {string} [options.status] - 상태 필터 ('HOLDING' 또는 'COMPLETED')
+ * @param {number} [options.limit] - 최대 조회 건수
+ * @returns {Promise<Object>} 성공 여부와 조회된 데이터 또는 에러 정보를 포함하는 객체
  */
 export async function getTradeHistory(accountNo, options = {}) {
     if (!isSupabaseConfigured()) {

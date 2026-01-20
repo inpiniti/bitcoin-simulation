@@ -94,7 +94,9 @@ export function getUSMarketCloseTime(now = new Date()) {
 }
 
 /**
- * 다음 정규 장 마감까지 남은 분(Minute)을 반환합니다.
+ * 다음 정규 장 마감까지 남은 시간(분)을 계산하여 반환합니다.
+ * 
+ * @returns {number} 마감까지 남은 분(Minute)
  */
 export function getMinutesUntilClose() {
     const now = new Date();

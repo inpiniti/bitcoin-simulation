@@ -6,7 +6,11 @@ const KIS_BASE_URL = import.meta.env.DEV
     : '/api/kis'
 
 /**
- * 접근토큰 발급
+ * KIS API 접근 토큰을 발급받습니다.
+ * 
+ * @param {string} appkey - 한국투자증권 앱 키
+ * @param {string} appsecret - 한국투자증권 앱 시크릿
+ * @returns {Promise<Object>} 토큰 정보 객체 (success, access_token 등)
  */
 export async function getAccessToken(appkey, appsecret) {
     try {
@@ -48,7 +52,12 @@ export async function getAccessToken(appkey, appsecret) {
 }
 
 /**
- * 접근토큰 폐기
+ * 발급받은 KIS API 접근 토큰을 폐기합니다.
+ * 
+ * @param {string} appkey - 한국투자증권 앱 키
+ * @param {string} appsecret - 한국투자증권 앱 시크릿
+ * @param {string} token - 폐기할 접근 토큰
+ * @returns {Promise<Object>} 결과 객체 (success, message)
  */
 export async function revokeAccessToken(appkey, appsecret, token) {
     try {
@@ -79,7 +88,14 @@ export async function revokeAccessToken(appkey, appsecret, token) {
 }
 
 /**
- * 해외주식 현재가 조회
+ * 해외주식 현재 가격을 상세 조회합니다.
+ * 
+ * @param {string} accessToken - KIS 접근 토큰
+ * @param {string} appkey - 한국투자증권 앱 키
+ * @param {string} appsecret - 한국투자증권 앱 시크릿
+ * @param {string} exchangeCode - 거래소 코드 (예: NAS, NYS 등)
+ * @param {string} symbol - 종목 심볼 (예: AAPL)
+ * @returns {Promise<Object>} 현재가 정보 객체
  */
 export async function getOverseasStockPrice(accessToken, appkey, appsecret, exchangeCode, symbol) {
     try {
@@ -123,7 +139,14 @@ export async function getOverseasStockPrice(accessToken, appkey, appsecret, exch
 }
 
 /**
- * 해외주식 잔고 조회
+ * 해외주식 잔고 및 보유 종목 정보를 조회합니다.
+ * 
+ * @param {string} accessToken - KIS 접근 토큰
+ * @param {string} appkey - 한국투자증권 앱 키
+ * @param {string} appsecret - 한국투자증권 앱 시크릿
+ * @param {string} accountNo - 계좌번호 (8자리)
+ * @param {string} accountCode - 계좌상품코드 (2자리)
+ * @returns {Promise<Object>} 잔고 및 보유 종목 리스트
  */
 export async function getOverseasBalance(accessToken, appkey, appsecret, accountNo, accountCode) {
     try {
@@ -171,7 +194,14 @@ export async function getOverseasBalance(accessToken, appkey, appsecret, account
 }
 
 /**
- * 해외주식 미체결내역 조회
+ * 해외주식 미체결 주문 내역을 조회합니다.
+ * 
+ * @param {string} accessToken - KIS 접근 토큰
+ * @param {string} appkey - 한국투자증권 앱 키
+ * @param {string} appsecret - 한국투자증권 앱 시크릿
+ * @param {string} accountNo - 계좌번호 (8자리)
+ * @param {string} accountCode - 계좌상품코드 (2자리)
+ * @returns {Promise<Object>} 미체결 주문 리스트
  */
 export async function getUnfilledOrders(accessToken, appkey, appsecret, accountNo, accountCode) {
     try {
@@ -218,7 +248,16 @@ export async function getUnfilledOrders(accessToken, appkey, appsecret, accountN
 }
 
 /**
- * 해외주식 일별거래내역 조회
+ * 특정 기간 동안의 해외주식 일별 거래 내역을 조회합니다.
+ * 
+ * @param {string} accessToken - KIS 접근 토큰
+ * @param {string} appkey - 한국투자증권 앱 키
+ * @param {string} appsecret - 한국투자증권 앱 시크릿
+ * @param {string} accountNo - 계좌번호 (8자리)
+ * @param {string} accountCode - 계좌상품코드 (2자리)
+ * @param {string} startDate - 조회 시작일 (YYYYMMDD)
+ * @param {string} endDate - 조회 종료일 (YYYYMMDD)
+ * @returns {Promise<Object>} 거래 내역 리스트 및 요약 정보
  */
 export async function getDailyTransactions(accessToken, appkey, appsecret, accountNo, accountCode, startDate, endDate) {
     try {
@@ -271,7 +310,16 @@ export async function getDailyTransactions(accessToken, appkey, appsecret, accou
 }
 
 /**
- * 해외주식 기간손익 조회
+ * 특정 기간 동안의 해외주식 실현 손익 내역을 조회합니다.
+ * 
+ * @param {string} accessToken - KIS 접근 토큰
+ * @param {string} appkey - 한국투자증권 앱 키
+ * @param {string} appsecret - 한국투자증권 앱 시크릿
+ * @param {string} accountNo - 계좌번호 (8자리)
+ * @param {string} accountCode - 계좌상품코드 (2자리)
+ * @param {string} startDate - 조회 시작일 (YYYYMMDD)
+ * @param {string} endDate - 조회 종료일 (YYYYMMDD)
+ * @returns {Promise<Object>} 손익 내역 리스트 및 요약 정보
  */
 export async function getPeriodProfit(accessToken, appkey, appsecret, accountNo, accountCode, startDate, endDate) {
     try {
@@ -325,13 +373,15 @@ export async function getPeriodProfit(accessToken, appkey, appsecret, accountNo,
 }
 
 /**
- * 해외주식 가격급등락 조회
- * @param {string} accessToken - 접근 토큰
- * @param {string} appkey - 앱 키
- * @param {string} appsecret - 앱 시크릿
- * @param {string} type - 'rise' (급등) 또는 'fall' (급락)
- * @param {string} excd - 거래소코드 (NAS, NYS, AMS 등)
- * @param {string} mixn - N분전 (0:1분, 3:5분, 4:10분, 7:30분, 8:60분)
+ * 해외주식 가격 급등 또는 급락 종목 순위를 조회합니다.
+ * 
+ * @param {string} accessToken - KIS 접근 토큰
+ * @param {string} appkey - 한국투자증권 앱 키
+ * @param {string} appsecret - 한국투자증권 앱 시크릿
+ * @param {string} [type='fall'] - 'rise' (급등) 또는 'fall' (급락)
+ * @param {string} [excd='NAS'] - 거래소 코드 (NAS, NYS, AMS 등)
+ * @param {string} [mixn='8'] - 시간 간격 (0:1분, 3:5분, 4:10분, 7:30분, 8:60분)
+ * @returns {Promise<Object>} 급등락 종목 리스트
  */
 export async function getPriceFluctuation(accessToken, appkey, appsecret, type = 'fall', excd = 'NAS', mixn = '8') {
     try {
@@ -385,12 +435,14 @@ export async function getPriceFluctuation(accessToken, appkey, appsecret, type =
 }
 
 /**
- * 해외주식 거래량급증 조회
- * @param {string} accessToken - 접근 토큰
- * @param {string} appkey - 앱 키
- * @param {string} appsecret - 앱 시크릿
- * @param {string} excd - 거래소코드 (NAS, NYS, AMS 등)
- * @param {string} mixn - N분전 (0:1분, 3:5분, 4:10분, 7:30분, 8:60분)
+ * 해외주식 거래량 급증 종목 순위를 조회합니다.
+ * 
+ * @param {string} accessToken - KIS 접근 토큰
+ * @param {string} appkey - 한국투자증권 앱 키
+ * @param {string} appsecret - 한국투자증권 앱 시크릿
+ * @param {string} [excd='NAS'] - 거래소 코드 (NAS, NYS, AMS 등)
+ * @param {string} [mixn='8'] - 시간 간격 (0:1분, 3:5분, 4:10분, 7:30분, 8:60분)
+ * @returns {Promise<Object>} 거래량 급증 종목 리스트
  */
 export async function getVolumeSurge(accessToken, appkey, appsecret, excd = 'NAS', mixn = '8') {
     try {
@@ -443,7 +495,19 @@ export async function getVolumeSurge(accessToken, appkey, appsecret, excd = 'NAS
 }
 
 /**
- * 해외주식 주문 (매수/매도) - 실전 투자 기준 (미국)
+ * 해외주식(미국)에 대한 매수 또는 매도 주문을 실행합니다.
+ * 
+ * @param {string} accessToken - KIS 접근 토큰
+ * @param {string} appkey - 한국투자증권 앱 키
+ * @param {string} appsecret - 한국투자증권 앱 시크릿
+ * @param {string} accountNo - 계좌번호 (8자리)
+ * @param {string} accountCode - 계좌상품코드 (2자리)
+ * @param {string} orderType - 'buy' (매수) 또는 'sell' (매도)
+ * @param {string} exchange - 거래소 코드 (NAS, NYS, AMS 등)
+ * @param {string} symbol - 종목 심볼 (예: AAPL)
+ * @param {number|string} price - 주문 가격
+ * @param {number|string} qty - 주문 수량
+ * @returns {Promise<Object>} 주문 실행 결과 (success, orderNo 등)
  */
 export async function orderOverseasStock(accessToken, appkey, appsecret, accountNo, accountCode, orderType, exchange, symbol, price, qty) {
     try {
@@ -517,7 +581,14 @@ export async function orderOverseasStock(accessToken, appkey, appsecret, account
 }
 
 /**
- * 해외주식 현재가 상세 조회
+ * 해외주식 현재 가격 및 등락 정보를 상세 조회합니다.
+ * 
+ * @param {string} accessToken - KIS 접근 토큰
+ * @param {string} appkey - 한국투자증권 앱 키
+ * @param {string} appsecret - 한국투자증권 앱 시크릿
+ * @param {string} exchange - 거래소 코드 (NAS, NYS, AMS 등)
+ * @param {string} symbol - 종목 심볼
+ * @returns {Promise<Object>} 현재가 상세 정보 객체
  */
 export async function getOverseasCurrentPrice(accessToken, appkey, appsecret, exchange, symbol) {
     try {
@@ -571,7 +642,14 @@ export async function getOverseasCurrentPrice(accessToken, appkey, appsecret, ex
     }
 }
 /**
- * 거래소 코드를 모를 때, 주요 거래소(NAS, NYS, AMS)를 순회하며 현재가를 조회하고 올바른 거래소를 반환함
+ * 거래소 코드를 모를 때 주요 거래소(NAS, NYS, AMS)를 순서대로 조회하여 현재가를 가져옵니다.
+ * 성공한 거래소 코드를 함께 반환합니다.
+ * 
+ * @param {string} accessToken - KIS 접근 토큰
+ * @param {string} appkey - 한국투자증권 앱 키
+ * @param {string} appsecret - 한국투자증권 앱 시크릿
+ * @param {string} ticker - 종목 티커
+ * @returns {Promise<Object>} 성공 시 현재가 및 거래소 코드 객체
  */
 export async function getOverseasStockPriceWithExchangeSearch(accessToken, appkey, appsecret, ticker) {
     const exchanges = ['NAS', 'NYS', 'AMS']; // 나스닥, 뉴욕, 아멕스 순 시도
@@ -596,14 +674,36 @@ export async function getOverseasStockPriceWithExchangeSearch(accessToken, appke
 }
 
 /**
- * 해외주식 매수 주문 Wrapper
+ * 해외주식 매수 주문을 위한 Wrapper 함수입니다.
+ * 
+ * @param {string} accessToken - KIS 접근 토큰
+ * @param {string} appkey - 한국투자증권 앱 키
+ * @param {string} appsecret - 한국투자증권 앱 시크릿
+ * @param {string} accountNo - 계좌번호
+ * @param {string} accountCode - 계좌상품코드
+ * @param {string} ticker - 종목 티커
+ * @param {number} qty - 수량
+ * @param {number} price - 가격
+ * @param {string} [exchange='NAS'] - 거래소 코드
+ * @returns {Promise<Object>} 주문 결과
  */
 export async function buyOverseasStock(accessToken, appkey, appsecret, accountNo, accountCode, ticker, qty, price, exchange = 'NAS') {
     return orderOverseasStock(accessToken, appkey, appsecret, accountNo, accountCode, 'buy', exchange, ticker, price, qty);
 }
 
 /**
- * 해외주식 매도 주문 Wrapper
+ * 해외주식 매도 주문을 위한 Wrapper 함수입니다.
+ * 
+ * @param {string} accessToken - KIS 접근 토큰
+ * @param {string} appkey - 한국투자증권 앱 키
+ * @param {string} appsecret - 한국투자증권 앱 시크릿
+ * @param {string} accountNo - 계좌번호
+ * @param {string} accountCode - 계좌상품코드
+ * @param {string} ticker - 종목 티커
+ * @param {number} qty - 수량
+ * @param {number} price - 가격
+ * @param {string} [exchange='NAS'] - 거래소 코드
+ * @returns {Promise<Object>} 주문 결과
  */
 export async function sellOverseasStock(accessToken, appkey, appsecret, accountNo, accountCode, ticker, qty, price, exchange = 'NAS') {
     return orderOverseasStock(accessToken, appkey, appsecret, accountNo, accountCode, 'sell', exchange, ticker, price, qty);

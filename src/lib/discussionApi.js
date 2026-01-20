@@ -7,10 +7,12 @@
 const API_BASE = '/api/discussion';
 
 /**
- * 통합 API 호출 함수
+ * 통합 종목 토론 API를 호출하여 게시글 목록을 가져옵니다.
+ * 이 함수는 백엔드(Vercel 서버리스 함수 또는 Vite 프록시) 엔드포인트를 사용합니다.
+ * 
  * @param {string} ticker - 종목 티커
- * @param {string} source - 소스 ('naver' | 'stocktwits' | 'reddit' | 'yahoo' | 'toss')
- * @returns {Promise<Array>} 토론 게시글 목록
+ * @param {string} source - 데이터 소스 ('naver', 'stocktwits', 'reddit', 'yahoo', 'toss')
+ * @returns {Promise<Array<Object>>} 토론 게시글 목록 배열
  */
 async function fetchDiscussionFromAPI(ticker, source) {
     try {
@@ -30,7 +32,10 @@ async function fetchDiscussionFromAPI(ticker, source) {
 }
 
 /**
- * Naver Finance (Overseas) Discussion API
+ * 네이버 경제(해외주식) 종목 토론 게시글을 가져옵니다.
+ * 
+ * @param {string} ticker - 종목 티커 (예: AAPL)
+ * @returns {Promise<Array<Object>>} 정규화된 게시글 목록
  */
 export async function fetchNaverDiscussion(ticker) {
     // 프로덕션에서는 통합 API 사용
@@ -74,7 +79,10 @@ export async function fetchNaverDiscussion(ticker) {
 }
 
 /**
- * Stocktwits API
+ * Stocktwits 종목 토론 게시글을 가져옵니다.
+ * 
+ * @param {string} ticker - 종목 심볼 (예: AAPL)
+ * @returns {Promise<Array<Object>>} 정규화된 게시글 목록
  */
 export async function fetchStocktwitsDiscussion(ticker) {
     // 프로덕션과 로컬 모두 통합 API 사용 (Stocktwits는 직접 호출 불가)
@@ -82,7 +90,10 @@ export async function fetchStocktwitsDiscussion(ticker) {
 }
 
 /**
- * Toss Invest API (토스증권 종목 토론)
+ * 토스증권 종목 토론 게시글을 가져옵니다.
+ * 
+ * @param {string} ticker - 종목 티커
+ * @returns {Promise<Array<Object>>} 정규화된 게시글 목록
  */
 export async function fetchTossDiscussion(ticker) {
     // 프로덕션과 로컬 모두 통합 API 사용
