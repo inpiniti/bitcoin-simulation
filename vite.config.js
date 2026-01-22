@@ -753,7 +753,7 @@ export default defineConfig(({ mode }) => {
         server: {
             proxy: {
                 '/api/yahoo': {
-                    target: 'https://query1.finance.yahoo.com',
+                    target: 'https://query2.finance.yahoo.com',
                     changeOrigin: true,
                     secure: false,
                     rewrite: (path) => path.replace(/^\/api\/yahoo/, ''),
@@ -761,6 +761,8 @@ export default defineConfig(({ mode }) => {
                         proxy.on('proxyReq', (proxyReq, req, _res) => {
                             proxyReq.setHeader('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
                             proxyReq.setHeader('Accept', 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8');
+                            proxyReq.setHeader('Origin', 'https://finance.yahoo.com');
+                            proxyReq.setHeader('Referer', 'https://finance.yahoo.com/');
                         });
                     },
                 },
@@ -796,6 +798,21 @@ export default defineConfig(({ mode }) => {
                     configure: (proxy, _options) => {
                         proxy.on('proxyReq', (proxyReq, req, _res) => {
                             proxyReq.setHeader('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+                        });
+                    },
+                },
+                '/api/nasdaq': {
+                    target: 'https://api.nasdaq.com',
+                    changeOrigin: true,
+                    secure: false,
+                    rewrite: (path) => path.replace(/^\/api\/nasdaq/, '/api'),
+                    configure: (proxy, _options) => {
+                        proxy.on('proxyReq', (proxyReq, req, _res) => {
+                            proxyReq.setHeader('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+                            proxyReq.setHeader('Accept', 'application/json, text/plain, */*');
+                            proxyReq.setHeader('Accept-Language', 'en-US,en;q=0.9');
+                            proxyReq.setHeader('Origin', 'https://www.nasdaq.com');
+                            proxyReq.setHeader('Referer', 'https://www.nasdaq.com/');
                         });
                     },
                 },

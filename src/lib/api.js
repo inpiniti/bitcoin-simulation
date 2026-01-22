@@ -452,3 +452,45 @@ export async function fetchStockOverview(ticker) {
     }
 }
 
+/**
+ * Nasdaq API를 이용한 실적 데이터 조회
+ * @param {string} ticker 
+ */
+export async function fetchEarningsData(ticker) {
+    const symbol = ticker.toUpperCase().replace(/\./g, '-');
+    const url = `/api/nasdaq/company/${symbol}/earnings-surprise`;
+
+    try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`Nasdaq fetch failed for ${ticker}`);
+
+        const json = await response.json();
+        const data = json.data;
+
+        if (!data || !data.earningsSurpriseTable || !data.earningsSurpriseTable.rows) {
+            return null;
+        }
+
+        // Nasdaq 데이터를 우리 앱 형식에 매핑
+        const history = data.earningsSurpriseTable.rows.map(row => ({
+            quarter: { fmt: row.dateReported || 'Unknown' },
+            actual: { raw: parseFloat(row.actualEPS) || 0, fmt: row.actualEPS },
+            estimate: { raw: parseFloat(row.consensusEPS) || 0, fmt: row.consensusEPS },
+            surprisePercent: {
+                raw: (parseFloat(row.surprisePcnt) || 0) / 100,
+                fmt: (row.surprisePcnt || '0') + '%'
+            }
+        }));
+
+        return {
+            history: history,
+            trend: [],
+            calendar: {
+                earningsDate: history.length > 0 ? [history[0].quarter] : []
+            }
+        };
+    } catch (e) {
+        console.error(`Earnings fetch failed for ${ticker} from Nasdaq:`, e);
+        return null;
+    }
+}

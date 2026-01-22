@@ -38,6 +38,7 @@
 - 📈 차트 뷰 (Chart View): 가격 차트 + AI 예측
 - ⚡ 실시간 시뮬레이션 차트 (Real-Time Chart): 1분봉 자동 갱신 + AI 예측
 - 🔍 분석 (Analyze): 전체 종목 스캔 및 매매 신호
+- 🏆 실적 임팩트 (Earnings): 실적 발표 캘린더 + 변동성 예측 (AI)
 - 💬 종목 토론 (Discussion): Naver/Stocktwits 실시간 토론
 ```
 
@@ -110,6 +111,7 @@
     *   📈 **차트 뷰 (Chart View)**: 가격 라인 차트 + AI 예측
     *   ⚡ **실시간 시뮬레이션 차트 (Real-Time Chart)**: 1분봉 자동 갱신 + AI 예측
     *   🔍 **분석 (Analyze)**: 전체 종목 스캔 및 매매 신호
+    *   📅 **실적 임팩트 (Earnings)**: 실적 발표 캘린더 및 가격 변동 임팩트 예측
     *   💬 **종목 토론 (Discussion)**: Naver/Stocktwits/Reddit/Yahoo/Toss 실시간 토론
     *   ❓ **AI 질문 (Financial QA)**: 기업 정보 질의응답 (Wikipedia 기반)
 
@@ -195,6 +197,13 @@
     *   **Sharpe Ratio**: 향후 추가 예정.
 *   **매매 신호 통합**: 내 보유 종목에 대한 실시간 '매수/매도/보류' 신호 및 추천 액션(추매, 익절, 손절) 표시.
 *   **데이터 갱신**: KIS 잔고 데이터 + Yahoo Finance 과거 데이터 하이브리드 사용.
+
+#### 실적 발표 임팩트 분석 (Earnings Impact Predictor) - New
+*   **기능**: 예정된 실적 발표 캘린더를 통합하고, 과거 실적 발표 전후의 주가 데이터를 분석하여 변동성 예측.
+*   **AI 예측**:
+    *   'Surprise' 시나리오별 예상 상승/하락폭 산출.
+    *   최근 4분기 예측치 vs 실제 실적 비교 차트 제공.
+*   **데이터 소스**: Yahoo Finance `quoteSummary` (earningsHistory, calendarEvents).
 
 #### AI 모델 활용 가이드
 *   상세 내용은 `.agent/skills/ai-models.md` 참조.
