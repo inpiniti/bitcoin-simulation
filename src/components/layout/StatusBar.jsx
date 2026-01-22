@@ -3,10 +3,10 @@ import { useStore } from "@/store/useStore"
 import { GitBranch, Check, Loader2 } from "lucide-react"
 
 export function StatusBar() {
-    const { hist, loadingInterval, selectedResult, isAnalyzing, analysisProgress, mode, ticker } = useStore()
+    const { hist, loadingInterval, selectedResult, isAnalyzing, analysisProgress, mode, ticker, interval } = useStore()
 
-    const dataCount = hist['1d']?.length || 0
-    const isLoading = loadingInterval['1d'] || loadingInterval['STOCK_BASE']
+    const dataCount = hist[interval]?.length || 0
+    const isLoading = loadingInterval[interval] || loadingInterval['STOCK_BASE']
 
     return (
         <div className="h-6 bg-[#007acc] flex items-center px-2 text-white text-[11px] select-none">
@@ -46,7 +46,7 @@ export function StatusBar() {
             {/* Center */}
             <div className="flex-1 text-center">
                 <span>
-                    {mode === 'coin' ? 'BTC-KRW' : ticker} (1d) |
+                    {mode === 'coin' ? 'BTC-KRW' : ticker} ({interval}) |
                     데이터: <strong>{dataCount.toLocaleString()}</strong>개
                 </span>
             </div>

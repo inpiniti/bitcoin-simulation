@@ -197,7 +197,7 @@ function CustomTooltip({ active, payload, label }) {
  * 고성능 캔들스틱 차트 컴포넌트
  */
 export function ChartView() {
-    const { hist, ticker, mode } = useStore()
+    const { hist, ticker, mode, interval } = useStore()
     const [isLoadingForecast, setIsLoadingForecast] = useState(false)
     const [forecastData, setForecastData] = useState(null)
 
@@ -209,7 +209,7 @@ export function ChartView() {
 
     // 데이터 준비
     const chartData = useMemo(() => {
-        const data = hist['1d'] || []
+        const data = hist[interval] || []
         if (!data || data.length === 0) return []
 
         // 초기 로딩 성능을 위해 최근 200개만 사용하거나, 전체 사용 후 Brush로 조절
@@ -217,8 +217,10 @@ export function ChartView() {
         // 여기선 365개 정도는 문제 없으므로 전체 사용
         const formatted = data.map(item => ({
             ...item,
-            date: formatShortDate(item.timestamp),
-            fullDate: new Date(item.timestamp).toLocaleDateString('ko-KR'),
+            date: interval === '1d'
+                ? formatShortDate(item.timestamp)
+                : new Date(item.timestamp).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }),
+            fullDate: new Date(item.timestamp).toLocaleString('ko-KR'),
             // 캔들 필수 데이터
             open: item.open,
             high: item.high,
@@ -246,13 +248,17 @@ export function ChartView() {
             })
         }
         return formatted
-    }, [hist, forecastData, showForecast])
+    }, [hist, forecastData, showForecast, interval])
 
 
 
     // 예측 데이터 로드 (이전과 동일 로직)
     useEffect(() => {
         const load = async () => {
+            if (interval !== '1d') {
+                setForecastData(null);
+                return;
+            }
             const symbol = mode === 'coin' ? 'BTC-KRW' : ticker
             setIsLoadingForecast(true)
             try {
@@ -266,7 +272,7 @@ export function ChartView() {
         }
         setForecastData(null)
         load()
-    }, [ticker, mode])
+    }, [ticker, mode, interval])
 
     // Y축 도메인 계산
     const yDomain = useMemo(() => {

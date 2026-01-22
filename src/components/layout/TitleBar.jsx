@@ -82,7 +82,8 @@ export function TitleBar() {
         loadDailyData, hist, loadingInterval,
         tickerGroup, setTickerGroup,
         groupStocks, setGroupStocks, loadingGroupStocks, setLoadingGroupStocks, // Store에서 가져옴
-        kisAuth, loginKIS, logoutKIS, reloginKIS
+        kisAuth, loginKIS, logoutKIS, reloginKIS,
+        interval, setInterval
     } = useStore()
     const [localTicker, setLocalTicker] = useState(ticker)
     const [filterText, setFilterText] = useState('') // 드롭다운 필터용 (포커스 시 리셋)
@@ -91,8 +92,8 @@ export function TitleBar() {
     const [autoTradeDialogOpen, setAutoTradeDialogOpen] = useState(false)
     const skipBlurRef = useRef(false)
 
-    const isLoading = loadingInterval['1d'] || loadingInterval['STOCK_BASE']
-    const hasData = (hist['1d']?.length || 0) > 0
+    const isLoading = loadingInterval[interval] || loadingInterval['STOCK_BASE']
+    const hasData = (hist[interval]?.length || 0) > 0
 
     // 로컬 Alert 상태 관리
     const [alertConfig, setAlertConfig] = useState({
@@ -204,6 +205,31 @@ export function TitleBar() {
                         Stock
                     </button>
                 </div>
+
+                <div className="flex bg-[#252526] rounded-md p-0.5 border border-[#3e3e42]">
+                    <button
+                        onClick={() => setInterval('1d')}
+                        className={cn(
+                            "px-2 py-0.5 text-[10px] rounded-sm transition-colors",
+                            useStore.getState().interval === '1d'
+                                ? "bg-[#424242] text-white font-medium"
+                                : "text-[#777777] hover:text-[#cccccc]"
+                        )}
+                    >
+                        Day
+                    </button>
+                    <button
+                        onClick={() => setInterval('1m')}
+                        className={cn(
+                            "px-2 py-0.5 text-[10px] rounded-sm transition-colors",
+                            useStore.getState().interval === '1m'
+                                ? "bg-[#424242] text-white font-medium"
+                                : "text-[#777777] hover:text-[#cccccc]"
+                        )}
+                    >
+                        Min
+                    </button>
+                </div>
             </div>
 
             {/* Center: Stock Ticker Input */}
@@ -229,7 +255,7 @@ export function TitleBar() {
                     {isLoading ? (
                         <span className="text-[#007acc] animate-pulse">📊 Loading Data...</span>
                     ) : hasData ? (
-                        <span className="text-[#4ec9b0]">✓ {hist['1d'].length} days loaded</span>
+                        <span className="text-[#4ec9b0]">✓ {hist[interval].length} {interval === '1m' ? 'minutes' : 'days'} loaded</span>
                     ) : (
                         <span className="text-[#666]">No data</span>
                     )}

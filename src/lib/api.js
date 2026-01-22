@@ -47,7 +47,7 @@ function convertToYahooSymbol(ticker) {
  * @param {string} interval - 데이터 간격 (기본: 1d)
  * @param {string} range - 데이터 범위 (기본: 365d)
  * @param {boolean} includePrePost - 장전/장후 데이터 포함 여부 (기본: false)
- * @returns {Promise<Array>} 정규화된 캔들 데이터
+ * @returns {Promise<Array>} 정규화된 캔들 데이터 (isRegular 필드 포함)
  */
 export async function fetchStockData(ticker, interval = '1d', range = '365d', includePrePost = false) {
     // Yahoo Finance 호환성을 위해 심볼 변환
@@ -72,8 +72,9 @@ export async function fetchStockData(ticker, interval = '1d', range = '365d', in
     const timestamps = result.timestamp;
     const indicators = result.indicators.quote[0];
 
-    // tradingPeriods 확인 (장 운영 시간 정보) - 필요 시 사용
-    // const tradingPeriods = result.meta.tradingPeriods;
+    // tradingPeriods 확인 (장 운영 시간 정보)
+    const tradingPeriods = result.meta.tradingPeriods;
+    const regularPeriods = tradingPeriods && tradingPeriods.regular ? tradingPeriods.regular.flat() : [];
 
     const { open, high, low, close, volume } = indicators;
 
@@ -85,9 +86,16 @@ export async function fetchStockData(ticker, interval = '1d', range = '365d', in
         const date = new Date(t * 1000);
         const isoDate = date.toISOString();
 
+        // 정규장 여부 확인 (timestamp t는 unix timestamp)
+        // 일봉(1d)은 항상 정규장으로 간주, 분봉(1m)은 tradingPeriods 기준 판단
+        const isRegular = interval === '1d'
+            ? true
+            : (regularPeriods.length > 0 ? regularPeriods.some(p => t >= p.start && t < p.end) : true);
+
         return {
             // 표준 필드
             timestamp: isoDate,
+            isRegular,
             open: Number(open[i]),
             high: Number(high[i]),
             low: Number(low[i]),
@@ -138,14 +146,15 @@ export async function fetchStockHistory(ticker, days = 365) {
 
 
 /**
- * 1분봉 데이터 조회 (최근 1일치)
+ * 1분봉 데이터 조회 (최근 7일치)
  * 실시간 시뮬레이션 차트에서 사용
  * @param {string} ticker - 종목 코드 (예: AAPL)
  * @returns {Promise<Array>} 정규화된 1분봉 데이터
  */
 export async function fetchStockMinuteData(ticker) {
     // 1분봉 조회 시 장전/장후 데이터(includePrePost) 포함
-    return fetchStockData(ticker, '1m', '1d', true);
+    // 야후 파이낸스 API의 1분봉 최대 조회 범위인 7일로 확장
+    return fetchStockData(ticker, '1m', '7d', true);
 }
 
 /**

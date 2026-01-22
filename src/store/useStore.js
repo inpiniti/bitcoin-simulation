@@ -42,12 +42,11 @@ export const useStore = create(
                 mode: 'stock', // 'coin' | 'stock' (Default)
                 ticker: 'AAPL', // Stock ticker
 
-                // View Mode (새로운 모드 시스템)
-                viewMode: 'simulation', // 'simulation' | 'dataView' | 'chartView' | 'analyze'
-
-                // History data - 일봉만 사용 (단순화)
+                // History data - 일봉 또는 분봉 사용
+                interval: '1d', // '1d' | '1m'
                 hist: {
                     '1d': [],
+                    '1m': [],
                 },
 
                 // Simulation results
@@ -87,6 +86,7 @@ export const useStore = create(
                     martingaleMultiplier: 1.0,
                     useVMartingale: false,
                     vMartingaleProfitCut: 2.0,
+                    vMartingaleMultiplierMode: 'double', // 'double' | 'fixed'
                     baseQuantity: 100000,
                 },
 
@@ -106,6 +106,7 @@ export const useStore = create(
                     // V-Martingale (강화 매수) 설정
                     useVMartingale: false, // V-Martingale 활성화
                     vMartingaleProfitCut: 2.0, // 최소 매도 수익률 (%)
+                    vMartingaleMultiplierMode: 'double', // 'double' | 'fixed'
                 },
 
                 autoTradeStatus: {
@@ -140,6 +141,14 @@ export const useStore = create(
                 updateStrategyOptions: (options) => set(state => ({
                     strategyOptions: { ...state.strategyOptions, ...options }
                 })),
+
+                setInterval: (interval) => {
+                    const currentInterval = get().interval;
+                    if (currentInterval !== interval) {
+                        set({ interval, hist: { ...get().hist, [interval]: [] } });
+                        get().loadDailyData();
+                    }
+                },
 
                 // Ticker Group Selection
                 tickerGroup: 'superinvestor', // 'superinvestor' | 'myholdings' | 'pricesurge' | 'pricedrop' | 'volumesurge'
@@ -496,21 +505,29 @@ export const useStore = create(
                         try {
                             const now = Date.now();
                             const today = new Date().toISOString().split('T')[0];
+                            const interval = state.interval;
 
                             let rawData;
                             let exchange = stock.exchange || 'NAS';
                             const cachedEntry = state.dataCache[stock.ticker];
 
-                            // KIS에서 가져온 티커가 Yahoo Finance 형식과 다를 수 있으므로 주의 (ex. 005930.KS)
-                            // 현재 해외 주식이므로 대부분 호환될 것으로 예상 (AAPL, TSLA...)
-                            if (cachedEntry && new Date(cachedEntry.timestamp).toISOString().split('T')[0] === today) {
+                            // 1d일 때만 캐시 사용
+                            if (interval === '1d' && cachedEntry && new Date(cachedEntry.timestamp).toISOString().split('T')[0] === today) {
                                 rawData = cachedEntry.data;
                                 if (cachedEntry.exchange) exchange = cachedEntry.exchange;
                             } else {
-                                rawData = await fetchStockHistory(stock.ticker);
+                                if (interval === '1m') {
+                                    const { fetchStockMinuteData } = await import('@/lib/api');
+                                    rawData = await fetchStockMinuteData(stock.ticker);
+                                } else {
+                                    const { fetchStockHistory } = await import('@/lib/api');
+                                    rawData = await fetchStockHistory(stock.ticker);
+                                }
+
                                 if (rawData && rawData.exchange) exchange = rawData.exchange;
 
-                                if (rawData && rawData.length > 0) {
+                                // 1d일 때만 캐시 저장
+                                if (interval === '1d' && rawData && rawData.length > 0) {
                                     set(s => ({
                                         dataCache: {
                                             ...s.dataCache,
@@ -690,28 +707,27 @@ export const useStore = create(
                 },
 
                 /**
-                 * 선택된 종목의 일봉 데이터를 로드합니다 (캐시 또는 API).
+                 * 선택된 종목의 데이터를 로드합니다 (캐시 또는 API).
+                 * interval 상태에 따라 일봉 또는 분봉을 로드합니다.
                  * @returns {Promise<void>}
                  */
                 loadDailyData: async () => {
                     const state = get();
                     const ticker = state.ticker;
+                    const interval = state.interval;
 
                     // 티커가 없으면 중단
                     if (!ticker) return;
 
-                    // 이미 데이터가 있고(length > 5), 현재 티커 데이터가 맞으면(확인 필요하지만 여기선 hist['1d']가 현재 티커꺼라고 가정) 리턴?
-                    // 하지만 탭 전환 시 hist['1d']를 갈아끼워야 하므로 무조건 실행해야 함.
-
-                    set((s) => ({ loadingInterval: { ...s.loadingInterval, '1d': true } }));
+                    set((s) => ({ loadingInterval: { ...s.loadingInterval, [interval]: true } }));
 
                     try {
                         const now = Date.now();
                         const today = new Date().toISOString().split('T')[0];
                         let rawData = null;
 
-                        // 1. 캐시 확인 (Stock 모드일 때만)
-                        if (state.mode === 'stock') {
+                        // 1. 캐시 확인 (Stock 모드 + 1d 일 때만)
+                        if (state.mode === 'stock' && interval === '1d') {
                             const cachedEntry = state.dataCache[ticker];
                             if (cachedEntry && new Date(cachedEntry.timestamp).toISOString().split('T')[0] === today) {
                                 console.log(`[Store] Using cached data for ${ticker}`);
@@ -722,40 +738,47 @@ export const useStore = create(
                         // 2. 캐시 없으면 API 호출
                         if (!rawData) {
                             if (state.mode === 'coin') {
+                                // 코인은 현재 일봉만 지원 (추후 필요시 확장)
+                                const { fetchCoinDailyData } = await import('@/lib/api');
                                 rawData = await fetchCoinDailyData();
                             } else {
-                                rawData = await fetchStockHistory(ticker);
+                                if (interval === '1m') {
+                                    const { fetchStockMinuteData } = await import('@/lib/api');
+                                    rawData = await fetchStockMinuteData(ticker);
+                                } else {
+                                    const { fetchStockHistory } = await import('@/lib/api');
+                                    rawData = await fetchStockHistory(ticker);
+                                }
                             }
 
-                            // 캐시 저장 (Stock만)
-                            if (state.mode === 'stock' && rawData && rawData.length > 0) {
+                            // 캐시 저장 (Stock + 1d만)
+                            if (state.mode === 'stock' && interval === '1d' && rawData && rawData.length > 0) {
                                 set(s => ({
                                     dataCache: {
                                         ...s.dataCache,
                                         [ticker]: {
                                             timestamp: now,
                                             data: rawData,
-                                            // exchange 정보는 fetchStockShortData에서만 옴. 여기선 일단 패스하거나 보주 
                                         }
                                     }
                                 }));
                             }
                         }
 
-                        if (!rawData || rawData.length <= 5) {
-                            console.warn(`[Warning] Fetched data count is too low (${rawData?.length}).`);
+                        if (!rawData || rawData.length < 1) {
+                            console.warn(`[Warning] Fetched data is empty or too low.`);
                         }
 
                         const dataWithSlope = addDerivedData(rawData);
 
                         set((s) => ({
-                            hist: { ...s.hist, '1d': dataWithSlope },
-                            loadingInterval: { ...s.loadingInterval, '1d': false },
+                            hist: { ...s.hist, [interval]: dataWithSlope },
+                            loadingInterval: { ...s.loadingInterval, [interval]: false },
                         }));
 
                     } catch (error) {
-                        console.error('Failed to load daily data:', error);
-                        set((s) => ({ loadingInterval: { ...s.loadingInterval, '1d': false } }));
+                        console.error(`Failed to load ${interval} data:`, error);
+                        set((s) => ({ loadingInterval: { ...s.loadingInterval, [interval]: false } }));
                         get().setGlobalError({ title: '데이터 로드 실패', description: error.message });
                     }
                 },
@@ -766,7 +789,8 @@ export const useStore = create(
                  */
                 runSimulation: async () => {
                     const state = get();
-                    const data = state.hist['1d'];
+                    const interval = state.interval;
+                    const data = state.hist[interval];
 
                     if (!data || data.length === 0) {
                         get().setGlobalError('데이터가 없습니다. 먼저 데이터를 로드해주세요.');
@@ -813,7 +837,7 @@ export const useStore = create(
                  * 스토어 초기화 (데이터 삭제)
                  */
                 clearAllData: () => set({
-                    hist: { '1d': [] },
+                    hist: { '1d': [], '1m': [] },
                     simul: {},
                     selectedResult: null,
                     // recommendedStocks는 유지 (티커 변경 시 매번 로드 방지)
@@ -830,6 +854,7 @@ export const useStore = create(
                     hist: state.hist,
                     simul: state.simul,
                     viewMode: state.viewMode,
+                    interval: state.interval,
                     recommendedStocks: state.recommendedStocks,
                     lastRecommendedFetch: state.lastRecommendedFetch,
                     dataCache: state.dataCache,

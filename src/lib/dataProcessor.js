@@ -224,7 +224,7 @@ export function addSlopeData(data) {
 
 
 /**
- * 통합 매매 엔진: 다양한 필터 및 손절/익절 조건을 적용하여 매매 내역을 생성합니다.
+ * 통합 매매 엔진: 다양한 필터 및 손절/익절 조건을 적용하여 매매 내역을 생성합니다. (정규장 시간 외 매매 제한 포함)
  * @param {Array<Object>} data - 지표가 포함된 캔들 데이터
  * @param {Object} options - 매매 전략 옵션
  * @returns {Array<Object>} 생성된 매매 내역 배열
@@ -245,6 +245,7 @@ export function generateIntegratedTrades(data, options = {}) {
         useSellAtBB2 = false,
         useVMartingale = false,        // NEW: V-Martingale 전략
         vMartingaleProfitCut = 2.0,   // NEW: V-Martingale 매도 타겟
+        vMartingaleMultiplierMode = 'double', // 배팅 모드 ('double': 2배, 'fixed': 1배)
     } = options;
 
     const trades = [];
@@ -274,9 +275,14 @@ export function generateIntegratedTrades(data, options = {}) {
                 if (useVolumeFilter && curr.vma20 && curr.volume < curr.vma20) buySignal = false;
             }
 
+            // 정규장 시간 외 매매 제한 (이동: 모든 필터 적용 후 최종 체크)
+            if (curr.isRegular === false) buySignal = false;
+
             if (buySignal) {
-                // 상한선 없이 무제한 지수 증가
-                const multiplier = useVMartingale ? Math.pow(2, entries.length) : 1;
+                // 상한선 없이 무제한 지수 증가 (또는 고정 1배)
+                const multiplier = useVMartingale
+                    ? (vMartingaleMultiplierMode === 'fixed' ? 1 : Math.pow(2, entries.length))
+                    : 1;
 
                 const entry = {
                     type: 'buy',
@@ -301,6 +307,7 @@ export function generateIntegratedTrades(data, options = {}) {
         if (currentPosition === 'long') {
             let sellSignal = (prevSign === 'positive' && currSign === 'negative');
             let sellReason = 'Slope Down';
+
 
             if (curr.high > highestPriceDuringTrade) {
                 highestPriceDuringTrade = curr.high;
@@ -339,6 +346,11 @@ export function generateIntegratedTrades(data, options = {}) {
                     sellSignal = true;
                     sellReason = `Trailing Stop (${trailingStopPcnt}%)`;
                 }
+            }
+
+            // 정규장 시간 외 매도 제한 (최종 체크)
+            if (curr.isRegular === false) {
+                sellSignal = false;
             }
 
             if (sellSignal) {
@@ -739,7 +751,7 @@ export function calculateVMartingaleResult(trades, baseQuantity = 100000, costs 
 }
 
 /**
- * 현재 데이터와 전략 옵션에 따른 실시간 매매 신호를 분석합니다.
+ * 현재 데이터와 전략 옵션에 따른 실시간 매매 신호를 분석합니다. (정규장 시간 외 매매 제한 포함)
  * @param {Array<Object>} dataWithSlope - 지표가 포함된 캔들 데이터
  * @param {Object} options - 매매 전략 옵션
  * @returns {Object} 분석 결과 (signal: 'BUY'|'SELL'|'HOLD', reason: string)
@@ -785,6 +797,14 @@ export function analyzeSignal(dataWithSlope, options = {}) {
             buyReason = `Slope Up (Locked: ${failures.join(', ')})`;
         } else {
             buyReason = 'Strategy Match (BUY)';
+        }
+    }
+
+    // 정규장 시간 외 매매 제한
+    if (curr.isRegular === false) {
+        if (buySignal) {
+            buySignal = false;
+            buyReason = 'Market Closed (Pre/Post)';
         }
     }
 

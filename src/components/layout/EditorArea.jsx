@@ -51,7 +51,7 @@ function formatBtcPrice(price) {
 }
 
 export function EditorArea() {
-    const { selectedResult, viewMode, hist, ticker, activeTickers, openTicker } = useStore()
+    const { selectedResult, viewMode, hist, ticker, activeTickers, openTicker, interval } = useStore()
     const [currentPage, setCurrentPage] = useState(1)
 
     // 페이지네이션 초기화
@@ -66,7 +66,7 @@ export function EditorArea() {
         }
     }, [ticker, activeTickers, openTicker])
 
-    const data = hist['1d'] || []
+    const data = hist[interval] || []
 
     const renderContent = () => {
         // Overview Mode
@@ -149,7 +149,7 @@ export function EditorArea() {
                     <div className="h-9 bg-[#252526] flex items-center border-b border-[#3c3c3c] px-4 justify-between shrink-0">
                         <div className="flex items-center gap-2 text-[13px] text-[#cccccc]">
                             <TableIcon className="w-4 h-4 text-[#569cd6]" />
-                            <span>DATA VIEW: 1d ({totalItems.toLocaleString()} rows)</span>
+                            <span>DATA VIEW: {interval === '1d' ? '1d' : '1m'} ({totalItems.toLocaleString()} rows)</span>
                         </div>
                     </div>
 
@@ -343,6 +343,11 @@ export function EditorArea() {
                                     {selectedResult.options.useStopLoss && <span className="text-[10px] px-1.5 py-0.5 bg-[#f14c4c] text-white rounded">손절</span>}
                                     {selectedResult.options.useTakeProfit && <span className="text-[10px] px-1.5 py-0.5 bg-[#4ec9b0] text-black rounded font-bold">익절</span>}
                                     {selectedResult.options.useTrailingStop && <span className="text-[10px] px-1.5 py-0.5 bg-[#ce9178] text-white rounded">추적손절</span>}
+                                    {selectedResult.options.useVMartingale && (
+                                        <span className="text-[10px] px-1.5 py-0.5 bg-[#ffcc00] text-black rounded font-bold">
+                                            V-마틴({selectedResult.options.vMartingaleMultiplierMode === 'fixed' ? '1배' : '2배'})
+                                        </span>
+                                    )}
                                     {selectedResult.options.martingaleMultiplier > 1.0 && <span className="text-[10px] px-1.5 py-0.5 bg-[#c586c0] text-white rounded">마틴({selectedResult.options.martingaleMultiplier}x)</span>}
                                 </div>
                             </div>
