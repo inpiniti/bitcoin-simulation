@@ -357,8 +357,8 @@ export async function fetchForecast(symbol, interval = 'day') {
         });
 
         if (!response.ok) {
-            const errorText = await response.text();
-            console.error('Forecast API Error:', response.status, response.statusText, errorText);
+            // Cold Start나 일시적 서버 오류일 경우 조용히 처리 (사용자 경험 보호)
+            console.warn(`[AI Forecast] 예측 서버 응답 없음 (${response.status}). 잠시 후 다시 시도하세요.`);
             return null;
         }
 
@@ -366,7 +366,8 @@ export async function fetchForecast(symbol, interval = 'day') {
         console.log(`[API] Forecast loaded for ${symbol}:`, data.predictionCount, 'predictions');
         return data;
     } catch (err) {
-        console.error('Forecast API Error:', err);
+        // 네트워크 에러 등 (Failed to fetch)
+        console.warn(`[AI Forecast] API 연결 실패: ${err.message}. (서버가 절전 모드일 수 있음)`);
         return null;
     }
 }

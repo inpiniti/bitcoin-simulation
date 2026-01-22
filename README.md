@@ -148,12 +148,18 @@
 *   **테이블 모드**: `날짜` | `가격 (Median)` | `기울기 (Slope)` | `BB Status` 등.
 
 #### 차트 뷰어 (Chart Viewer)
-*   **라인 차트**: 실제 가격(실선) + AI 예측(점선)
+*   **메인 차트**: 고성능 **OHLC 캔들스틱 차트** (Recharts Custom Shape).
+*   **보조지표 (Toggle)**:
+    *   이동평균선 (MA20, MA50)
+    *   볼린저 밴드 (Upper, Lower)
+    *   RSI (하단 별도 차트, Sync 적용)
 *   **AI 가격 예측 (Forecast)**: 
     *   API: `POST https://younginpiniti-bitcoin-ai-backend.hf.space/v1/forecast`
     *   Payload: `{ "symbol": "[TICKER]", "interval": "day" }`
-    *   과거 데이터: 파란 계열 **실선(solid line)**
+    *   과거 데이터: 캔들스틱
     *   예측 데이터: 밝은 계열 **점선(dashed line)**
+*   **기능**: Brush 기능을 통한 기간 줌인/줌아웃 지원.
+
 
 #### 실시간 시뮬레이션 차트 (Real-Time Chart Viewer)
 *   **1분봉 자동 갱신**: 1분마다 Yahoo Finance API로 최근 1일치 1분봉 데이터 자동 조회
