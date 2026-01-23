@@ -198,6 +198,7 @@ export const DOCS_DATA = {
             { id: 'resultpanel', label: 'ResultPanel', type: 'component' },
             { id: 'financialqapanel', label: 'FinancialQAPanel', type: 'component' },
             { id: 'earningsimpactpanel', label: 'EarningsImpactPanel', type: 'component' },
+            { id: 'introscreen', label: 'IntroScreen', type: 'component' },
         ]
     },
     'components/charts': {

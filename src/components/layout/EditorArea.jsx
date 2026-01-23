@@ -25,6 +25,7 @@ const FinancialQAPanel = lazy(() => import("../FinancialQAPanel").then(m => ({ d
 const PortfolioDashboard = lazy(() => import("../PortfolioDashboard").then(m => ({ default: m.PortfolioDashboard })))
 const EarningsImpactPanel = lazy(() => import("../EarningsImpactPanel").then(m => ({ default: m.EarningsImpactPanel })))
 const DocsPanel = lazy(() => import("../docs/DocsPanel").then(m => ({ default: m.DocsPanel })))
+const IntroScreen = lazy(() => import("../IntroScreen").then(m => ({ default: m.IntroScreen })))
 
 
 // 페이지당 거래 수
@@ -51,6 +52,13 @@ function formatBtcPrice(price) {
     return Math.round(price).toLocaleString()
 }
 
+/**
+ * Main editor area component that renders different panels based on the current view mode.
+ * Handles pagination for data tables and switching between simulation, analysis, charts, etc.
+ * 
+ * @component
+ * @returns {JSX.Element} The rendered EditorArea component
+ */
 export function EditorArea() {
     const { selectedResult, viewMode, hist, ticker, activeTickers, openTicker, interval } = useStore()
     const [currentPage, setCurrentPage] = useState(1)
@@ -70,6 +78,12 @@ export function EditorArea() {
     const data = hist[interval] || []
 
     const renderContent = () => {
+        // 탭이 하나도 없으면 소개 화면 표시 (단, 티커와 무관한 독립 패널 모드는 제외)
+        const independentModes = ['docs', 'portfolio', 'analyze']
+        if ((!activeTickers || activeTickers.length === 0) && !independentModes.includes(viewMode)) {
+            return <IntroScreen />
+        }
+
         // Overview Mode
         if (viewMode === 'overview') {
             return <OverviewPanel />

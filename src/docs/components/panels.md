@@ -96,3 +96,23 @@ return <ResultPanel />;
 ### State Dependencies
 - `earningsHistory`: 과거 실적 데이터.
 - `priceHistory`: 과거 주가 데이터.
+
+---
+
+## IntroScreen
+**Path:** `src/components/IntroScreen.jsx`
+
+특정 뷰가 활성화되지 않았을 때(초기 실행 시 또는 모든 탭 종료 시) 표시되는 소개 화면입니다. 시뮬레이션, 시장 스캔, AI 예측 등 주요 기능으로 바로 진입할 수 있는 바로가기 카드와 시작 가이드를 제공합니다.
+
+### Features
+- **기능 바로가기**: 주요 기능(Simulation, Scanner, AI Forecast, Real-time Trading)으로 빠른 이동.
+- **Getting Started**: 간단한 사용 가이드 문구 제공.
+- **비주얼 효과**: 그라디언트 및 애니메이션 효과가 적용된 환영 메시지.
+
+### Example Usage
+\`\`\`jsx
+// EditorArea 내에서 조건부 렌더링
+if (!activeView) {
+  return <IntroScreen />;
+}
+\`\`\`

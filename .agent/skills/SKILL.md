@@ -63,11 +63,10 @@ description: 비트코인/주식 시뮬레이션 프로젝트의 마스터 스�
 ## 📌 핵심 규칙 요약
 
 ### ❌ 절대 하지 말 것
-1. 감성 분석(FinBERT) 기능 제거/주석 처리
-2. 외부 API 직접 호출 (CORS 에러 발생)
-3. Native Dialog 사용 (alert, confirm, prompt)
-4. State/Props 직접 변경
-5. 반복문/조건문 내에서 Hook 호출
+1. 외부 API 직접 호출 (CORS 에러 발생)
+2. Native Dialog 사용 (alert, confirm, prompt)
+3. State/Props 직접 변경
+4. 반복문/조건문 내에서 Hook 호출
 
 ### ✅ 항상 해야 할 것
 1. 작업 전 설계도(README.md) 확인

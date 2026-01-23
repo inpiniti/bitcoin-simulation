@@ -54,6 +54,13 @@ function CodeBlock({ node, inline, className, children, ...props }) {
     )
 }
 
+/**
+ * Documentation viewer panel.
+ * Renders Markdown content using react-markdown with syntax highlighting and deep linking support.
+ * 
+ * @component
+ * @returns {JSX.Element} The rendered DocsPanel component
+ */
 export function DocsPanel() {
     const { selectedDoc } = useStore()
     const doc = DOCS_DATA[selectedDoc]
@@ -90,8 +97,8 @@ export function DocsPanel() {
 
     return (
         <div className="flex-1 bg-[#1e1e1e] flex flex-col h-full overflow-hidden">
-            <ScrollArea className="flex-1 p-8">
-                <div className="max-w-4xl mx-auto pb-20">
+            <ScrollArea className="flex-1 h-full">
+                <div className="max-w-4xl mx-auto p-8 pb-20">
                     <ReactMarkdown
                         remarkPlugins={[remarkGfm]}
                         rehypePlugins={[rehypeHighlight, rehypeSlug]}
