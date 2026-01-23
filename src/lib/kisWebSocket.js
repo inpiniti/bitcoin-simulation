@@ -1,6 +1,9 @@
 import { useStore } from "@/store/useStore";
 
-const WS_URL = "ws://ops.koreainvestment.com:21000";
+const WS_URL = import.meta.env.DEV
+    ? "ws://ops.koreainvestment.com:21000" // 로컬 개발 환경: 기존의 비보안 포트(21000) 사용
+    : "wss://ops.koreainvestment.com:31000"; // 운영 환경(HTTPS): 보안 포트(31000) 및 WSS 사용
+
 
 /**
  * 단일 웹소켓 연결을 통해 뷰포트에 보이는 종목만 구독 관리하는 매니저
