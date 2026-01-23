@@ -3,6 +3,7 @@ import { useStore } from "@/store/useStore"
 import { Loader2, Lock, TrendingUp, Zap, Coins, ShieldAlert, Target, BarChart3, List, Settings2 } from "lucide-react"
 import { useState, useEffect } from "react"
 import { TickerSelectionPanel } from "./TickerSelectionPanel"
+import { DocsSidebarContent } from "../docs/DocsSidebarContent"
 
 export function Sidebar() {
     const {
@@ -36,6 +37,14 @@ export function Sidebar() {
 
     const handleOptionChange = (key, value) => {
         updateStrategyOptions({ [key]: value })
+    }
+
+    if (viewMode === 'docs') {
+        return (
+            <div className="w-64 bg-[#252526] border-r border-[#3c3c3c] flex flex-col overflow-hidden">
+                <DocsSidebarContent />
+            </div>
+        )
     }
 
     if (showStrategy) {

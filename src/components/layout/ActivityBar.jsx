@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils"
 import { useStore } from "@/store/useStore"
-import { Play, Table2, LineChart, Search, Loader2, MessageSquare, BookOpen, Newspaper, Bot, Activity, PieChart, Zap } from "lucide-react"
+import { Play, Table2, LineChart, Search, Loader2, MessageSquare, BookOpen, Newspaper, Bot, Activity, PieChart, Zap, Book } from "lucide-react"
 import {
     Tooltip,
     TooltipContent,
@@ -77,10 +77,31 @@ export function ActivityBar() {
 
                 {/* 로딩 인디케이터 */}
                 {isLoading && (
-                    <div className="mt-auto mb-2">
+                    <div className="mb-2">
                         <Loader2 className="w-5 h-5 animate-spin text-[#f7931a]" />
                     </div>
                 )}
+
+                {/* Spacer to push Docs to bottom */}
+                <div className="flex-1" />
+
+                {/* Docs Button */}
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <button
+                            onClick={() => handleClick('docs')}
+                            className={cn(
+                                "w-12 h-12 flex items-center justify-center transition-colors relative mb-2",
+                                viewMode === 'docs' ? "text-white before:absolute before:left-0 before:top-0 before:bottom-0 before:w-0.5 before:bg-white" : "text-[#858585] hover:text-[#cccccc]"
+                            )}
+                        >
+                            <Book className="w-6 h-6" />
+                        </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="right" className="bg-[#252526] border-[#454545] text-[#cccccc]">
+                        <p>문서 (Docs)</p>
+                    </TooltipContent>
+                </Tooltip>
             </div>
         </TooltipProvider>
     )

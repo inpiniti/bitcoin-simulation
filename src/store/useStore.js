@@ -134,6 +134,10 @@ export const useStore = create(
                 isAnalyzing: false,
                 analysisProgress: { current: 0, total: 0 },
 
+                // Documentation Viewer State
+                selectedDoc: null, // key of DOCS_DATA
+                setSelectedDoc: (docKey) => set({ selectedDoc: docKey }),
+
                 // Actions
                 setViewMode: (viewMode) => set({ viewMode }),
                 setGlobalError: (error) => set({ globalError: error }),

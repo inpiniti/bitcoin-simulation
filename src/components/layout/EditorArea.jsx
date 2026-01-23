@@ -24,6 +24,7 @@ const NewsPanel = lazy(() => import("../NewsPanel").then(m => ({ default: m.News
 const FinancialQAPanel = lazy(() => import("../FinancialQAPanel").then(m => ({ default: m.FinancialQAPanel })))
 const PortfolioDashboard = lazy(() => import("../PortfolioDashboard").then(m => ({ default: m.PortfolioDashboard })))
 const EarningsImpactPanel = lazy(() => import("../EarningsImpactPanel").then(m => ({ default: m.EarningsImpactPanel })))
+const DocsPanel = lazy(() => import("../docs/DocsPanel").then(m => ({ default: m.DocsPanel })))
 
 
 // 페이지당 거래 수
@@ -107,6 +108,11 @@ export function EditorArea() {
         // Chart View Mode
         if (viewMode === 'chartView') {
             return <ChartView />
+        }
+
+        // Docs View Mode
+        if (viewMode === 'docs') {
+            return <DocsPanel />
         }
 
         // Real-Time Chart View Mode (실시간 시뮬레이션 차트)
