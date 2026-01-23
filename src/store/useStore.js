@@ -166,8 +166,25 @@ export const useStore = create(
                     accountNo: '', // 계좌번호 앞 8자리
                     accountCode: '', // 계좌번호 뒤 2자리
                     accessToken: '',
+                    approvalKey: '', // WebSocket Approval Key
                     tokenExpiry: null,
                 },
+
+                // Real-time Prices (WebSocket)
+                realtimePrices: {}, // { [ticker]: { price: number, change: number, rate: number, volume: number } }
+                updateRealtimePrice: (ticker, data) => set(state => ({
+                    realtimePrices: {
+                        ...state.realtimePrices,
+                        [ticker]: { ...state.realtimePrices[ticker], ...data }
+                    }
+                })),
+                batchUpdateRealtimePrices: (updates) => set(state => {
+                    const newPrices = { ...state.realtimePrices };
+                    Object.entries(updates).forEach(([ticker, data]) => {
+                        newPrices[ticker] = { ...newPrices[ticker], ...data };
+                    });
+                    return { realtimePrices: newPrices };
+                }),
 
                 /**
                  * 한국투자증권(KIS) 로그인 및 액세스 토큰 발급
@@ -180,10 +197,25 @@ export const useStore = create(
                  */
                 loginKIS: async (appkey, appsecret, accountNo, accountCode) => {
                     try {
-                        const { getAccessToken } = await import('@/lib/kisApi')
+                        const { getAccessToken, getWebSocketApprovalKey } = await import('@/lib/kisApi')
+
+                        // 1. REST API Access Token 발급
                         const result = await getAccessToken(appkey, appsecret)
 
                         if (result.success) {
+                            // 2. WebSocket Approval Key 발급 (병렬 처리 가능하지만 순차 처리로 안전하게)
+                            let approvalKey = '';
+                            try {
+                                const wsResult = await getWebSocketApprovalKey(appkey, appsecret);
+                                if (wsResult.success) {
+                                    approvalKey = wsResult.approval_key;
+                                } else {
+                                    console.warn('[KIS] 웹소켓 키 발급 실패 (REST API만 사용):', wsResult.error);
+                                }
+                            } catch (wsErr) {
+                                console.error('[KIS] 웹소켓 키 발급 에러:', wsErr);
+                            }
+
                             set({
                                 kisAuth: {
                                     isLoggedIn: true,
@@ -192,6 +224,7 @@ export const useStore = create(
                                     accountNo,
                                     accountCode,
                                     accessToken: result.access_token,
+                                    approvalKey: approvalKey,
                                     tokenExpiry: result.access_token_token_expired,
                                 }
                             })
@@ -232,8 +265,10 @@ export const useStore = create(
                             accountNo: '',
                             accountCode: '',
                             accessToken: '',
+                            approvalKey: '',
                             tokenExpiry: null,
-                        }
+                        },
+                        realtimePrices: {} // 로그아웃 시 실시간 데이터 초기화
                     })
                 },
 
@@ -344,7 +379,7 @@ export const useStore = create(
                         try {
                             const { fetchKospi200Tickers } = await import('@/lib/api');
                             const stocks = await fetchKospi200Tickers();
-                            setGroupStocks(stocks);
+                            setGroupStocks(stocks.map(s => ({ ...s, exchange: 'KOSPI' })));
                         } catch (e) {
                             console.error('KOSPI 200 fetch error', e);
                             setGroupStocks([]);
@@ -359,7 +394,7 @@ export const useStore = create(
                         try {
                             const { fetchKosdaq150Tickers } = await import('@/lib/api');
                             const stocks = await fetchKosdaq150Tickers();
-                            setGroupStocks(stocks);
+                            setGroupStocks(stocks.map(s => ({ ...s, exchange: 'KOSDAQ' })));
                         } catch (e) {
                             console.error('KOSDAQ 150 fetch error', e);
                             setGroupStocks([]);
@@ -435,7 +470,7 @@ export const useStore = create(
                                     ticker: s.ticker,
                                     name: s.name,
                                     count: parseFloat(s.changeRate || 0).toFixed(2) + '%',
-                                    exchange: 'NAS'
+                                    exchange: 'NAS' // 미국 랭킹이면 NAS
                                 })));
                             }
                         } else if (tickerGroup === 'pricesurge') {
@@ -446,7 +481,7 @@ export const useStore = create(
                                     ticker: s.ticker,
                                     name: s.name,
                                     count: '+' + parseFloat(s.changeRate || 0).toFixed(2) + '%',
-                                    exchange: 'NAS'
+                                    exchange: 'NAS' // 미국 랭킹이면 NAS
                                 })));
                             }
                         } else if (tickerGroup === 'volumesurge') {
@@ -457,7 +492,7 @@ export const useStore = create(
                                     ticker: s.ticker,
                                     name: s.name,
                                     count: parseFloat(s.volumeRate || 0).toFixed(0) + '%',
-                                    exchange: 'NAS'
+                                    exchange: 'NAS' // 미국 랭킹이면 NAS
                                 })));
                             }
                         }

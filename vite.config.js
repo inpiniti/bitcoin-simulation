@@ -465,6 +465,57 @@ export default defineConfig(({ mode }) => {
                         }
                     });
 
+                    // KOSPI 200 Wikipedia Scraper (Korean Wikipedia)
+                    server.middlewares.use('/api/kospi200', async (req, res, next) => {
+                        try {
+                            const cheerio = await import('cheerio');
+                            const fetch = (await import('node-fetch')).default || global.fetch;
+
+                            const TARGET_URL = 'https://ko.wikipedia.org/wiki/%EC%BD%94%EC%8A%A4%ED%94%BC_200';
+                            console.log(`[Vite Dev] Fetching KOSPI 200 from Korean Wikipedia: ${TARGET_URL}`);
+
+                            const apiResponse = await fetch(TARGET_URL);
+                            if (!apiResponse.ok) throw new Error(apiResponse.statusText);
+
+                            const html = await apiResponse.text();
+                            const $ = cheerio.load(html);
+                            const stocks = [];
+
+                            // Korean Wikipedia table for KOSPI 200 is usually the second wikitable
+                            // or the one containing '삼성전자'
+                            const table = $('table.wikitable').filter((i, el) => $(el).text().includes('삼성전자')).first();
+
+                            table.find('tbody tr').each((i, el) => {
+                                const tds = $(el).find('td');
+                                if (tds.length < 2) return;
+
+                                // Column 0: Company Name, Column 1: Ticker (6 digits)
+                                const name = $(tds[0]).text().trim();
+                                let ticker = $(tds[1]).text().trim();
+                                const sector = $(tds[2]).text().trim();
+
+                                // Clean up ticker (ensure 6 digits)
+                                ticker = ticker.replace(/\n/g, '').trim();
+
+                                if (ticker && /^\d{6}$/.test(ticker)) {
+                                    stocks.push({
+                                        ticker,
+                                        name,
+                                        count: sector,
+                                        exchange: 'KOSPI'
+                                    });
+                                }
+                            });
+
+                            res.setHeader('Content-Type', 'application/json');
+                            res.end(JSON.stringify(stocks));
+                        } catch (e) {
+                            console.error(e);
+                            res.statusCode = 500;
+                            res.end(JSON.stringify({ error: e.message }));
+                        }
+                    });
+
 
                     // Hugging Face Proxy (Local Dev)
                     server.middlewares.use('/api/hf', async (req, res, next) => {

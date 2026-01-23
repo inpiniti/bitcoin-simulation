@@ -13,3 +13,5 @@ Handles all external data fetching.
 - `fetchCoinDailyData()`: Upbit API (KRW-BTC)
 - `fetchStockData(ticker, interval, range)`: Yahoo Finance API via Proxy
 - `fetchForecast(symbol)`: Custom AI API for price prediction
+- `fetchKospi200Tickers()`: KOSPI 200 list via Wikipedia Scraper Proxy
+- `fetchKosdaq150Tickers()`: KOSDAQ 150 list (Fallback Sample)

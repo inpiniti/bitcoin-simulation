@@ -52,6 +52,49 @@ export async function getAccessToken(appkey, appsecret) {
 }
 
 /**
+ * 실시간 웹소켓 접속키를 발급받습니다.
+ * 
+ * @param {string} appkey - 한국투자증권 앱 키
+ * @param {string} appsecret - 한국투자증권 앱 시크릿
+ * @returns {Promise<Object>} 접속키 정보 객체 (success, approval_key 등)
+ */
+export async function getWebSocketApprovalKey(appkey, appsecret) {
+    try {
+        const response = await fetch(`${KIS_BASE_URL}/oauth2/Approval`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json; charset=utf-8'
+            },
+            body: JSON.stringify({
+                grant_type: 'client_credentials',
+                appkey: appkey,
+                secretkey: appsecret // 주의: 여기서는 appsecret이 아닌 secretkey 필드명 사용
+            })
+        })
+
+        const data = await response.json()
+
+        if (data.approval_key) {
+            return {
+                success: true,
+                approval_key: data.approval_key
+            }
+        } else {
+            return {
+                success: false,
+                error: data.msg1 || '웹소켓 접속키 발급 실패'
+            }
+        }
+    } catch (error) {
+        console.error('웹소켓 접속키 발급 오류:', error)
+        return {
+            success: false,
+            error: error.message
+        }
+    }
+}
+
+/**
  * 발급받은 KIS API 접근 토큰을 폐기합니다.
  * 
  * @param {string} appkey - 한국투자증권 앱 키

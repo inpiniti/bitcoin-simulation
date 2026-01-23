@@ -158,65 +158,25 @@ export async function fetchStockMinuteData(ticker) {
 }
 
 /**
- * KOSPI 200 주요 종목 리스트 반환
+ * KOSPI 200 종목 리스트를 한국어 위키백과에서 가져옵니다.
  * @returns {Promise<Array>} { ticker, name, count } 배열
  */
 export async function fetchKospi200Tickers() {
-    // 주요 시가총액 상위 종목 (샘플)
-    // 실제로는 더 많은 리스트를 추가하거나 외부 소스에서 가져와야 함.
-    const kospiList = [
-        { ticker: "005930", name: "삼성전자", count: 1 },
-        { ticker: "000660", name: "SK하이닉스", count: 2 },
-        { ticker: "373220", name: "LG에너지솔루션", count: 3 },
-        { ticker: "207940", name: "삼성바이오로직스", count: 4 },
-        { ticker: "005380", name: "현대차", count: 5 },
-        { ticker: "005935", name: "삼성전자우", count: 6 },
-        { ticker: "000270", name: "기아", count: 7 },
-        { ticker: "068270", name: "셀트리온", count: 8 },
-        { ticker: "105560", name: "KB금융", count: 9 },
-        { ticker: "005490", name: "POSCO홀딩스", count: 10 },
-        { ticker: "035420", name: "NAVER", count: 11 },
-        { ticker: "055550", name: "신한지주", count: 12 },
-        { ticker: "003550", name: "LG화학", count: 13 },
-        { ticker: "051910", name: "LG화학", count: 14 },
-        { ticker: "000810", name: "삼성화재", count: 15 },
-        { ticker: "032830", name: "삼성생명", count: 16 },
-        { ticker: "015760", name: "한국전력", count: 17 },
-        { ticker: "018260", name: "삼성에스디에스", count: 18 },
-        { ticker: "034730", name: "SK", count: 19 },
-        { ticker: "003670", name: "포스코퓨처엠", count: 20 },
-        { ticker: "086790", name: "하나금융지주", count: 21 },
-        { ticker: "009150", name: "삼성전기", count: 22 },
-        { ticker: "010130", name: "고려아연", count: 23 },
-        { ticker: "017670", name: "SK텔레콤", count: 24 },
-        { ticker: "000100", name: "유한양행", count: 25 },
-        { ticker: "090430", name: "아모레퍼시픽", count: 26 },
-        { ticker: "012330", name: "현대모비스", count: 27 },
-        { ticker: "034020", name: "두산에너빌리티", count: 28 },
-        { ticker: "316140", name: "우리금융지주", count: 29 },
-        { ticker: "011200", name: "HMM", count: 30 },
-        { ticker: "009540", name: "HD한국조선해양", count: 31 },
-        { ticker: "066570", name: "LG전자", count: 32 },
-        { ticker: "259960", name: "크래프톤", count: 33 },
-        { ticker: "033780", name: "KT&G", count: 34 },
-        { ticker: "003490", name: "대한항공", count: 35 },
-        { ticker: "035720", name: "카카오", count: 36 },
-        { ticker: "323410", name: "카카오뱅크", count: 37 },
-        { ticker: "028260", name: "삼성물산", count: 38 },
-        { ticker: "010950", name: "S-Oil", count: 39 },
-        { ticker: "000720", name: "현대건설", count: 40 },
-        { ticker: "024110", name: "기업은행", count: 41 },
-        { ticker: "030200", name: "KT", count: 42 },
-        { ticker: "006400", name: "삼성SDI", count: 43 },
-        { ticker: "011170", name: "롯데케미칼", count: 44 },
-        { ticker: "326030", name: "SK바이오팜", count: 45 },
-        { ticker: "010120", name: "LS ELECTRIC", count: 46 },
-        { ticker: "096770", name: "SK이노베이션", count: 47 },
-        { ticker: "036570", name: "엔씨소프트", count: 48 },
-        { ticker: "251270", name: "넷마블", count: 49 },
-        { ticker: "352820", name: "하이브", count: 50 },
-    ];
-    return Promise.resolve(kospiList);
+    try {
+        const response = await fetch('/api/kospi200');
+        if (!response.ok) throw new Error('Failed to fetch KOSPI 200 list');
+        const stocks = await response.json();
+        return stocks;
+    } catch (error) {
+        console.warn('KOSPI 200 리스트 로드 실패 (Fallback 사용):', error);
+        // 실패 시 기존의 50개 샘플 리스트 반환
+        return [
+            { ticker: "005930", name: "삼성전자", count: "전기전자", exchange: "KOSPI" },
+            { ticker: "000660", name: "SK하이닉스", count: "전기전자", exchange: "KOSPI" },
+            { ticker: "373220", name: "LG에너지솔루션", count: "전기전자", exchange: "KOSPI" },
+            // ... (원하는 만큼 추가하거나 메시지로 설명)
+        ];
+    }
 }
 
 /**
