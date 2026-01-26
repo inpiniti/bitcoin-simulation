@@ -302,10 +302,27 @@ export const useStore = create(
                         }
 
                         // 2. 새 토큰 발급
-                        const { getAccessToken } = await import('@/lib/kisApi')
+                        const { getAccessToken, getWebSocketApprovalKey } = await import('@/lib/kisApi')
                         const result = await getAccessToken(appkey, appsecret)
 
                         if (result.success) {
+                            // 3. WebSocket Approval Key 발급 (재로그인 시에도 필요!)
+                            let approvalKey = '';
+                            console.log('[KIS] 재로그인: Access Token 발급 성공, WebSocket 키 발급 시도...');
+                            try {
+                                const wsResult = await getWebSocketApprovalKey(appkey, appsecret);
+                                console.log('[KIS] 재로그인: WebSocket 키 발급 응답:', { success: wsResult.success, hasKey: !!wsResult.approval_key, error: wsResult.error });
+                                if (wsResult.success) {
+                                    approvalKey = wsResult.approval_key;
+                                    console.log('[KIS] 재로그인: WebSocket 키 발급 성공');
+                                } else {
+                                    console.warn('[KIS] 재로그인: 웹소켓 키 발급 실패 (REST API만 사용):', wsResult.error);
+                                }
+                            } catch (wsErr) {
+                                console.error('[KIS] 재로그인: 웹소켓 키 발급 에러:', wsErr);
+                            }
+
+                            console.log('[KIS] 재로그인: 최종 상태 - approvalKey:', approvalKey ? 'EXISTS' : 'EMPTY');
                             set({
                                 kisAuth: {
                                     isLoggedIn: true,
@@ -314,6 +331,7 @@ export const useStore = create(
                                     accountNo,
                                     accountCode,
                                     accessToken: result.access_token,
+                                    approvalKey: approvalKey,
                                     tokenExpiry: result.access_token_token_expired,
                                 }
                             })
@@ -326,6 +344,7 @@ export const useStore = create(
                                     ...s.kisAuth,
                                     isLoggedIn: false,
                                     accessToken: '',
+                                    approvalKey: '',
                                     tokenExpiry: null,
                                 }
                             }))
