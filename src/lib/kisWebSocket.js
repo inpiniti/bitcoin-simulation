@@ -1,12 +1,37 @@
 import { useStore } from "@/store/useStore";
 
+// WebSocket URL 설정
+// - 개발: 직접 KIS WebSocket 연결 (ws://)
+// - 운영: Railway 프록시 경유 (wss://) - VITE_WS_PROXY_URL 환경변수로 설정
 const WS_URL = import.meta.env.DEV
-    ? "ws://ops.koreainvestment.com:21000" // 로컬 개발 환경: 기존의 비보안 포트(21000) 사용
-    : "wss://ops.koreainvestment.com:31000"; // 운영 환경(HTTPS): 보안 포트(31000) 및 WSS 사용
+    ? "ws://ops.koreainvestment.com:21000"
+    : import.meta.env.VITE_WS_PROXY_URL || "wss://YOUR_RAILWAY_APP.up.railway.app";
 
 
 /**
- * 단일 웹소켓 연결을 통해 뷰포트에 보이는 종목만 구독 관리하는 매니저
+ * KIS(한국투자증권) 실시간 WebSocket을 관리하는 싱글턴 클래스.
+ * 
+ * 뷰포트에 보이는 종목만 구독하여 효율적인 실시간 데이터 수신을 지원합니다.
+ * 
+ * ## 환경별 연결
+ * - **개발환경**: `ws://ops.koreainvestment.com:21000` 직접 연결
+ * - **운영환경**: Railway 프록시(`wss://`)를 경유하여 연결 (HTTPS 환경에서 ws:// 차단 우회)
+ * 
+ * ## 사용 예시
+ * ```javascript
+ * import { kisWebSocket } from '@/lib/kisWebSocket';
+ * 
+ * // 연결
+ * kisWebSocket.connect(approvalKey);
+ * 
+ * // 종목 구독
+ * kisWebSocket.subscribeStocks([{ ticker: 'AAPL', exchange: 'NAS' }]);
+ * 
+ * // 연결 종료
+ * kisWebSocket.disconnect();
+ * ```
+ * 
+ * @class
  */
 class KISWebSocketManager {
     constructor() {

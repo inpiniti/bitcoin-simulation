@@ -56,3 +56,16 @@ const handleVisible = (stock, isVisible) => {
     kisWebSocket.subscribeStocks(Array.from(visibleStocksRef.current.values()));
 };
 ```
+
+---
+
+## 운영 환경 인프라 (Railway Proxy)
+
+운영 환경(HTTPS)에서는 브라우저 보안 정책으로 인해 KIS의 비보안 웹소켓(`ws://`)에 직접 연결할 수 없습니다. 이를 해결하기 위해 Railway에 배포된 WebSocket 프록시 서버를 경유합니다.
+
+### 아키텍처 (Architecture)
+`브라우저 (wss://)` ──▶ `Railway Proxy (wss → ws 변환)` ──▶ `KIS WebSocket (ws://)`
+
+### 관련 환경 변수
+- `VITE_WS_PROXY_URL`: 운영 환경에서 사용할 프록시 서버 주소 (예: `wss://your-app.up.railway.app`)
+- 설정되지 않은 경우 기본 프록시 주소로 시도합니다.
