@@ -14,7 +14,6 @@ const VIEW_MODES = [
     { key: 'simulation', label: '시뮬레이션', icon: Play },
     { key: 'dataView', label: '데이터 뷰', icon: Table2 },
     { key: 'chartView', label: '차트 뷰', icon: LineChart },
-    { key: 'realTimeChart', label: '실시간 시뮬레이션 차트', icon: Activity },
     { key: 'analyze', label: '분석', icon: Search },
     { key: 'portfolio', label: '포트폴리오', icon: PieChart },
     { key: 'discussion', label: '종목 토론', icon: MessageSquare },

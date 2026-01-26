@@ -26,26 +26,3 @@ Recharts는 기본적으로 캔들스틱을 지원하지 않으므로, `Customiz
 </div>
 ```
 
----
-
-## RealTimeChartView
-**Path:** `src/components/RealTimeChartView.jsx`
-
-최근 7일간의 **1분봉 데이터**를 실시간으로 보여주는 차트입니다. 장 중 실시간 흐름, 단기 급등락 패턴, 그리고 AI 예측 경로(Forecast)를 표시하는 데 최적화되어 있습니다.
-
-### Features
-- **자동 갱신**: 주기적으로(예: 1분) API를 호출하여 최신 캔들을 가져옵니다.
-- **AI 예측 오버레이**: `fetchForecast` 결과가 있다면 미래 영역에 점선으로 예측 경로를 그립니다.
-- **포커스 줌**: 최근 N개(예: 60분) 데이터에 집중하여 보여주는 줌 기능.
-
-### State Dependencies
-- `data1m`: 전역 스토어의 1분봉 데이터.
-- `ticker`: 현재 종목.
-
-### Example Usage
-```jsx
-// 실시간 탭에서 사용
-<TabsContent value="realtime">
-  <RealTimeChartView />
-</TabsContent>
-```

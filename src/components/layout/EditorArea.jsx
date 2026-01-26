@@ -16,7 +16,6 @@ import { TickerTabBar } from "./TickerTabBar"
 
 // 패널들을 지연 로딩(Lazy Loading)으로 전환하여 초기 번들 크기 최적화
 const ChartView = lazy(() => import("../ChartView").then(m => ({ default: m.ChartView })))
-const RealTimeChartView = lazy(() => import("../RealTimeChartView").then(m => ({ default: m.RealTimeChartView })))
 const AnalysisPanel = lazy(() => import("../AnalysisPanel").then(m => ({ default: m.AnalysisPanel })))
 const StockDiscussionPanel = lazy(() => import("../StockDiscussionPanel").then(m => ({ default: m.StockDiscussionPanel })))
 const OverviewPanel = lazy(() => import("../OverviewPanel").then(m => ({ default: m.OverviewPanel })))
@@ -129,10 +128,6 @@ export function EditorArea() {
             return <DocsPanel />
         }
 
-        // Real-Time Chart View Mode (실시간 시뮬레이션 차트)
-        if (viewMode === 'realTimeChart') {
-            return <RealTimeChartView />
-        }
 
         // Data View Mode
         if (viewMode === 'dataView') {

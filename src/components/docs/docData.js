@@ -210,7 +210,6 @@ export const DOCS_DATA = {
         content: chartsMd,
         children: [
             { id: 'chartview', label: 'ChartView', type: 'component' },
-            { id: 'realtimechartview', label: 'RealTimeChartView', type: 'component' },
         ]
     },
     'components/dialogs': {
