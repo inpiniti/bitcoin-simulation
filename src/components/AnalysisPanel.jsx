@@ -4,6 +4,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { KISOrderDialog } from "@/components/KISOrderDialog" // Import Dialog
+import { RealtimeTradeLog } from "@/components/RealtimeTradeLog"
+import { kisWebSocket } from "@/lib/kisWebSocket"
 
 /**
  * 시장 스캔 결과를 표 형태로 표시하는 컴포넌트입니다.
@@ -13,7 +15,14 @@ import { KISOrderDialog } from "@/components/KISOrderDialog" // Import Dialog
  * @returns {JSX.Element} 시장 분석 결과 패널
  */
 export function AnalysisPanel() {
-    const { analysisResult, isAnalyzing, setTicker, setAnalysisMode } = useStore()
+    const {
+        analysisResult,
+        isAnalyzing,
+        isRealtimeAnalysis,
+        setTicker,
+        setAnalysisMode,
+        wsStatus
+    } = useStore()
 
     // Order Dialog State
     const [orderDialogOpen, setOrderDialogOpen] = useState(false)
@@ -59,74 +68,128 @@ export function AnalysisPanel() {
 
     return (
         <div className="h-full flex flex-col bg-[#1e1e1e]">
-            {/* Header */}
-            <div className="p-4 border-b border-[#3e3e42] flex justify-between items-center bg-[#252526]">
-                <div>
-                    <h2 className="text-lg font-bold text-[#e1e1e1]">Market Scanner Result</h2>
-                    <p className="text-xs text-[#9d9d9d]">Click BUY/SELL signal to execute order.</p>
-                </div>
-                <div className="text-xs text-[#777]">
-                    Total: {analysisResult.length} scanned
-                </div>
-            </div>
-
-            <ScrollArea className="flex-1">
-                <Table>
-                    <TableHeader className="bg-[#2d2d2d] sticky top-0 z-10">
-                        <TableRow className="border-[#3e3e42] hover:bg-transparent">
-                            <TableHead className="text-[#9d9d9d] w-[140px]">Ticker</TableHead>
-                            <TableHead className="text-[#9d9d9d] w-[100px]">Signal</TableHead>
-                            <TableHead className="text-[#9d9d9d] text-right">Price</TableHead>
-                            <TableHead className="text-[#9d9d9d] text-right">Change (24h)</TableHead>
-                            <TableHead className="text-[#9d9d9d] text-center w-[120px]">AI Sentiment</TableHead>
-                            <TableHead className="text-[#9d9d9d]">Reason / Status</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {analysisResult.map((item) => (
-                            <TableRow
-                                key={item.ticker}
-                                className="border-[#2d2d2d] hover:bg-[#2a2d2e] cursor-pointer transition-colors"
-                                onClick={() => handleRowClick(item.ticker)}
-                            >
-                                <TableCell className="font-medium text-[#cccccc]">
-                                    <div className="flex flex-col">
-                                        <span className="text-sm font-bold text-white">{item.ticker}</span>
-                                        <span className="text-[10px] text-[#777] truncate max-w-[120px]">{item.name}</span>
-                                    </div>
-                                </TableCell>
-                                <TableCell>
-                                    <Badge
-                                        variant={item.signal === 'BUY' ? 'destructive' : 'secondary'}
-                                        onClick={(e) => handleSignalClick(e, item)}
-                                        className={`rounded-sm px-2 py-0.5 text-[10px] uppercase cursor-pointer hover:scale-105 active:scale-95 transition-transform ${getSignalColorClass(item.signal)}`}
-                                    >
-                                        {item.signal}
+            <div className={`flex-1 overflow-hidden grid ${isRealtimeAnalysis ? 'grid-cols-[1fr_300px]' : 'grid-cols-1'}`}>
+                {/* Left Side: Market Scanner Table */}
+                <div className="flex flex-col h-full overflow-hidden">
+                    {/* Header */}
+                    <div className="p-4 border-b border-[#3e3e42] flex justify-between items-center bg-[#252526]">
+                        <div>
+                            <h2 className="text-lg font-bold text-[#e1e1e1] flex items-center gap-2">
+                                Market Scanner Result
+                                {isRealtimeAnalysis && (
+                                    <Badge variant="destructive" className="animate-pulse px-1.5 py-0 text-[10px] bg-red-600 border-none rounded-sm">
+                                        LIVE
                                     </Badge>
-                                </TableCell>
-                                <TableCell className="text-right text-[#cccccc] font-mono">
-                                    {item.price ? item.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
-                                </TableCell>
-                                <TableCell className={`text-right font-mono font-medium ${item.changeRate > 0 ? 'text-[#f23645]' : item.changeRate < 0 ? 'text-[#089981]' : 'text-[#9d9d9d]'}`}>
-                                    {item.changeRate ? `${item.changeRate > 0 ? '+' : ''}${item.changeRate.toFixed(2)}%` : '-'}
-                                </TableCell>
-                                <TableCell className="text-center">
-                                    {item.news && item.news.length > 0 ? (
-                                        <Badge variant="outline" className={`text-[10px] h-5 ${item.sentiment > 0 ? 'text-[#089981] border-[#089981]' : item.sentiment < 0 ? 'text-[#f23645] border-[#f23645]' : 'text-[#9d9d9d] border-[#555]'}`}>
-                                            {item.sentiment > 0 ? 'POS' : item.sentiment < 0 ? 'NEG' : 'NEU'} ({item.sentiment.toFixed(2)})
-                                        </Badge>
-                                    ) : (
-                                        <span className="text-[#555] text-[10px]">-</span>
-                                    )}
-                                </TableCell>
-                                <TableCell className="text-[#9d9d9d] text-xs">
-                                    {item.reason}
-                                </TableCell>
-                            </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
-            </ScrollArea>
+                                )}
+                            </h2>
+                            <p className="text-xs text-[#9d9d9d]">
+                                Click BUY/SELL signal to execute order.
+                                {isRealtimeAnalysis && (
+                                    <span className="text-[#089981] ml-2">
+                                        ● Priority Mode: Top 40 Analyzed Stocks Only
+                                    </span>
+                                )}
+                            </p>
+                        </div>
+                        <div className="text-xs text-[#777] flex items-center gap-3">
+                            {isRealtimeAnalysis && (
+                                <button
+                                    onClick={() => kisWebSocket.syncSubscriptions()}
+                                    className="px-2 py-0.5 border border-[#444] rounded hover:bg-[#333] transition-colors text-[10px]"
+                                >
+                                    Resync WS
+                                </button>
+                            )}
+                            Total: {analysisResult.length} scanned
+                            {isRealtimeAnalysis && (
+                                <div className="flex items-center gap-2 ml-2">
+                                    <Badge
+                                        variant="outline"
+                                        className={`text-[10px] px-1.5 py-0 border-none ${wsStatus.connected ? 'bg-[#089981]/20 text-[#089981]' : 'bg-[#f23645]/20 text-[#f23645]'}`}
+                                    >
+                                        {wsStatus.connected ? 'Connected' : 'Disconnected'}
+                                    </Badge>
+                                    <span className="text-[#888]">Active WS: {wsStatus.subscriptionCount}</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <ScrollArea className="flex-1">
+                        <Table>
+                            <TableHeader className="bg-[#2d2d2d] sticky top-0 z-10">
+                                <TableRow className="border-[#3e3e42] hover:bg-transparent">
+                                    <TableHead className="text-[#9d9d9d] w-[140px]">Ticker</TableHead>
+                                    <TableHead className="text-[#9d9d9d] w-[100px]">Signal</TableHead>
+                                    <TableHead className="text-[#9d9d9d] text-right">Price</TableHead>
+                                    <TableHead className="text-[#9d9d9d] text-right">Change (24h)</TableHead>
+                                    <TableHead className="text-[#9d9d9d] text-center w-[120px]">AI Sentiment</TableHead>
+                                    <TableHead className="text-[#9d9d9d]">Reason / Status</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {analysisResult.map((item) => (
+                                    <TableRow
+                                        key={item.ticker}
+                                        className="border-[#2d2d2d] hover:bg-[#2a2d2e] cursor-pointer transition-colors"
+                                        onClick={() => handleRowClick(item.ticker)}
+                                    >
+                                        <TableCell className="font-medium text-[#cccccc]">
+                                            <div className="flex items-center gap-2">
+                                                {isRealtimeAnalysis && (
+                                                    <div className="flex items-center" title={kisWebSocket.isSubscribed(item.ticker, item.exchange) ? "Live Connected" : "Not Subscribed"}>
+                                                        {kisWebSocket.isSubscribed(item.ticker, item.exchange) ? (
+                                                            <div className="w-1.5 h-1.5 rounded-full bg-[#089981] animate-pulse" />
+                                                        ) : (
+                                                            <div className="w-1.5 h-1.5 rounded-full bg-[#3c3c3c]" />
+                                                        )}
+                                                    </div>
+                                                )}
+                                                <div className="flex flex-col">
+                                                    <span className="text-sm font-bold text-white">{item.ticker}</span>
+                                                    <span className="text-[10px] text-[#777] truncate max-w-[120px]">{item.name}</span>
+                                                </div>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            <Badge
+                                                variant={item.signal === 'BUY' ? 'destructive' : 'secondary'}
+                                                onClick={(e) => handleSignalClick(e, item)}
+                                                className={`rounded-sm px-2 py-0.5 text-[10px] uppercase cursor-pointer hover:scale-105 active:scale-95 transition-transform ${getSignalColorClass(item.signal)}`}
+                                            >
+                                                {item.signal}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell className="text-right text-[#cccccc] font-mono">
+                                            {item.price ? item.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
+                                        </TableCell>
+                                        <TableCell className={`text-right font-mono font-medium ${item.changeRate > 0 ? 'text-[#f23645]' : item.changeRate < 0 ? 'text-[#089981]' : 'text-[#9d9d9d]'}`}>
+                                            {item.changeRate ? `${item.changeRate > 0 ? '+' : ''}${item.changeRate.toFixed(2)}%` : '-'}
+                                        </TableCell>
+                                        <TableCell className="text-center">
+                                            {item.news && item.news.length > 0 ? (
+                                                <Badge variant="outline" className={`text-[10px] h-5 ${item.sentiment > 0 ? 'text-[#089981] border-[#089981]' : item.sentiment < 0 ? 'text-[#f23645] border-[#f23645]' : 'text-[#9d9d9d] border-[#555]'}`}>
+                                                    {item.sentiment > 0 ? 'POS' : item.sentiment < 0 ? 'NEG' : 'NEU'} ({item.sentiment.toFixed(2)})
+                                                </Badge>
+                                            ) : (
+                                                <span className="text-[#555] text-[10px]">-</span>
+                                            )}
+                                        </TableCell>
+                                        <TableCell className="text-[#9d9d9d] text-xs">
+                                            {item.reason}
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </ScrollArea>
+                </div>
+
+                {/* Right Side: Realtime Trade Log */}
+                {isRealtimeAnalysis && (
+                    <RealtimeTradeLog />
+                )}
+            </div>
 
             <KISOrderDialog
                 open={orderDialogOpen}

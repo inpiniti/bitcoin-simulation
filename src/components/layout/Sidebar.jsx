@@ -15,6 +15,9 @@ export function Sidebar() {
         runMarketAnalysis,
         isAnalyzing,
         stopAnalysis,
+        startRealtimeAnalysis,
+        stopRealtimeAnalysis,
+        isRealtimeAnalysis,
         interval
     } = useStore()
 
@@ -257,6 +260,21 @@ export function Sidebar() {
                                                     <option value={5.0}>+5.0% 이상</option>
                                                 </select>
                                             </div>
+
+                                            <div className="space-y-1">
+                                                <span className="text-[11px] text-[#999999]">추가 매수 조건 (평단가)</span>
+                                                <select
+                                                    value={strategyOptions.vMartingaleAddBuyThreshold || 0}
+                                                    onChange={(e) => handleOptionChange('vMartingaleAddBuyThreshold', parseFloat(e.target.value))}
+                                                    className="w-full bg-[#3c3c3c] border border-[#555555] text-[12px] text-[#cccccc] p-1 rounded focus:outline-none focus:border-[#ffcc00]"
+                                                >
+                                                    <option value={0}>제한없음 (항상 추가 매수)</option>
+                                                    <option value={-1}>-1% 이하 손실 시</option>
+                                                    <option value={-2}>-2% 이하 손실 시</option>
+                                                    <option value={-3}>-3% 이하 손실 시</option>
+                                                    <option value={-5}>-5% 이하 손실 시</option>
+                                                </select>
+                                            </div>
                                         </div>
                                     )}
                                 </div>
@@ -322,8 +340,40 @@ export function Sidebar() {
                         ) : (
                             <Zap className={cn("w-4 h-4", isAnalyzeMode ? "text-[#9cdcfe]" : "fill-white")} />
                         )}
-                        {isAnalyzing ? "분석 중지 (취소)" : (isAnalyzeMode ? "시장 분석 실행" : "시뮬레이션 실행")}
+                        {isAnalyzing ? "분석 중지 (취소)" : (isAnalyzeMode ? "전체 시장 분석 실행" : "시뮬레이션 실행")}
                     </button>
+
+                    {/* 실시간 분석 버튼 (Analyze 모드 전용) */}
+                    {isAnalyzeMode && (
+                        <button
+                            disabled={!hasData || isAnalyzing}
+                            onClick={() => {
+                                if (isRealtimeAnalysis) {
+                                    stopRealtimeAnalysis()
+                                } else {
+                                    startRealtimeAnalysis()
+                                }
+                            }}
+                            className={cn(
+                                "w-full py-2.5 text-[13px] font-bold rounded flex items-center justify-center gap-2 transition-all mt-2",
+                                isRealtimeAnalysis
+                                    ? "bg-[#c72e2e] hover:bg-[#f44336] text-white animate-pulse"
+                                    : "bg-[#2d2d2d] border border-[#3c3c3c] text-[#cccccc] hover:bg-[#3c3c3c] hover:border-[#007acc]"
+                            )}
+                        >
+                            {isRealtimeAnalysis ? (
+                                <>
+                                    <div className="w-2 h-2 rounded-full bg-white animate-ping mr-1" />
+                                    실시간 분석 중지
+                                </>
+                            ) : (
+                                <>
+                                    <Target className="w-4 h-4 text-[#4ec9b0]" />
+                                    실시간 분석 (Live 40)
+                                </>
+                            )}
+                        </button>
+                    )}
                     {!hasData && (
                         <p className="text-[10px] text-[#888888] text-center">
                             데이터({interval}) 로딩 대기 중...

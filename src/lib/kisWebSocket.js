@@ -37,7 +37,13 @@ class KISWebSocketManager {
     constructor() {
         this.socket = null;
         this.approvalKey = null;
-        this.subscribedTickers = new Set(); // 현재 구독 중인 "TR_ID|TR_KEY" 셋
+
+        // 구독 관리: 소스별 키 집합
+        this.viewportKeys = new Set();
+        this.analysisKeys = new Set();
+
+        this.subscribedTickers = new Set(); // 실제 활성 구독 (TR_ID|TR_KEY)
+
         this.isConnecting = false;
         this.reconnectTimer = null;
         this.pingTimer = null;
@@ -70,6 +76,7 @@ class KISWebSocketManager {
                 this.resubscribeAll();
                 this.startPing();
                 this.startFlushTimer();
+                useStore.getState().setWsStatus({ connected: true });
             };
 
             this.socket.onmessage = (event) => {
@@ -84,11 +91,13 @@ class KISWebSocketManager {
                 if (event.code !== 1000) {
                     this.scheduleReconnect();
                 }
+                useStore.getState().setWsStatus({ connected: false, subscriptionCount: 0 });
             };
 
             this.socket.onerror = (error) => {
                 console.error("[KIS WS] Error:", error);
                 this.isConnecting = false;
+                useStore.getState().setWsStatus({ connected: false });
             };
 
         } catch (e) {
@@ -124,27 +133,53 @@ class KISWebSocketManager {
     }
 
     /**
-     * 뷰포트에 보이는 종목들로 구독 리스트 동적 업데이트
+     * 뷰포트에 보이는 종목들로 구독 리스트 업데이트 (Source: Viewport)
      * @param {Array<{ticker: string, exchange: string}>} visibleStocks 
      */
     subscribeStocks(visibleStocks) {
-        if (!this.approvalKey) return;
-
-        const newTickerKeys = new Set();
-        const subscribeList = [];
-
-        for (const stock of visibleStocks) {
+        const newKeys = new Set();
+        visibleStocks.forEach(stock => {
             const trInfo = this.getTrInfo(stock);
             if (trInfo) {
-                const key = `${trInfo.tr_id}|${trInfo.tr_key}`;
-                newTickerKeys.add(key);
-                subscribeList.push({ ...trInfo, key });
+                newKeys.add(`${trInfo.tr_id}|${trInfo.tr_key}`);
             }
-        }
+        });
 
-        // 1. 현재 구독 중인데 새로운 뷰포트 리스트에 없는 것 해제
+        this.viewportKeys = newKeys;
+        this.syncSubscriptions();
+    }
+
+    /**
+     * 실시간 분석 대상 종목 구독 (Source: Analysis)
+     * @param {Array<{ticker: string, exchange: string}>} analysisStocks 
+     */
+    subscribeAnalysis(analysisStocks) {
+        const newKeys = new Set();
+        analysisStocks.forEach(stock => {
+            const trInfo = this.getTrInfo(stock);
+            if (trInfo) {
+                newKeys.add(`${trInfo.tr_id}|${trInfo.tr_key}`);
+            }
+        });
+
+        this.analysisKeys = newKeys;
+        this.syncSubscriptions();
+    }
+
+    /**
+     * 구독 상태 동기화 (Union of Viewport & Analysis)
+     */
+    syncSubscriptions() {
+        if (!this.approvalKey) return;
+
+        // 1. 필요한 모든 키의 합집합 생성 (단, 분석 중이면 분석 리스트에만 집중)
+        // 사용자의 요청: "분석창에서는 기존 티커선택창에서 보이는 종목만 구독하는건 안해야 하고, 오로지 지금 실시간 분석중인 4개 종목에 대해서만 구독"
+        const isAnalysisActive = this.analysisKeys.size > 0;
+        const neededKeys = isAnalysisActive ? new Set(this.analysisKeys) : new Set(this.viewportKeys);
+
+        // 2. 더 이상 필요없는 구독 해제 (Current - Needed)
         for (const oldKey of this.subscribedTickers) {
-            if (!newTickerKeys.has(oldKey)) {
+            if (!neededKeys.has(oldKey)) {
                 const [tr_id, tr_key] = oldKey.split('|');
                 this.sendJson({
                     header: {
@@ -161,9 +196,10 @@ class KISWebSocketManager {
             }
         }
 
-        // 2. 새로운 뷰포트 리스트 중 아직 구독 안 한 것 등록
-        for (const item of subscribeList) {
-            if (!this.subscribedTickers.has(item.key)) {
+        // 3. 새로운 구독 요청 (Needed - Current)
+        for (const newKey of neededKeys) {
+            if (!this.subscribedTickers.has(newKey)) {
+                const [tr_id, tr_key] = newKey.split('|');
                 this.sendJson({
                     header: {
                         approval_key: this.approvalKey,
@@ -172,16 +208,22 @@ class KISWebSocketManager {
                         "content-type": "utf-8"
                     },
                     body: {
-                        input: { tr_id: item.tr_id, tr_key: item.tr_key }
+                        input: { tr_id, tr_key }
                     }
                 });
-                this.subscribedTickers.add(item.key);
+                this.subscribedTickers.add(newKey);
             }
         }
+
+        // 스토어 구독 개수 업데이트
+        useStore.getState().setWsStatus({ subscriptionCount: this.subscribedTickers.size });
     }
 
     resubscribeAll() {
-        for (const key of this.subscribedTickers) {
+        const isAnalysisActive = this.analysisKeys.size > 0;
+        const neededKeys = isAnalysisActive ? this.analysisKeys : this.viewportKeys;
+
+        for (const key of neededKeys) {
             const [tr_id, tr_key] = key.split('|');
             this.sendJson({
                 header: {
@@ -214,6 +256,30 @@ class KISWebSocketManager {
         }
     }
 
+    /**
+     * 특정 티커가 현재 활발하게 구독 중인지 확인 (TR_KEY 기준)
+     */
+    isSubscribed(ticker, exchange) {
+        const trInfo = this.getTrInfo({ ticker, exchange });
+        if (!trInfo) return false;
+        return this.subscribedTickers.has(`${trInfo.tr_id}|${trInfo.tr_key}`);
+    }
+
+    /**
+     * 현재 구독 중인 티커 리스트 반환
+     */
+    getSubscribedTickerList() {
+        return Array.from(this.subscribedTickers).map(k => k.split('|')[1]);
+    }
+
+    /**
+     * 현재 활성 구독 개수 반환
+     */
+    getActiveSubscriptionsCount() {
+        return this.subscribedTickers.size;
+    }
+
+
     sendJson(data) {
         if (this.socket && this.socket.readyState === WebSocket.OPEN) {
             this.socket.send(JSON.stringify(data));
@@ -228,7 +294,8 @@ class KISWebSocketManager {
             try {
                 const json = JSON.parse(message);
                 if (json.body && json.body.msg1) {
-                    console.log(`[KIS WS Msg] ${json.body.msg1}`);
+                    const msg = json.body.msg1;
+                    console.log(`[KIS WS Msg] ${msg}`);
                 }
             } catch (e) { }
             return;

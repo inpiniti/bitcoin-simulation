@@ -42,6 +42,17 @@ export const useStore = create(
                 mode: 'stock', // 'coin' | 'stock' (Default)
                 ticker: 'AAPL', // Stock ticker
 
+                // Real-time Analysis State
+                isRealtimeAnalysis: false,
+                realtimeAnalysisTickers: [], // tickers being analyzed
+                realtimeAnalysisData: {}, // { [ticker]: { data: [], ... } }
+                realtimeTrades: [], // [{ id, time, type:'BUY'|'SELL', ticker, price, quantity:1, profit, profitRate }]
+                realtimePositions: {}, // { [ticker]: { buyPrice, time } }
+                clearRealtimeTrades: () => set({ realtimeTrades: [], realtimePositions: {} }),
+                wsStatus: { connected: false, subscriptionCount: 0 },
+                setWsStatus: (status) => set(s => ({ wsStatus: { ...s.wsStatus, ...status } })),
+
+
                 // History data - 일봉 또는 분봉 사용
                 interval: '1d', // '1d' | '1m'
                 hist: {
@@ -87,6 +98,7 @@ export const useStore = create(
                     useVMartingale: false,
                     vMartingaleProfitCut: 2.0,
                     vMartingaleMultiplierMode: 'double', // 'double' | 'fixed'
+                    vMartingaleAddBuyThreshold: 0, // 추가 매수 조건: 평단가 대비 N% 이하 손실 시 (0=제한없음, -1=-1%, -2=-2%, ...)
                     baseQuantity: 100000,
                 },
 
@@ -107,6 +119,7 @@ export const useStore = create(
                     useVMartingale: false, // V-Martingale 활성화
                     vMartingaleProfitCut: 2.0, // 최소 매도 수익률 (%)
                     vMartingaleMultiplierMode: 'double', // 'double' | 'fixed'
+                    vMartingaleAddBuyThreshold: 0, // 추가 매수 조건: 평단가 대비 N% 이하일 때 (0=제한없음)
                 },
 
                 autoTradeStatus: {
@@ -142,9 +155,36 @@ export const useStore = create(
                 setViewMode: (viewMode) => set({ viewMode }),
                 setGlobalError: (error) => set({ globalError: error }),
 
-                updateStrategyOptions: (options) => set(state => ({
-                    strategyOptions: { ...state.strategyOptions, ...options }
-                })),
+                updateStrategyOptions: (options) => set(state => {
+                    const newOptions = { ...state.strategyOptions, ...options };
+
+                    let newAnalysisResult = state.analysisResult;
+
+                    // 실시간 분석 중이라면, 변경된 전략으로 신호 즉시 재계산
+                    if (state.isRealtimeAnalysis) {
+                        newAnalysisResult = state.analysisResult.map(item => {
+                            const tickerData = state.realtimeAnalysisData[item.ticker];
+                            if (tickerData && tickerData.data && tickerData.data.length > 0) {
+                                // 기존 데이터를 사용하여 계산
+                                const dataWithSlope = addDerivedData(tickerData.data);
+                                const analysis = analyzeSignal(dataWithSlope, { ...newOptions, isRealtimeMode: true });
+
+                                // 신호와 이유 업데이트 (가격 등은 유지)
+                                return {
+                                    ...item,
+                                    signal: analysis.signal,
+                                    reason: analysis.reason
+                                };
+                            }
+                            return item;
+                        });
+                    }
+
+                    return {
+                        strategyOptions: newOptions,
+                        analysisResult: newAnalysisResult
+                    };
+                }),
 
                 setInterval: (interval) => {
                     const currentInterval = get().interval;
@@ -180,10 +220,190 @@ export const useStore = create(
                 })),
                 batchUpdateRealtimePrices: (updates) => set(state => {
                     const newPrices = { ...state.realtimePrices };
+                    let analysisUpdated = false;
+                    let analysisData = state.realtimeAnalysisData;
+                    let newAnalysisResult = state.analysisResult;
+                    let newTrades = state.realtimeTrades;
+                    let newPositions = state.realtimePositions;
+                    let tradesUpdated = false;
+
+                    // Copy objects only if we need to modify them for analysis
+                    if (state.isRealtimeAnalysis) {
+                        analysisData = { ...analysisData };
+                        newAnalysisResult = [...newAnalysisResult];
+                        newTrades = [...newTrades];
+                        newPositions = { ...newPositions };
+                    }
+
                     Object.entries(updates).forEach(([ticker, data]) => {
                         newPrices[ticker] = { ...newPrices[ticker], ...data };
+
+                        // Real-time Analysis Update
+                        if (state.isRealtimeAnalysis && state.realtimeAnalysisTickers.includes(ticker)) {
+                            const tickerEntry = analysisData[ticker];
+                            if (tickerEntry && tickerEntry.data && tickerEntry.data.length > 0) {
+                                // 1. Update Last Candle
+                                const lastIndex = tickerEntry.data.length - 1;
+                                const originalLastCandle = tickerEntry.data[lastIndex];
+
+                                const price = data.price;
+                                const newLastCandle = {
+                                    ...originalLastCandle,
+                                    close: price,
+                                    high: Math.max(originalLastCandle.high, price),
+                                    low: Math.min(originalLastCandle.low, price),
+                                    // Volume handling: KIS sends daily accumulated volume. 
+                                    // Usage of volume in 1m analysis might be inaccurate if we don't have start-of-minute volume.
+                                    // We'll update the volume if provided (assuming daily chart) or ignore/approximate.
+                                    // reliable 'volume' from socket is daily total.
+                                    // For '1d', this is perfect. For '1m', this is accumulated.
+                                    // Ideally we need volume delta, but let's just stick to price for strategy signal update.
+                                };
+
+                                const newData = [...tickerEntry.data];
+                                newData[lastIndex] = newLastCandle;
+
+                                // 2. Recalculate Analysis (Derived Data + Signal)
+                                // Optimization: derived data calculation on 300 items is fast enough (~1-2ms).
+                                const dataWithSlope = addDerivedData(newData);
+                                const analysis = analyzeSignal(dataWithSlope, { ...state.strategyOptions, isRealtimeMode: true });
+
+                                // 3. Update Result List
+                                const resultIdx = newAnalysisResult.findIndex(r => r.ticker === ticker);
+                                if (resultIdx !== -1) {
+                                    const prevCandle = newData.length >= 2 ? newData[newData.length - 2] : null;
+                                    const changeRate = prevCandle
+                                        ? ((price - prevCandle.close) / prevCandle.close * 100)
+                                        : 0;
+
+                                    newAnalysisResult[resultIdx] = {
+                                        ...newAnalysisResult[resultIdx],
+                                        price: price,
+                                        changeRate: changeRate,
+                                        signal: analysis.signal,
+                                        reason: analysis.reason,
+                                        slope: dataWithSlope[dataWithSlope.length - 1].slope,
+                                        bbStatus: dataWithSlope[dataWithSlope.length - 1].bbStatus,
+                                        timestamp: Date.now() // Update timestamp to force refresh if needed
+                                    };
+                                }
+
+                                // 4. Virtual Trading Logic (Paper Trading)
+                                const currentPosition = newPositions[ticker];
+                                const timestamp = new Date().toISOString();
+                                const isVMartingale = state.strategyOptions.useVMartingale;
+
+                                if (analysis.signal === 'BUY') {
+                                    // 매수 진입 또는 추가 매수 (V-Martingale 시)
+                                    if (!currentPosition || isVMartingale) {
+                                        // V-Martingale 시 현재 몇 번째 매수인지 계산하여 수량 결정
+                                        const entryCount = currentPosition ? (currentPosition.entryCount || 0) : 0;
+
+                                        // V-Martingale 추가 매수 조건: 평단가 대비 손실률 체크
+                                        let canAddBuy = true;
+                                        if (currentPosition && isVMartingale) {
+                                            const addBuyThreshold = state.strategyOptions.vMartingaleAddBuyThreshold || 0;
+                                            if (addBuyThreshold < 0) {
+                                                // 평단가 대비 현재 손실률 계산
+                                                const currentLossRate = ((price - currentPosition.avgPrice) / currentPosition.avgPrice) * 100;
+                                                // 손실률이 임계값보다 크면(덜 손실이면) 추가 매수 불가
+                                                if (currentLossRate > addBuyThreshold) {
+                                                    canAddBuy = false;
+                                                    console.log(`[V-Martingale] ${ticker} 추가 매수 스킵: 손실률 ${currentLossRate.toFixed(2)}% > 임계값 ${addBuyThreshold}%`);
+                                                }
+                                            }
+                                        }
+
+                                        // 이미 같은 캔들(시간대)에서 매수했는지 체크 (중복 피드백 방지)
+                                        const lastBuyTime = currentPosition?.lastTime;
+                                        if (canAddBuy && lastBuyTime !== originalLastCandle.timestamp) {
+                                            const multiplier = isVMartingale
+                                                ? (state.strategyOptions.vMartingaleMultiplierMode === 'fixed' ? 1 : Math.pow(2, entryCount))
+                                                : 1;
+
+                                            const qty = multiplier; // 가상 단위 수량
+                                            const cost = price * qty;
+
+                                            console.log(`[Realtime Trade] ${ticker} BUY Signal! Entry #${entryCount + 1}, Qty: ${qty}`);
+
+                                            if (!currentPosition) {
+                                                // 첫 매수
+                                                const timestampStr = new Date().toISOString();
+                                                newPositions[ticker] = {
+                                                    avgPrice: price,
+                                                    totalQty: qty,
+                                                    totalCost: cost,
+                                                    lastTime: originalLastCandle.timestamp,
+                                                    entryCount: 1,
+                                                    startTime: timestampStr
+                                                };
+                                            } else {
+                                                // 추가 매입 (물타기)
+                                                const nextQty = currentPosition.totalQty + qty;
+                                                const nextCost = currentPosition.totalCost + cost;
+                                                newPositions[ticker] = {
+                                                    ...currentPosition,
+                                                    avgPrice: nextCost / nextQty,
+                                                    totalQty: nextQty,
+                                                    totalCost: nextCost,
+                                                    lastTime: originalLastCandle.timestamp,
+                                                    entryCount: entryCount + 1
+                                                };
+                                            }
+
+                                            newTrades.unshift({
+                                                id: Date.now() + Math.random(),
+                                                time: new Date().toISOString(),
+                                                type: 'BUY',
+                                                ticker: ticker,
+                                                price: price,
+                                                quantity: qty,
+                                                entryCount: entryCount + 1,
+                                                reason: analysis.reason + (entryCount > 0 ? ` (V-Martingale #${entryCount + 1})` : '')
+                                            });
+                                            tradesUpdated = true;
+                                        }
+                                    }
+                                } else if (analysis.signal === 'SELL' && currentPosition) {
+                                    // 매도 청산 (전량 매도)
+                                    const avgPrice = currentPosition.avgPrice;
+                                    const totalQty = currentPosition.totalQty;
+                                    const profit = (price - avgPrice) * totalQty;
+                                    const profitRate = ((price - avgPrice) / avgPrice) * 100;
+
+                                    newTrades.unshift({
+                                        id: Date.now() + Math.random(),
+                                        time: timestamp,
+                                        type: 'SELL',
+                                        ticker: ticker,
+                                        price: price,
+                                        quantity: totalQty,
+                                        profit: profit,
+                                        profitRate: profitRate,
+                                        reason: analysis.reason
+                                    });
+
+                                    delete newPositions[ticker];
+                                    tradesUpdated = true;
+                                }
+
+                                // 5. Save back to data state
+                                analysisData[ticker] = { ...tickerEntry, data: newData };
+                                analysisUpdated = true;
+                            }
+                        }
                     });
-                    return { realtimePrices: newPrices };
+
+                    const newState = { realtimePrices: newPrices };
+                    if (analysisUpdated) {
+                        newState.realtimeAnalysisData = analysisData;
+                        newState.analysisResult = newAnalysisResult;
+                    }
+                    if (tradesUpdated) {
+                        newState.realtimeTrades = newTrades;
+                        newState.realtimePositions = newPositions;
+                    }
+                    return newState;
                 }),
 
                 /**
@@ -666,6 +886,140 @@ export const useStore = create(
                     results.sort((a, b) => (priority[a.signal] ?? 99) - (priority[b.signal] ?? 99));
 
                     set({ analysisResult: results, isAnalyzing: false });
+                },
+
+                /**
+                 * 실시간 분석 시작 (최대 40개 종목)
+                 */
+                startRealtimeAnalysis: async () => {
+                    const state = get();
+                    const stocks = state.groupStocks.slice(0, 40); // Max 40
+                    const interval = state.interval;
+
+                    if (stocks.length === 0) {
+                        get().setGlobalError('분석할 종목이 없습니다.');
+                        return;
+                    }
+
+                    if (!state.kisAuth.approvalKey) {
+                        get().setGlobalError('실시간 분석을 위해서는 KIS 로그인이 필요합니다.');
+                        return;
+                    }
+
+                    // 1. 초기 상태 설정
+                    set({
+                        isAnalyzing: true,
+                        isRealtimeAnalysis: true,
+                        realtimeAnalysisTickers: stocks.map(s => s.ticker),
+                        realtimeAnalysisData: {}, // 데이터 리셋
+                        analysisResult: [], // 결과 리셋
+                        analysisProgress: { current: 0, total: stocks.length }
+                    });
+
+                    const results = [];
+                    const analysisData = {};
+                    const options = state.strategyOptions;
+                    let processed = 0;
+
+                    const today = new Date().toISOString().split('T')[0];
+
+                    // 2. 초기 데이터 로드 (순차적)
+                    for (const stock of stocks) {
+                        if (!get().isRealtimeAnalysis) break; // 중지 체크
+
+                        try {
+                            let rawData;
+                            let exchange = stock.exchange || 'NAS';
+
+                            if (interval === '1m') {
+                                const { fetchStockMinuteData } = await import('@/lib/api');
+                                const fullData = await fetchStockMinuteData(stock.ticker);
+                                // 최근 300개만 사용
+                                rawData = fullData.slice(-300);
+                            } else {
+                                // 1d
+                                const cachedEntry = state.dataCache[stock.ticker];
+                                if (cachedEntry && new Date(cachedEntry.timestamp).toISOString().split('T')[0] === today) {
+                                    rawData = cachedEntry.data;
+                                    if (cachedEntry.exchange) exchange = cachedEntry.exchange;
+                                } else {
+                                    const { fetchStockHistory } = await import('@/lib/api');
+                                    rawData = await fetchStockHistory(stock.ticker);
+                                    if (rawData && rawData.exchange) exchange = rawData.exchange;
+
+                                    // 캐시 저장 (1d만)
+                                    if (rawData && rawData.length > 0) {
+                                        set(s => ({
+                                            dataCache: {
+                                                ...s.dataCache,
+                                                [stock.ticker]: { timestamp: Date.now(), data: rawData, exchange }
+                                            }
+                                        }));
+                                    }
+                                }
+                            }
+
+                            if (rawData && rawData.length > 0) {
+                                const dataWithSlope = addDerivedData(rawData);
+                                const analysis = analyzeSignal(dataWithSlope, options);
+
+                                const lastCandle = dataWithSlope[dataWithSlope.length - 1];
+                                const prevCandle = dataWithSlope.length >= 2 ? dataWithSlope[dataWithSlope.length - 2] : null;
+                                const changeRate = prevCandle
+                                    ? ((lastCandle.close - prevCandle.close) / prevCandle.close * 100)
+                                    : 0;
+
+                                results.push({
+                                    ticker: stock.ticker,
+                                    name: stock.name || stock.ticker,
+                                    signal: analysis.signal,
+                                    reason: analysis.reason,
+                                    price: lastCandle.close,
+                                    changeRate: changeRate,
+                                    slope: lastCandle.slope,
+                                    bbStatus: lastCandle.bbStatus,
+                                    timestamp: lastCandle.timestamp,
+                                    exchange: exchange,
+                                    sentiment: 0 // 초기값, 필요시 로드
+                                });
+
+                                // 실시간 업데이트를 위한 데이터 저장
+                                analysisData[stock.ticker] = { data: rawData, exchange };
+                            } else {
+                                results.push({ ticker: stock.ticker, signal: 'SKIP', reason: 'Insufficient Data' });
+                            }
+
+                        } catch (e) {
+                            console.error(`Failed to init realtime for ${stock.ticker}`, e);
+                            results.push({ ticker: stock.ticker, signal: 'ERROR', reason: 'Load Error' });
+                        }
+
+                        processed++;
+                        set({ analysisProgress: { current: processed, total: stocks.length } });
+                        await new Promise(r => setTimeout(r, 20)); // UI Blocking 방지
+                    }
+
+                    set({
+                        analysisResult: results,
+                        realtimeAnalysisData: analysisData,
+                        isAnalyzing: false
+                    });
+
+                    // 3. WebSocket 구독
+                    const { kisWebSocket } = await import('@/lib/kisWebSocket');
+                    const subList = stocks.map(s => ({
+                        ticker: s.ticker,
+                        exchange: analysisData[s.ticker]?.exchange || s.exchange || 'NAS'
+                    }));
+                    kisWebSocket.subscribeAnalysis(subList);
+                },
+
+                stopRealtimeAnalysis: () => {
+                    set({ isRealtimeAnalysis: false, isAnalyzing: false });
+                    // WebSocket 구독 해제
+                    import('@/lib/kisWebSocket').then(({ kisWebSocket }) => {
+                        kisWebSocket.subscribeAnalysis([]);
+                    });
                 },
 
                 /**

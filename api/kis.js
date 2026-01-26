@@ -49,6 +49,11 @@ export default async function handler(req, res) {
             headers['content-type'] = 'application/json; charset=utf-8';
         }
 
+        // User-Agent 설정 (비어있으면 기본값)
+        if (!headers['user-agent']) {
+            headers['user-agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+        }
+
         const options = {
             method: req.method,
             headers,
@@ -90,9 +95,12 @@ export default async function handler(req, res) {
 
     } catch (error) {
         console.error('[KIS Proxy Handler Fatal Error]:', error);
+        if (error.cause) console.error('[KIS Proxy Error Cause]:', error.cause);
+
         return res.status(500).json({
             error: 'Internal Proxy Error',
             message: error.message,
+            cause: error.cause ? String(error.cause) : undefined,
             stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
         });
     }

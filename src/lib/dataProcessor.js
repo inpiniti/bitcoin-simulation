@@ -763,7 +763,8 @@ export function analyzeSignal(dataWithSlope, options = {}) {
         useTrend20 = false,
         useRSI = false,
         useVolumeFilter = false,
-        useSellAtBB2 = false
+        useSellAtBB2 = false,
+        isRealtimeMode = false // 실시간 분석 모드 (웹소켓) - 거래량 필터 비활성화
     } = options;
 
     if (!dataWithSlope || dataWithSlope.length < 2) {
@@ -790,7 +791,8 @@ export function analyzeSignal(dataWithSlope, options = {}) {
         if (useTrend && curr.ma50 && curr.close < curr.ma50) failures.push('Trend(50)');
         if (useTrend20 && curr.ma20 && curr.close < curr.ma20) failures.push('Trend(20)');
         if (useRSI && curr.rsi !== undefined && curr.rsi > 70) failures.push('RSI');
-        if (useVolumeFilter && curr.vma20 && curr.volume < curr.vma20) failures.push('Volume');
+        // 실시간 모드에서는 거래량 필터 스킵 (웹소켓 거래량은 일일 누적값이므로 분봉 비교 부정확)
+        if (useVolumeFilter && !isRealtimeMode && curr.vma20 && curr.volume < curr.vma20) failures.push('Volume');
 
         if (failures.length > 0) {
             buySignal = false;
