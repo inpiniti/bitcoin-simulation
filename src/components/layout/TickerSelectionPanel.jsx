@@ -114,10 +114,16 @@ export function TickerSelectionPanel() {
 
     // WebSocket 연결 관리
     useEffect(() => {
+        console.log('[WSDebug] kisAuth.isLoggedIn:', kisAuth.isLoggedIn);
+        console.log('[WSDebug] kisAuth.approvalKey:', kisAuth.approvalKey ? 'EXISTS' : 'EMPTY');
+
         if (kisAuth.approvalKey) {
+            console.log('[WSDebug] Attempting WebSocket connection...');
             kisWebSocket.connect(kisAuth.approvalKey);
+        } else {
+            console.log('[WSDebug] No approvalKey - WebSocket connection skipped');
         }
-    }, [kisAuth.approvalKey]);
+    }, [kisAuth.approvalKey, kisAuth.isLoggedIn]);
 
     // 뷰포트 가시성 핸들러
     const handleVisible = (stock, isVisible) => {

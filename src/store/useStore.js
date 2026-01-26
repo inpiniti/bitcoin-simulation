@@ -205,10 +205,13 @@ export const useStore = create(
                         if (result.success) {
                             // 2. WebSocket Approval Key 발급 (병렬 처리 가능하지만 순차 처리로 안전하게)
                             let approvalKey = '';
+                            console.log('[KIS] Access Token 발급 성공, WebSocket 키 발급 시도...');
                             try {
                                 const wsResult = await getWebSocketApprovalKey(appkey, appsecret);
+                                console.log('[KIS] WebSocket 키 발급 응답:', { success: wsResult.success, hasKey: !!wsResult.approval_key, error: wsResult.error });
                                 if (wsResult.success) {
                                     approvalKey = wsResult.approval_key;
+                                    console.log('[KIS] WebSocket 키 발급 성공');
                                 } else {
                                     console.warn('[KIS] 웹소켓 키 발급 실패 (REST API만 사용):', wsResult.error);
                                 }
@@ -216,6 +219,7 @@ export const useStore = create(
                                 console.error('[KIS] 웹소켓 키 발급 에러:', wsErr);
                             }
 
+                            console.log('[KIS] 최종 상태 - approvalKey:', approvalKey ? 'EXISTS' : 'EMPTY');
                             set({
                                 kisAuth: {
                                     isLoggedIn: true,
