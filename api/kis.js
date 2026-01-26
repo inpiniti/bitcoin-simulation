@@ -17,62 +17,83 @@ export default async function handler(req, res) {
 
     try {
         // 경로 추출 (URL 기반)
-        const url = new URL(req.url, `http://${req.headers.host}`)
-        const pathname = url.pathname
+        // req.url은 Vercel에서 인덱스 경로를 포함할 수 있으므로 보정
+        const fullUrl = req.url || '';
+        let targetPath = fullUrl.replace(/^\/api\/kis/, '');
 
-        // '/api/kis/' 제거하여 타겟 경로 추출
-        // 예: /api/kis/oauth2/tokenP -> oauth2/tokenP
-        let targetPath = pathname.replace(/^\/api\/kis/, '');
+        // 쿼리 스트링 분리
+        const [pathOnly, search] = targetPath.split('?');
+        targetPath = pathOnly;
+        const queryString = search ? `?${search}` : '';
+
+        // 슬래시 중복 제거 및 시작 슬래시 제거
         if (targetPath.startsWith('/')) targetPath = targetPath.substring(1);
 
-        const search = url.search // ?query=string
+        // 기본 도메인 설정 (실전투자 9443포트)
+        const domain = 'openapi.koreainvestment.com:9443';
+        const targetUrl = `https://${domain}/${targetPath}${queryString}`;
 
-        const targetUrl = `https://openapi.koreainvestment.com:9443/${targetPath}${search}`
+        // 요청 헤더 구성
+        const headers = {};
 
-        // 요청 헤더 복사 (필요한 것만)
-        const headers = {
-            'Content-Type': req.headers['content-type'] || 'application/json; charset=utf-8',
+        // 원본 요청의 헤더 중 필요한 것들을 복사 (호스트 관련 제외)
+        const skipHeaders = ['host', 'connection', 'content-length'];
+        Object.keys(req.headers).forEach(key => {
+            if (!skipHeaders.includes(key.toLowerCase())) {
+                headers[key] = req.headers[key];
+            }
+        });
+
+        // 필수 헤더 강제 설정 (있을 경우 덮어쓰기)
+        if (!headers['content-type']) {
+            headers['content-type'] = 'application/json; charset=utf-8';
         }
-
-        // KIS API 전용 헤더 추가
-        if (req.headers['authorization']) headers['authorization'] = req.headers['authorization']
-        if (req.headers['appkey']) headers['appkey'] = req.headers['appkey']
-        if (req.headers['appsecret']) headers['appsecret'] = req.headers['appsecret']
-        if (req.headers['tr_id']) headers['tr_id'] = req.headers['tr_id']
-        if (req.headers['custtype']) headers['custtype'] = req.headers['custtype']
 
         const options = {
             method: req.method,
             headers,
         }
 
-        // POST 요청인 경우 body 추가
-        if (req.method === 'POST' && req.body) {
-            options.body = (typeof req.body === 'object') ? JSON.stringify(req.body) : req.body
+        // POST/PUT 요청인 경우 body 처리
+        if (['POST', 'PUT', 'PATCH'].includes(req.method)) {
+            if (req.body) {
+                options.body = (typeof req.body === 'object') ? JSON.stringify(req.body) : req.body;
+            } else {
+                // 바디가 비어있는데 POST인 경우 등 예외 처리 (필요시)
+            }
         }
 
-        console.log(`[KIS Proxy] ${req.method} ${targetUrl}`)
+        console.log(`[KIS Proxy] ${req.method} -> ${targetUrl}`);
 
-        const response = await fetch(targetUrl, options)
+        const response = await fetch(targetUrl, options);
+
+        // 응답 상태 코드 복사
+        const responseStatus = response.status;
 
         // 응답 처리
         if (!response.ok) {
             const errorText = await response.text();
-            console.error(`[KIS Proxy Error] Upstream ${response.status}:`, errorText);
-            // JSON으로 파싱 시도 후 실패하면 text 그대로 전달
+            console.error(`[KIS Proxy Upstream Error] Status: ${responseStatus}`, errorText);
+
             try {
-                res.status(response.status).json(JSON.parse(errorText));
+                // JSON 형태의 에러면 JSON으로 전달
+                const errorJson = JSON.parse(errorText);
+                return res.status(responseStatus).json(errorJson);
             } catch (e) {
-                res.status(response.status).send(errorText);
+                // 그렇지 않으면 텍스트로 전달
+                return res.status(responseStatus).send(errorText);
             }
-            return;
         }
 
-        const data = await response.json()
-        res.status(response.status).json(data)
+        const data = await response.json();
+        return res.status(responseStatus).json(data);
 
     } catch (error) {
-        console.error('[KIS Proxy Handler Error]:', error)
-        res.status(500).json({ error: error.message })
+        console.error('[KIS Proxy Handler Fatal Error]:', error);
+        return res.status(500).json({
+            error: 'Internal Proxy Error',
+            message: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
     }
 }

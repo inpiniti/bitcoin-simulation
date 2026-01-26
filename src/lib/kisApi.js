@@ -5,13 +5,6 @@ const KIS_BASE_URL = import.meta.env.DEV
     ? '/api/kis'
     : '/api/kis'
 
-/**
- * KIS API 접근 토큰을 발급받습니다.
- * 
- * @param {string} appkey - 한국투자증권 앱 키
- * @param {string} appsecret - 한국투자증권 앱 시크릿
- * @returns {Promise<Object>} 토큰 정보 객체 (success, access_token 등)
- */
 export async function getAccessToken(appkey, appsecret) {
     try {
         const response = await fetch(`${KIS_BASE_URL}/oauth2/tokenP`, {
@@ -25,6 +18,15 @@ export async function getAccessToken(appkey, appsecret) {
                 appsecret: appsecret
             })
         })
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('토큰 발급 실패 응답:', errorText);
+            return {
+                success: false,
+                error: `HTTP ${response.status}: ${errorText.substring(0, 100)}`
+            }
+        }
 
         const data = await response.json()
 
@@ -51,13 +53,6 @@ export async function getAccessToken(appkey, appsecret) {
     }
 }
 
-/**
- * 실시간 웹소켓 접속키를 발급받습니다.
- * 
- * @param {string} appkey - 한국투자증권 앱 키
- * @param {string} appsecret - 한국투자증권 앱 시크릿
- * @returns {Promise<Object>} 접속키 정보 객체 (success, approval_key 등)
- */
 export async function getWebSocketApprovalKey(appkey, appsecret) {
     try {
         const response = await fetch(`${KIS_BASE_URL}/oauth2/Approval`, {
@@ -68,9 +63,18 @@ export async function getWebSocketApprovalKey(appkey, appsecret) {
             body: JSON.stringify({
                 grant_type: 'client_credentials',
                 appkey: appkey,
-                secretkey: appsecret // 주의: 여기서는 appsecret이 아닌 secretkey 필드명 사용
+                secretkey: appsecret
             })
         })
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('웹소켓 접속키 발급 실패 응답:', errorText);
+            return {
+                success: false,
+                error: `HTTP ${response.status}: ${errorText.substring(0, 100)}`
+            }
+        }
 
         const data = await response.json()
 
