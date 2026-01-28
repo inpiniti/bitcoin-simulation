@@ -197,9 +197,17 @@ export async function getOverseasStockPrice(accessToken, appkey, appsecret, exch
  */
 export async function getOverseasBalance(accessToken, appkey, appsecret, accountNo, accountCode) {
     try {
+        if (!accessToken || !appkey || !appsecret || !accountNo || !accountCode) {
+            console.warn('getOverseasBalance: 필수 파라미터 누락', { hasToken: !!accessToken, hasKey: !!appkey, hasSecret: !!appsecret, accountNo, accountCode });
+            return {
+                success: false,
+                error: '필수 인증 정보가 누락되었습니다.'
+            }
+        }
+
         const params = new URLSearchParams({
-            'CANO': accountNo,
-            'ACNT_PRDT_CD': accountCode,
+            'CANO': accountNo.trim(),
+            'ACNT_PRDT_CD': accountCode.trim(),
             'WCRC_FRCR_DVSN_CD': '01', // 외화
             'NATN_CD': '840', // 미국
             'TR_MKET_CD': '00', // 전체
@@ -210,12 +218,32 @@ export async function getOverseasBalance(accessToken, appkey, appsecret, account
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json; charset=utf-8',
-                'authorization': `Bearer ${accessToken}`,
-                'appkey': appkey,
-                'appsecret': appsecret,
+                'authorization': `Bearer ${accessToken.trim()}`,
+                'appkey': appkey.trim(),
+                'appsecret': appsecret.trim(),
                 'tr_id': 'CTRP6504R'
             }
         })
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`[KIS] 잔고 조회 실패 (HTTP ${response.status}):`, errorText);
+
+            let errorMsg = `HTTP ${response.status} Error`;
+            try {
+                const errJson = JSON.parse(errorText);
+                errorMsg = errJson.msg1 || errJson.message || errorMsg;
+            } catch (e) {
+                // Not JSON
+                errorMsg = errorText.substring(0, 100);
+            }
+
+            return {
+                success: false,
+                error: errorMsg,
+                status: response.status
+            };
+        }
 
         const data = await response.json()
 
