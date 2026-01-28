@@ -15,14 +15,11 @@ import { kisWebSocket } from "@/lib/kisWebSocket"
  * @returns {JSX.Element} 시장 분석 결과 패널
  */
 export function AnalysisPanel() {
-    const {
-        analysisResult,
-        isAnalyzing,
-        isRealtimeAnalysis,
-        setTicker,
-        setAnalysisMode,
-        wsStatus
-    } = useStore()
+    const analysisResult = useStore(state => state.analysisResult);
+    const isAnalyzing = useStore(state => state.isAnalyzing);
+    const isRealtimeAnalysis = useStore(state => state.isRealtimeAnalysis);
+    const setTicker = useStore(state => state.setTicker);
+    const setAnalysisMode = useStore(state => state.setAnalysisMode);
 
     // Order Dialog State
     const [orderDialogOpen, setOrderDialogOpen] = useState(false)
@@ -102,18 +99,11 @@ export function AnalysisPanel() {
                             )}
                             Total: {analysisResult.length} scanned
                             {isRealtimeAnalysis && (
-                                <div className="flex items-center gap-2 ml-2">
-                                    <Badge
-                                        variant="outline"
-                                        className={`text-[10px] px-1.5 py-0 border-none ${wsStatus.connected ? 'bg-[#089981]/20 text-[#089981]' : 'bg-[#f23645]/20 text-[#f23645]'}`}
-                                    >
-                                        {wsStatus.connected ? 'Connected' : 'Disconnected'}
-                                    </Badge>
-                                    <span className="text-[#888]">Active WS: {wsStatus.subscriptionCount}</span>
-                                </div>
+                                <WSStatusIndicator />
                             )}
                         </div>
                     </div>
+
 
                     <ScrollArea className="flex-1">
                         <Table>
@@ -199,6 +189,21 @@ export function AnalysisPanel() {
                 currentPrice={orderConfig.price}
                 initialExchange={orderConfig.exchange}
             />
+        </div>
+    )
+}
+
+function WSStatusIndicator() {
+    const wsStatus = useStore(state => state.wsStatus);
+    return (
+        <div className="flex items-center gap-2 ml-2">
+            <Badge
+                variant="outline"
+                className={`text-[10px] px-1.5 py-0 border-none ${wsStatus.connected ? 'bg-[#089981]/20 text-[#089981]' : 'bg-[#f23645]/20 text-[#f23645]'}`}
+            >
+                {wsStatus.connected ? 'Connected' : 'Disconnected'}
+            </Badge>
+            <span className="text-[#888]">Active WS: {wsStatus.subscriptionCount}</span>
         </div>
     )
 }

@@ -1,7 +1,7 @@
 import { useStore } from "@/store/useStore"
 import { cn } from "@/lib/utils"
 import { Search, Loader2 } from "lucide-react"
-import { useState, useEffect, useRef, memo } from "react"
+import { useState, useEffect, useRef, useMemo, useCallback, memo } from "react"
 import { kisWebSocket } from "@/lib/kisWebSocket"
 
 // 개별 티커 아이템 컴포넌트
@@ -29,10 +29,14 @@ const TickerItem = memo(({ stock, isActive, onClick, onVisible }) => {
         return () => observer.disconnect();
     }, [stock, onVisible]);
 
+    const handleInternalClick = useCallback(() => {
+        onClick(stock.ticker, stock.name);
+    }, [stock.ticker, stock.name, onClick]);
+
     return (
         <button
             ref={itemRef}
-            onClick={onClick}
+            onClick={handleInternalClick}
             className={cn(
                 "flex items-center justify-between px-3 py-2 text-left transition-colors border-l-2",
                 isActive
@@ -105,12 +109,15 @@ export function TickerSelectionPanel() {
     const visibleStocksRef = useRef(new Map()); // 현재 화면에 보이는 종목 관리
     const debounceTimerRef = useRef(null);
 
-    const filteredStocks = (tickerGroup === 'superinvestor' ? recommendedStocks : groupStocks)
-        .filter(stock =>
-            filterText === "" ||
-            stock.ticker.toLowerCase().includes(filterText.toLowerCase()) ||
-            stock.name.toLowerCase().includes(filterText.toLowerCase())
-        )
+    const filteredStocks = useMemo(() => {
+        const stocks = (tickerGroup === 'superinvestor' ? recommendedStocks : groupStocks);
+        if (!filterText) return stocks;
+        const lowerFilter = filterText.toLowerCase();
+        return stocks.filter(stock =>
+            stock.ticker.toLowerCase().includes(lowerFilter) ||
+            stock.name.toLowerCase().includes(lowerFilter)
+        );
+    }, [tickerGroup, recommendedStocks, groupStocks, filterText]);
 
     // WebSocket 연결 관리
     useEffect(() => {
@@ -125,8 +132,8 @@ export function TickerSelectionPanel() {
         }
     }, [kisAuth.approvalKey, kisAuth.isLoggedIn]);
 
-    // 뷰포트 가시성 핸들러
-    const handleVisible = (stock, isVisible) => {
+    // 뷰포트 가시성 핸들러 - useCallback으로 안정화하여 TickerItem의 useEffect 재실행 방지
+    const handleVisible = useCallback((stock, isVisible) => {
         if (isVisible) {
             visibleStocksRef.current.set(stock.ticker, stock);
         } else {
@@ -139,7 +146,12 @@ export function TickerSelectionPanel() {
             const currentVisible = Array.from(visibleStocksRef.current.values());
             kisWebSocket.subscribeStocks(currentVisible);
         }, 200);
-    };
+    }, []); // 의존성 없음 (Ref와 Singleton 사용)
+
+    // 티커 클릭 핸들러
+    const handleTickerClick = useCallback((ticker, name) => {
+        openTicker(ticker, name);
+    }, [openTicker]);
 
     return (
         <div className="flex flex-col h-full bg-[#252526]">
@@ -188,13 +200,14 @@ export function TickerSelectionPanel() {
                                 key={stock.ticker}
                                 stock={stock}
                                 isActive={ticker === stock.ticker}
-                                onClick={() => openTicker(stock.ticker, stock.name)}
+                                onClick={handleTickerClick}
                                 onVisible={handleVisible}
                             />
                         ))}
                     </div>
                 )}
             </div>
+
 
             <div className="px-3 py-1 bg-[#1e1e1e] border-t border-[#3c3c3c] text-[10px] text-[#666666] flex justify-between">
                 <span>Total: {filteredStocks.length}</span>
