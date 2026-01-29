@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils"
 import { useStore } from "@/store/useStore"
 import { Loader2, Lock, TrendingUp, Zap, Coins, ShieldAlert, Target, BarChart3, List, Settings2 } from "lucide-react"
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { TickerSelectionPanel } from "./TickerSelectionPanel"
 import { DocsSidebarContent } from "../docs/DocsSidebarContent"
 
@@ -24,17 +24,17 @@ export function Sidebar() {
     } = useStore()
 
     const [activeTab, setActiveTab] = useState('strategy') // 'strategy' | 'ticker'
+    const [prevViewMode, setPrevViewMode] = useState(viewMode)
 
-    // 뷰 모드가 변경되면 탭 상태 초기화 or 적절한 기본값 설정
-    useEffect(() => {
+    // viewMode가 변경되면 탭 상태 초기화
+    if (viewMode !== prevViewMode) {
+        setPrevViewMode(viewMode)
         if (viewMode === 'simulation' || viewMode === 'analyze') {
-            // 시뮬레이션/분석 모드에서는 전략 탭 기본
             setActiveTab('strategy')
         } else {
-            // 그 외(데이터, 차트, 토론)에서는 티커 탭 강제 (사실상 탭 UI 없음)
             setActiveTab('ticker')
         }
-    }, [viewMode])
+    }
 
     const hasData = (hist[interval]?.length || 0) > 0
     const isAnalyzeMode = viewMode === 'analyze'
@@ -361,6 +361,16 @@ export function Sidebar() {
                                         });
                                         return;
                                     }
+
+                                    // 시간 간격 체크 (실시간 분석은 분봉(Min) 기준)
+                                    if (interval !== '1m') {
+                                        setGlobalError({
+                                            title: "설정 변경 필요",
+                                            description: "실시간 분석은 분봉(Min) 데이터 기반으로 작동합니다. 상단 타이틀바의 간격을 'Min'으로 변경 후 다시 시도해주세요."
+                                        });
+                                        return;
+                                    }
+
                                     startRealtimeAnalysis()
                                 }
                             }}

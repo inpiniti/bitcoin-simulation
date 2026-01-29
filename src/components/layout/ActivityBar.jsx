@@ -28,11 +28,20 @@ export function ActivityBar() {
         setViewMode,
         isAnalyzing,
         loadingInterval,
+        kisAuth,
+        setGlobalError
     } = useStore()
 
     const isLoading = loadingInterval['1d'] || loadingInterval['STOCK_BASE']
 
     const handleClick = (mode) => {
+        if (mode === 'portfolio' && !kisAuth.isLoggedIn) {
+            setGlobalError({
+                title: "로그인 필요",
+                description: "포트폴리오 기능은 KIS 증권 계좌 로그인이 필요합니다.\n먼저 로그인을 진행해주세요."
+            });
+            return;
+        }
         setViewMode(mode)
     }
 
