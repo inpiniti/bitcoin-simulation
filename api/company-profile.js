@@ -120,6 +120,7 @@ export default async function handler(request, response) {
         let services = '';
         let founded = '';
         let headquarters = '';
+        let employees = '';
 
         $('table.infobox tr').each((i, el) => {
             const th = $(el).find('th').text().trim().toLowerCase();
@@ -146,6 +147,10 @@ export default async function handler(request, response) {
             if (th.includes('website')) {
                 website = $(el).find('td a').attr('href') || td;
             }
+            // 직원 수 추출 (employees 또는 size 키워드)
+            if (th.includes('employees') || th.includes('size')) {
+                employees = td.replace(/\[.*?\]/g, '').split('(')[0].trim();
+            }
         });
 
         // 참조 표시 제거 [1], [2] 등
@@ -162,6 +167,7 @@ export default async function handler(request, response) {
                 services: services || '-',
                 founded: founded || '-',
                 headquarters: headquarters || '-',
+                fullTimeEmployees: employees || '-',
                 website: website,
                 country: 'US',
                 companyOfficers: []

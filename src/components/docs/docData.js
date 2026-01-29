@@ -10,6 +10,7 @@ import marketDataMd from '@/docs/lib/marketData.md?raw'
 
 import layoutMd from '@/docs/components/layout.md?raw'
 import panelsMd from '@/docs/components/panels.md?raw'
+import financialQAMd from '@/docs/components/financialQA.md?raw'
 import chartsMd from '@/docs/components/charts.md?raw'
 import dialogsMd from '@/docs/components/dialogs.md?raw'
 
@@ -69,6 +70,7 @@ export const DOCS_DATA = {
             { id: 'fetchstockhistory', label: 'fetchStockHistory', type: 'method' },
             { id: 'fetchstockminutedata', label: 'fetchStockMinuteData', type: 'method' },
             { id: 'fetchstockoverview', label: 'fetchStockOverview', type: 'method' },
+            { id: 'warmupaimodel', label: 'warmupAIModel', type: 'method' },
             { id: 'fetchstocknews', label: 'fetchStockNews', type: 'method' },
             { id: 'fetchearningsdata', label: 'fetchEarningsData', type: 'method' },
             { id: 'fetchkospi200tickers', label: 'fetchKospi200Tickers', type: 'method' },
@@ -226,6 +228,20 @@ export const DOCS_DATA = {
         ]
     },
 
+    'components/financialQA': {
+        id: 'components/financialQA',
+        title: 'Financial QA Engine',
+        type: 'component',
+        path: 'src/components/FinancialQAPanel.jsx',
+        description: 'AI-powered question answering system.',
+        content: financialQAMd,
+        children: [
+            { id: 'financialqapanel', label: 'FinancialQAPanel', type: 'component' },
+            { id: 'checkai', label: 'checkAI', type: 'method' },
+            { id: 'loadcontext', label: 'loadContext', type: 'method' },
+            { id: 'handlesend', label: 'handleSend', type: 'method' }
+        ]
+    },
     // UTILS
     'utils/simulation': {
         id: 'utils/simulation',

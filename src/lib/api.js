@@ -463,3 +463,52 @@ export async function fetchEarningsData(ticker) {
         return null;
     }
 }
+/**
+ * AI 모델의 상태를 확인하고 워밍업을 시도합니다.
+ * Hugging Face Inference API의 특성상 일정 시간 미사용 시 모델이 절전 모드로 전환되므로,
+ * 본격적인 요청 전 모델을 활성화시키기 위해 사용합니다.
+ * 
+ * @async
+ * @param {string} [model="deepset/roberta-base-squad2"] - 대상 모델 식별자
+ * @returns {Promise<{status: 'ready'|'loading'|'error', estimated_time?: number, message?: string}>} 서버 상태 객체
+ * 
+ * @example
+ * const result = await warmupAIModel("deepset/roberta-base-squad2");
+ * if (result.status === 'loading') console.log(`Wait for ${result.estimated_time}s`);
+ */
+export async function warmupAIModel(model = "deepset/roberta-base-squad2") {
+    // QA 모델 여부 확인 (구조화된 입력을 요구함)
+    const isQA = model.includes("squad") || model.includes("qa") || model.includes("roberta");
+    const inputs = isQA ? { question: "warmup", context: "The AI is warming up." } : "warmup";
+
+    try {
+        const response = await fetch("/api/hf", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                model,
+                inputs,
+                options: { wait_for_model: true }
+            }),
+        });
+
+        if (response.status === 503) {
+            const data = await response.json();
+            return { status: 'loading', ...data };
+        }
+
+        if (response.ok) {
+            return { status: 'ready' };
+        }
+
+        // 400 에러 등이 발생해도 서버 자체는 살아있으므로 ready로 간주할지 고민해봐야 함.
+        // 여기선 모델 활성화 여부가 중요하므로, 에러 텍스트를 로그로 남김.
+        const errorText = await response.text();
+        console.warn(`AI Warmup Response (${response.status}):`, errorText);
+
+        return { status: 'ready', message: 'Model exists but returned error for warmup input' };
+    } catch (err) {
+        console.error('AI Warmup Network Error:', err);
+        return { status: 'error' };
+    }
+}

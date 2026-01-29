@@ -150,7 +150,7 @@
     *   **차트 뷰 모드**: Recharts 라인 차트 + AI 예측 (점선)
     *   **분석 모드**: 전체 종목 스캔 결과 테이블
     *   **토론 모드**: Naver/Stocktwits/Reddit/Yahoo/Toss 종목 토론 게시글 리스트
-    *   **QA 모드**: AI와 대화형 챗봇 인터페이스
+    *   **QA 모드**: AI와 대화형 챗봇 인터페이스. AI 모델 서버(Hugging Face)의 상태(Ready/Loading/Offline)를 실시간으로 모니터링하며, 필요 시 자동 워밍업(Warm-up) 기능을 수행합니다.
 
 #### 데이터 뷰어 (Data Viewer)
 *   **테이블 모드**: `날짜` | `가격 (Median)` | `기울기 (Slope)` | `BB Status` 등.

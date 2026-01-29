@@ -519,11 +519,30 @@ export default defineConfig(({ mode }) => {
 
                     // Hugging Face Proxy (Local Dev)
                     server.middlewares.use('/api/hf', async (req, res, next) => {
+                        // CORS 및 OPTIONS 처리
+                        res.setHeader('Access-Control-Allow-Origin', '*');
+                        res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+                        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+                        if (req.method === 'OPTIONS') {
+                            res.statusCode = 200;
+                            res.end();
+                            return;
+                        }
+
+                        // GET 요청 시 헬스체크
+                        if (req.method === 'GET') {
+                            res.statusCode = 200;
+                            res.end(JSON.stringify({ status: 'ok', message: 'HF Proxy (Dev) is running' }));
+                            return;
+                        }
+
                         if (req.method !== 'POST') {
                             res.statusCode = 405;
                             res.end();
                             return;
                         }
+
                         try {
                             const buffers = [];
                             for await (const chunk of req) {
@@ -536,18 +555,24 @@ export default defineConfig(({ mode }) => {
                                 return;
                             }
                             const body = JSON.parse(bodyStr);
-                            const { inputs, model = "ProsusAI/finbert" } = body;
+                            const { inputs, model = "ProsusAI/finbert", options = {} } = body;
 
                             const token = env.VITE_HF_TOKEN || env.HF_TOKEN;
-
                             const fetch = (await import('node-fetch')).default || global.fetch;
+
                             const response = await fetch(`https://router.huggingface.co/hf-inference/models/${model}`, {
                                 method: 'POST',
                                 headers: {
                                     'Content-Type': 'application/json',
                                     ...(token ? { 'Authorization': `Bearer ${token}` } : {})
                                 },
-                                body: JSON.stringify({ inputs })
+                                body: JSON.stringify({
+                                    inputs: inputs || "ping",
+                                    options: {
+                                        wait_for_model: true,
+                                        ...options
+                                    }
+                                })
                             });
 
                             res.statusCode = response.status;
@@ -677,6 +702,7 @@ export default defineConfig(({ mode }) => {
                             let services = '';
                             let founded = '';
                             let headquarters = '';
+                            let employees = '';
 
                             $('table.infobox tr').each((i, el) => {
                                 const th = $(el).find('th').text().trim().toLowerCase();
@@ -703,6 +729,9 @@ export default defineConfig(({ mode }) => {
                                 if (th.includes('website')) {
                                     website = $(el).find('td a').attr('href') || td;
                                 }
+                                if (th.includes('employees') || th.includes('size')) {
+                                    employees = td.replace(/\[.*?\]/g, '').split('(')[0].trim();
+                                }
                             });
 
                             // 참조 표시 제거
@@ -717,6 +746,7 @@ export default defineConfig(({ mode }) => {
                                     services: services || '-',
                                     founded: founded || '-',
                                     headquarters: headquarters || '-',
+                                    fullTimeEmployees: employees || '-',
                                     website: website,
                                     country: 'US',
                                     companyOfficers: []
