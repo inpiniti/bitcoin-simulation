@@ -18,7 +18,9 @@ export function Sidebar() {
         startRealtimeAnalysis,
         stopRealtimeAnalysis,
         isRealtimeAnalysis,
-        interval
+        interval,
+        wsStatus,
+        setGlobalError
     } = useStore()
 
     const [activeTab, setActiveTab] = useState('strategy') // 'strategy' | 'ticker'
@@ -351,6 +353,14 @@ export function Sidebar() {
                                 if (isRealtimeAnalysis) {
                                     stopRealtimeAnalysis()
                                 } else {
+                                    // 웹소켓 연결 상태 체크
+                                    if (!wsStatus.connected) {
+                                        setGlobalError({
+                                            title: "실시간 분석 불가",
+                                            description: "웹소켓이 연결되어 있지 않습니다. KIS 로그인을 완료한 후 다시 시도해주세요."
+                                        });
+                                        return;
+                                    }
                                     startRealtimeAnalysis()
                                 }
                             }}
