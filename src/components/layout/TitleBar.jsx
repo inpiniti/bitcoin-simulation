@@ -75,6 +75,13 @@ function AutoTradeTimer({ executionTimeMinutes, isEnabled }) {
     );
 }
 
+/**
+ * 애플리케이션 상단 타이틀 바 컴포넌트입니다.
+ * 모드 전환(코인/주식), 간격 선택, 데이터 로딩 상태 표시, 자동 매매 제어 및 KIS 계좌 연동을 담당합니다.
+ * 
+ * @component
+ * @returns {JSX.Element} 타이틀 바
+ */
 export function TitleBar() {
     const {
         mode, ticker, setMode, setTicker, openTicker,
@@ -262,7 +269,7 @@ export function TitleBar() {
                 </div>
 
                 {/* Auto Trade Button (Stock Mode Only) */}
-                {mode === 'stock' && kisAuth.isLoggedIn && (
+                {mode === 'stock' && (
                     <div className="flex items-center gap-2">
                         <AutoTradeTimer executionTimeMinutes={useStore.getState().autoTradeSettings.executionTimeMinutes} isEnabled={useStore.getState().autoTradeSettings.isEnabled} />
                         <button

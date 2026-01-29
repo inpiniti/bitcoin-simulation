@@ -33,9 +33,11 @@ useStore.getState().setGlobalError({
 자동 매매를 설정하고 제어하는 다이얼로그입니다. 매매 대상 그룹(보유종목, S&P500 등), 1회 주문 금액, 전략 옵션(마틴게일 배수 등)을 상세하게 설정할 수 있습니다.
 
 ### Features
-- **Target Selection**: 매매할 종목군 선택.
+- **Activation Security**: 자동 매매 활성화 시 KIS 로그인이 필수이며, 비로그인 상태에서 시도 시 안내 메시지가 표시됨.
+- **Target Selection**: 매매할 종목군 선택 (보유종목, S&P 500 등).
 - **Form Controls**: 수량, 금액, 배수 등을 입력하는 폼 제공.
-- **Log Viewer**: 지난 자동 매매 실행 로그를 탭으로 확인 가능.
+- **Log Viewer**: 지난 자동 매매 실행 로그를 실시간으로 확인 가능.
+- **Test Mode**: 실제 주문 없이 분석 로직만 검증할 수 있는 즉시 실행 테스트 기능 제공.
 
 ### Example Usage
 ```jsx

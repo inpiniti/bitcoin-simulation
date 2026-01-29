@@ -22,13 +22,22 @@ export function AutoTradingDialog({ isOpen, onOpenChange }) {
         autoTradeSettings,
         setAutoTradeSettings,
         autoTradeStatus,
-        kisAuth
+        kisAuth,
+        setGlobalError
     } = useStore()
 
     const [isRunning, setIsRunning] = useState(false)
 
     // 헬퍼: 현재 설정된 값 업데이트
     const updateSetting = (key, value) => {
+        // 활성화 시도 시 로그인 체크
+        if (key === 'isEnabled' && value === true && !kisAuth.isLoggedIn) {
+            setGlobalError({
+                title: "로그인 필요",
+                description: "자동 매매를 활성화하려면 KIS 증권 계좌 로그인이 필요합니다.\n먼저 로그인을 진행해주세요."
+            });
+            return;
+        }
         setAutoTradeSettings({ [key]: value })
     }
 
@@ -50,17 +59,17 @@ export function AutoTradingDialog({ isOpen, onOpenChange }) {
                             <span className="text-[12px] text-[#888888]">설정된 시간에 자동으로 매수/매도를 실행합니다.</span>
                         </div>
                         <Switch
-                            checked={autoTradeSettings.isEnabled}
+                            checked={autoTradeSettings.isEnabled && kisAuth.isLoggedIn}
                             onCheckedChange={(v) => updateSetting('isEnabled', v)}
                         />
                     </div>
 
                     {!kisAuth.isLoggedIn && (
-                        <div className="p-3 bg-red-900/20 border border-red-800 rounded-md flex gap-2 items-start">
+                        <div className="p-3 bg-red-900/10 border border-red-900/30 rounded-md flex gap-2 items-start">
                             <ShieldAlert className="w-4 h-4 text-red-500 mt-0.5" />
-                            <div className="text-[12px] text-red-300">
-                                <strong>주의:</strong> KIS 증권 계좌 로그인이 필요합니다.<br />
-                                로그인이 되어있지 않으면 자동 매매가 실행되지 않습니다.
+                            <div className="text-[12px] text-red-400">
+                                <strong>알림:</strong> KIS 연동이 활성화되지 않았습니다.<br />
+                                로그인이 완료되어야 실제 자동 매매 기능이 활성화됩니다.
                             </div>
                         </div>
                     )}
@@ -253,6 +262,14 @@ export function AutoTradingDialog({ isOpen, onOpenChange }) {
                         disabled={isRunning}
                         className="h-8 text-[12px] bg-red-900/50 hover:bg-red-800 border border-red-800 text-red-200 disabled:opacity-50"
                         onClick={async () => {
+                            if (!kisAuth.isLoggedIn) {
+                                setGlobalError({
+                                    title: "로그인 필요",
+                                    description: "즉시 실행(테스트) 기능을 사용하려면 KIS 로그인이 필요합니다."
+                                });
+                                return;
+                            }
+
                             if (!confirm('테스트 모드로 즉시 실행하시겠습니까?\n실제 매매는 발생하지 않으며(수량 0 처리), 분석 로직만 검증합니다.')) return;
 
                             setIsRunning(true);
