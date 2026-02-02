@@ -2,6 +2,8 @@ import path from "path"
 import react from "@vitejs/plugin-react"
 import { defineConfig, loadEnv } from "vite"
 
+process.title = 'My-Vite-App';
+
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, process.cwd(), '');
     return {
@@ -516,6 +518,79 @@ export default defineConfig(({ mode }) => {
                         }
                     });
 
+
+                    // Gemini API Proxy (Local Dev)
+                    server.middlewares.use('/api/gemini', async (req, res, next) => {
+                        res.setHeader('Access-Control-Allow-Origin', '*');
+                        res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
+                        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+                        if (req.method === 'OPTIONS') {
+                            res.statusCode = 200;
+                            res.end();
+                            return;
+                        }
+
+                        if (req.method !== 'POST') {
+                            res.statusCode = 405;
+                            res.end();
+                            return;
+                        }
+
+                        try {
+                            const buffers = [];
+                            for await (const chunk of req) {
+                                buffers.push(chunk);
+                            }
+                            const bodyStr = Buffer.concat(buffers).toString();
+                            const body = JSON.parse(bodyStr);
+
+                            const apiKey = env.VITE_GEMINI_API_KEY;
+                            console.log('[Gemini Proxy] Request received, API Key exists:', !!apiKey);
+
+                            if (!apiKey) {
+                                console.error('[Gemini Proxy] API Key is missing in env');
+                                res.statusCode = 500;
+                                res.end(JSON.stringify({ error: 'Gemini API Key missing' }));
+                                return;
+                            }
+
+                            const model = body.model || "gemini-3-flash-preview";
+                            const fetch = (await import('node-fetch')).default || global.fetch;
+
+                            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    contents: body.contents,
+                                    generationConfig: body.generationConfig || {
+                                        temperature: 0.7,
+                                        topK: 40,
+                                        topP: 0.95,
+                                        maxOutputTokens: 1024,
+                                    }
+                                })
+                            });
+
+                            if (!response.ok) {
+                                const errorText = await response.text();
+                                console.error(`[Gemini Proxy] API Error (${response.status}):`, errorText);
+                                res.statusCode = response.status;
+                                res.setHeader('Content-Type', 'application/json');
+                                res.end(errorText);
+                                return;
+                            }
+
+                            const data = await response.json();
+                            res.statusCode = 200;
+                            res.setHeader('Content-Type', 'application/json');
+                            res.end(JSON.stringify(data));
+                        } catch (e) {
+                            console.error('Gemini Proxy Error:', e);
+                            res.statusCode = 500;
+                            res.end(JSON.stringify({ error: e.message }));
+                        }
+                    });
 
                     // Hugging Face Proxy (Local Dev)
                     server.middlewares.use('/api/hf', async (req, res, next) => {
