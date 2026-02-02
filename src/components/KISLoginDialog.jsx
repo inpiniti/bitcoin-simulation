@@ -95,6 +95,7 @@ export function KISLoginDialog({ open, onOpenChange, onLogin }) {
                         <Input
                             id="appkey"
                             type="password"
+                            autoComplete="off"
                             value={appkey}
                             onChange={(e) => setAppkey(e.target.value)}
                             placeholder="앱키를 입력하세요"
@@ -110,6 +111,7 @@ export function KISLoginDialog({ open, onOpenChange, onLogin }) {
                         <Input
                             id="appsecret"
                             type="password"
+                            autoComplete="off"
                             value={appsecret}
                             onChange={(e) => setAppsecret(e.target.value)}
                             placeholder="앱 시크릿을 입력하세요"
