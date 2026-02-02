@@ -5,7 +5,31 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Bot, User, Loader2, Send, Lightbulb, Wifi, WifiOff } from "lucide-react"
+import { Bot, User, Loader2, Send, Lightbulb, Wifi, WifiOff, Copy, Check } from "lucide-react"
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import { cn } from "@/lib/utils"
+
+/**
+ * 메시지 텍스트를 클립보드에 복사하는 버튼 컴포넌트
+ */
+function CopyButton({ text }) {
+    const [copied, setCopied] = useState(false)
+    const handleCopy = () => {
+        navigator.clipboard.writeText(text)
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+    }
+    return (
+        <button
+            onClick={handleCopy}
+            className="p-1 rounded hover:bg-[#3c3c3c] text-[#666] hover:text-[#007acc] transition-all"
+            title="복사하기"
+        >
+            {copied ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+        </button>
+    )
+}
 
 /**
  * AI 기반 금융 Q&A 패널 컴포넌트
@@ -129,6 +153,7 @@ export function FinancialQAPanel() {
                                 {
                                     text: `You are a professional financial advisor. Answer the user's question about the following company using the provided context. 
                                     If the question is in Korean, answer in Korean.
+                                    Use Markdown formatting (bolding, bullet points, or numbered lists) to make the answer easy to read and well-organized.
                                     Keep the answer concise and informative.
                                     
                                     CONTEXT:
@@ -187,15 +212,43 @@ export function FinancialQAPanel() {
                     {messages.map((msg, idx) => (
                         <div key={idx} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                             {msg.role === 'assistant' && (
-                                <div className="w-8 h-8 rounded-full bg-[#007acc]/20 flex items-center justify-center shrink-0">
-                                    <Bot className="w-5 h-5 text-[#007acc]" />
+                                <div className="flex flex-col gap-2 shrink-0">
+                                    <div className="w-8 h-8 rounded-full bg-[#007acc]/20 flex items-center justify-center">
+                                        <Bot className="w-5 h-5 text-[#007acc]" />
+                                    </div>
+                                    <CopyButton text={msg.text} />
                                 </div>
                             )}
-                            <div className={`max-w-[80%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${msg.role === 'user'
-                                ? 'bg-[#007acc] text-white rounded-tr-none'
-                                : 'bg-[#2d2d2d] text-[#e1e1e1] rounded-tl-none border border-[#3c3c3c]'
-                                }`}>
-                                {msg.text}
+                            <div className={cn(
+                                "max-w-[85%] px-4 py-2.5 rounded-2xl text-[13px] leading-relaxed shadow-sm transition-all",
+                                msg.role === 'user'
+                                    ? 'bg-[#007acc] text-white rounded-tr-none ml-auto'
+                                    : 'bg-[#2d2d2d] text-[#e1e1e1] rounded-tl-none border border-[#3c3c3c]'
+                            )}>
+                                {msg.role === 'assistant' ? (
+                                    <ReactMarkdown
+                                        remarkPlugins={[remarkGfm]}
+                                        components={{
+                                            p: ({ node, ...props }) => <p className="mb-2 last:mb-0" {...props} />,
+                                            ul: ({ node, ...props }) => <ul className="list-disc pl-4 mb-2 last:mb-0 space-y-1" {...props} />,
+                                            ol: ({ node, ...props }) => <ol className="list-decimal pl-4 mb-2 last:mb-0 space-y-1" {...props} />,
+                                            li: ({ node, ...props }) => <li className="marker:text-[#007acc]" {...props} />,
+                                            strong: ({ node, ...props }) => <strong className="font-bold text-[#569cd6]" {...props} />,
+                                            code: ({ node, inline, ...props }) => (
+                                                <code className={cn(
+                                                    "bg-[#1e1e1e] px-1 py-0.5 rounded font-mono text-[0.9em]",
+                                                    inline ? "text-[#ce9178]" : "block p-2 my-2 overflow-x-auto"
+                                                )} {...props} />
+                                            ),
+                                            hr: ({ node, ...props }) => <hr className="border-[#3c3c3c] my-3" {...props} />,
+                                            blockquote: ({ node, ...props }) => <blockquote className="border-l-2 border-[#007acc] pl-3 italic text-[#999] my-2" {...props} />
+                                        }}
+                                    >
+                                        {msg.text}
+                                    </ReactMarkdown>
+                                ) : (
+                                    <div className="whitespace-pre-wrap">{msg.text}</div>
+                                )}
                             </div>
                             {msg.role === 'user' && (
                                 <div className="w-8 h-8 rounded-full bg-[#3c3c3c] flex items-center justify-center shrink-0">

@@ -5,6 +5,8 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Loader2, Globe, Building2, TrendingUp, TrendingDown, Minus, Users, DollarSign, Brain } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 export function OverviewPanel() {
     const { ticker } = useStore()
@@ -122,8 +124,18 @@ export function OverviewPanel() {
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <div className="text-sm text-[#d4d4d4] leading-relaxed max-h-[300px] overflow-y-auto pr-2 scrollbar-msg">
-                                    {profile.longBusinessSummary || "설명이 없습니다."}
+                                <div className="text-sm text-[#d4d4d4] leading-relaxed max-h-[400px] overflow-y-auto pr-2 scrollbar-msg">
+                                    <ReactMarkdown
+                                        remarkPlugins={[remarkGfm]}
+                                        components={{
+                                            p: ({ node, ...props }) => <p className="mb-3 last:mb-0" {...props} />,
+                                            ul: ({ node, ...props }) => <ul className="list-disc pl-4 mb-3" {...props} />,
+                                            li: ({ node, ...props }) => <li className="mb-1" {...props} />,
+                                            strong: ({ node, ...props }) => <strong className="font-bold text-[#569cd6]" {...props} />,
+                                        }}
+                                    >
+                                        {profile.longBusinessSummary || "설명이 없습니다."}
+                                    </ReactMarkdown>
                                 </div>
                             </CardContent>
                         </Card>
