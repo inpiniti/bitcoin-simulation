@@ -163,7 +163,7 @@ export async function fetchStockMinuteData(ticker) {
  */
 export async function fetchKospi200Tickers() {
     try {
-        const response = await fetch('/api/kospi200');
+        const response = await fetch('/api/index-stocks/kospi200');
         if (!response.ok) throw new Error('Failed to fetch KOSPI 200 list');
         const stocks = await response.json();
         return stocks;
@@ -383,8 +383,8 @@ export async function fetchStockOverview(ticker) {
     try {
         // 병렬 호출 (둘 다 로컬 미들웨어 스크래퍼)
         const [profileRes, quoteRes] = await Promise.all([
-            fetch(`/api/company-profile?ticker=${formattedTicker}`),
-            fetch(`/api/company-quote?ticker=${formattedTicker}`)
+            fetch(`/api/company/profile?ticker=${formattedTicker}`),
+            fetch(`/api/company/quote?ticker=${formattedTicker}`)
         ]);
 
         const profileData = profileRes.ok ? await profileRes.json() : null;

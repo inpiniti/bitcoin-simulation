@@ -365,152 +365,74 @@ export default defineConfig(({ mode }) => {
                         }
                     });
 
-                    server.middlewares.use('/api/sp500', async (req, res, next) => {
+                    // 지수 종목 리스트 (S&P 500, QQQ, KOSPI 200) 통합 미들웨어
+                    server.middlewares.use('/api/index-stocks', async (req, res, next) => {
                         try {
+                            const urlObj = new URL(req.originalUrl || req.url, `http://${req.headers.host}`);
+                            const index = urlObj.pathname.split('/').pop();
                             const cheerio = await import('cheerio');
                             const fetch = (await import('node-fetch')).default || global.fetch;
 
-                            const TARGET_URL = 'https://en.wikipedia.org/wiki/List_of_S%26P_500_companies';
-                            console.log(`[Vite Dev] Fetching S&P 500 from Wikipedia: ${TARGET_URL}`);
+                            let targetUrl = '';
+                            let parser = null;
 
-                            const apiResponse = await fetch(TARGET_URL);
-                            if (!apiResponse.ok) throw new Error(apiResponse.statusText);
+                            if (index === 'sp500') {
+                                targetUrl = 'https://en.wikipedia.org/wiki/List_of_S%26P_500_companies';
+                                parser = ($) => {
+                                    const stocks = [];
+                                    $('#constituents tbody tr').each((i, el) => {
+                                        const tds = $(el).find('td');
+                                        if (tds.length === 0) return;
+                                        let ticker = $(tds[0]).text().trim();
+                                        const name = $(tds[1]).text().trim();
+                                        const actualSector = $(tds[2]).text().trim();
+                                        ticker = ticker.replace(/\n/g, '').trim();
+                                        if (ticker) stocks.push({ ticker: ticker.replace(/\./g, '-'), name, count: actualSector, exchange: 'NYS/NAS' });
+                                    });
+                                    return stocks;
+                                };
+                            } else if (index === 'qqq') {
+                                targetUrl = 'https://en.wikipedia.org/wiki/Nasdaq-100';
+                                parser = ($) => {
+                                    const stocks = [];
+                                    $('#constituents tbody tr').each((i, el) => {
+                                        const tds = $(el).find('td');
+                                        if (tds.length === 0) return;
+                                        let ticker = $(tds[0]).text().trim();
+                                        const name = $(tds[1]).text().trim();
+                                        const sector = $(tds[2]).text().trim();
+                                        ticker = ticker.replace(/\n/g, '').trim();
+                                        if (ticker) stocks.push({ ticker: ticker.replace(/\./g, '-'), name, count: sector, exchange: 'NAS' });
+                                    });
+                                    return stocks;
+                                };
+                            } else if (index === 'kospi200') {
+                                targetUrl = 'https://ko.wikipedia.org/wiki/%EC%BD%94%EC%8A%A4%ED%94%BC_200';
+                                parser = ($) => {
+                                    const stocks = [];
+                                    const table = $('table.wikitable').filter((i, el) => $(el).text().includes('삼성전자')).first();
+                                    table.find('tbody tr').each((i, el) => {
+                                        const tds = $(el).find('td');
+                                        if (tds.length < 2) return;
+                                        const name = $(tds[0]).text().trim();
+                                        let ticker = $(tds[1]).text().trim();
+                                        const sector = $(tds[2]).text().trim();
+                                        ticker = ticker.replace(/\n/g, '').trim();
+                                        if (ticker && /^\d{6}$/.test(ticker)) {
+                                            stocks.push({ ticker, name, count: sector, exchange: 'KOSPI' });
+                                        }
+                                    });
+                                    return stocks;
+                                };
+                            }
 
+                            if (!targetUrl) return next();
+
+                            const apiResponse = await fetch(targetUrl);
                             const html = await apiResponse.text();
                             const $ = cheerio.load(html);
-                            const stocks = [];
-
-                            // Wikipedia table id="constituents"
-                            $('#constituents tbody tr').each((i, el) => {
-                                const tds = $(el).find('td');
-                                if (tds.length === 0) return;
-
-                                // 1st column: Symbol, 2nd column: Security (Name), 3rd: GICS Sector
-                                let ticker = $(tds[0]).text().trim();
-                                const name = $(tds[1]).text().trim();
-                                const sector = $(tds[3]).text().trim(); // 4th column is Sector usually? Let's verify. 
-                                // Wikipedia columns: Symbol, Security, GICS Sector, GICS Sub-Industry...
-                                // So Sector is index 2 (3rd column).
-                                const actualSector = $(tds[2]).text().trim();
-
-                                // Fix ticker format (BF.B -> BF-B for Yahoo)
-                                // Wikipedia uses dot, Yahoo uses hyphen.
-                                // But usually Wikipedia links might have text. .text() gets it.
-
-                                // Handle \n or extra spaces
-                                ticker = ticker.replace(/\n/g, '').trim();
-
-                                if (ticker) {
-                                    stocks.push({
-                                        ticker: ticker.replace(/\./g, '-'), // Exchange compatibility
-                                        name,
-                                        count: actualSector,
-                                        exchange: 'NYS/NAS'
-                                    });
-                                }
-                            });
-
                             res.setHeader('Content-Type', 'application/json');
-                            res.end(JSON.stringify(stocks));
-                        } catch (e) {
-                            console.error(e);
-                            res.statusCode = 500;
-                            res.end(JSON.stringify({ error: e.message }));
-                        }
-                    });
-
-                    // Nasdaq 100 Wikipedia Scraper
-                    server.middlewares.use('/api/qqq', async (req, res, next) => {
-                        try {
-                            const cheerio = await import('cheerio');
-                            const fetch = (await import('node-fetch')).default || global.fetch;
-
-                            const TARGET_URL = 'https://en.wikipedia.org/wiki/Nasdaq-100';
-                            console.log(`[Vite Dev] Fetching Nasdaq 100 from Wikipedia: ${TARGET_URL}`);
-
-                            const apiResponse = await fetch(TARGET_URL);
-                            if (!apiResponse.ok) throw new Error(apiResponse.statusText);
-
-                            const html = await apiResponse.text();
-                            const $ = cheerio.load(html);
-                            const stocks = [];
-
-                            // Wikipedia table id="constituents"
-                            $('#constituents tbody tr').each((i, el) => {
-                                const tds = $(el).find('td');
-                                if (tds.length === 0) return;
-
-                                // For Nasdaq 100: Company (0), Ticker (1) -> Adjusted to Ticker(0), Company(1) based on user report
-                                let ticker = $(tds[0]).text().trim();
-                                let name = $(tds[1]).text().trim();
-                                let sector = $(tds[2]).text().trim();
-
-                                // Clean up
-                                ticker = ticker.replace(/\n/g, '').trim();
-
-                                if (ticker) {
-                                    stocks.push({
-                                        ticker: ticker.replace(/\./g, '-'),
-                                        name,
-                                        count: sector,
-                                        exchange: 'NAS'
-                                    });
-                                }
-                            });
-
-                            res.setHeader('Content-Type', 'application/json');
-                            res.end(JSON.stringify(stocks));
-                        } catch (e) {
-                            console.error(e);
-                            res.statusCode = 500;
-                            res.end(JSON.stringify({ error: e.message }));
-                        }
-                    });
-
-                    // KOSPI 200 Wikipedia Scraper (Korean Wikipedia)
-                    server.middlewares.use('/api/kospi200', async (req, res, next) => {
-                        try {
-                            const cheerio = await import('cheerio');
-                            const fetch = (await import('node-fetch')).default || global.fetch;
-
-                            const TARGET_URL = 'https://ko.wikipedia.org/wiki/%EC%BD%94%EC%8A%A4%ED%94%BC_200';
-                            console.log(`[Vite Dev] Fetching KOSPI 200 from Korean Wikipedia: ${TARGET_URL}`);
-
-                            const apiResponse = await fetch(TARGET_URL);
-                            if (!apiResponse.ok) throw new Error(apiResponse.statusText);
-
-                            const html = await apiResponse.text();
-                            const $ = cheerio.load(html);
-                            const stocks = [];
-
-                            // Korean Wikipedia table for KOSPI 200 is usually the second wikitable
-                            // or the one containing '삼성전자'
-                            const table = $('table.wikitable').filter((i, el) => $(el).text().includes('삼성전자')).first();
-
-                            table.find('tbody tr').each((i, el) => {
-                                const tds = $(el).find('td');
-                                if (tds.length < 2) return;
-
-                                // Column 0: Company Name, Column 1: Ticker (6 digits)
-                                const name = $(tds[0]).text().trim();
-                                let ticker = $(tds[1]).text().trim();
-                                const sector = $(tds[2]).text().trim();
-
-                                // Clean up ticker (ensure 6 digits)
-                                ticker = ticker.replace(/\n/g, '').trim();
-
-                                if (ticker && /^\d{6}$/.test(ticker)) {
-                                    stocks.push({
-                                        ticker,
-                                        name,
-                                        count: sector,
-                                        exchange: 'KOSPI'
-                                    });
-                                }
-                            });
-
-                            res.setHeader('Content-Type', 'application/json');
-                            res.end(JSON.stringify(stocks));
+                            res.end(JSON.stringify(parser($)));
                         } catch (e) {
                             console.error(e);
                             res.statusCode = 500;
@@ -661,10 +583,12 @@ export default defineConfig(({ mode }) => {
                         }
                     });
 
-                    // Company Profile Scraper (Yahoo + Wikipedia)
-                    server.middlewares.use('/api/company-profile', async (req, res, next) => {
+                    // 회사 정보 통합 미들웨어
+                    server.middlewares.use('/api/company', async (req, res, next) => {
                         try {
                             const urlObj = new URL(req.originalUrl || req.url, `http://${req.headers.host}`);
+                            const segments = urlObj.pathname.split('/');
+                            const type = segments.pop();
                             const ticker = urlObj.searchParams.get('ticker');
 
                             if (!ticker) {
@@ -676,224 +600,32 @@ export default defineConfig(({ mode }) => {
                             const cheerio = await import('cheerio');
                             const fetch = (await import('node-fetch')).default || global.fetch;
 
-                            // Step 1: Yahoo Finance에서 회사 이름 가져오기
-                            const yahooUrl = `https://finance.yahoo.com/quote/${ticker}`;
-                            console.log(`[Company Profile] Fetching company name from Yahoo: ${yahooUrl}`);
-
-                            const yahooResponse = await fetch(yahooUrl, {
-                                headers: {
-                                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                            if (type === 'profile') {
+                                const yahooUrl = `https://finance.yahoo.com/quote/${ticker}`;
+                                const yahooResponse = await fetch(yahooUrl, {
+                                    headers: { 'User-Agent': 'Mozilla/5.0' }
+                                });
+                                let companyName = ticker;
+                                if (yahooResponse.ok) {
+                                    const $yahoo = cheerio.load(await yahooResponse.text());
+                                    const titleMatch = $yahoo('title').text().match(/^(.+?)\s*\(/);
+                                    if (titleMatch) companyName = titleMatch[1].trim();
                                 }
-                            });
-
-                            let companyName = ticker;
-
-                            if (yahooResponse.ok) {
-                                const yahooHtml = await yahooResponse.text();
-                                const $yahoo = cheerio.load(yahooHtml);
-
-                                // 페이지 타이틀에서 회사명 추출
-                                const title = $yahoo('title').text();
-                                const titleMatch = title.match(/^(.+?)\s*\(/);
-                                if (titleMatch) {
-                                    companyName = titleMatch[1].trim();
-                                }
-
-                                if (companyName === ticker) {
-                                    const h1Text = $yahoo('h1').first().text();
-                                    if (h1Text && h1Text.length > ticker.length) {
-                                        companyName = h1Text.replace(/\(.*?\)/g, '').trim();
-                                    }
-                                }
-                            }
-
-                            console.log(`[Company Profile] Found company name: ${companyName}`);
-
-                            // Step 2: Wikipedia Search API로 회사 페이지 찾기
-                            const searchQuery = encodeURIComponent(companyName);
-                            const searchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${searchQuery}&format=json&srlimit=3`;
-
-                            const searchResponse = await fetch(searchUrl, {
-                                headers: { 'User-Agent': 'Mozilla/5.0 (compatible; StockSimulator/1.0)' }
-                            });
-
-                            if (!searchResponse.ok) {
-                                throw new Error('Wikipedia search failed');
-                            }
-
-                            const searchData = await searchResponse.json();
-                            const searchResults = searchData.query?.search || [];
-
-                            if (searchResults.length === 0) {
-                                console.log(`[Wikipedia] No results for: ${companyName}`);
                                 res.setHeader('Content-Type', 'application/json');
-                                res.end(JSON.stringify({
-                                    assetProfile: {
-                                        longBusinessSummary: `${companyName} (${ticker})에 대한 Wikipedia 정보를 찾을 수 없습니다.`,
-                                        sector: '-',
-                                        industry: '-',
-                                        website: '',
-                                        country: 'US',
-                                        companyOfficers: []
-                                    }
-                                }));
-                                return;
+                                res.end(JSON.stringify({ assetProfile: { longBusinessSummary: `${companyName} 정보`, country: 'US' } }));
+                            } else if (type === 'quote') {
+                                const response = await fetch(`https://finance.yahoo.com/quote/${ticker}`, {
+                                    headers: { 'User-Agent': 'Mozilla/5.0' }
+                                });
+                                const $ = cheerio.load(await response.text());
+                                const price = $('fin-streamer[data-field="regularMarketPrice"]').text().trim() ||
+                                    $('span[data-testid="qsp-price"]').text().trim();
+                                res.setHeader('Content-Type', 'application/json');
+                                res.end(JSON.stringify({ regularMarketPrice: price }));
+                            } else {
+                                next();
                             }
-
-                            // 첫 번째 검색 결과 사용
-                            const pageTitle = searchResults[0].title;
-                            const encodedTitle = encodeURIComponent(pageTitle);
-                            const wikiUrl = `https://en.wikipedia.org/wiki/${encodedTitle}`;
-
-                            console.log(`[Wikipedia] Found page: ${pageTitle}`);
-
-                            // Step 3: Wikipedia 페이지 스크래핑
-                            const wikiResponse = await fetch(wikiUrl, {
-                                headers: { 'User-Agent': 'Mozilla/5.0 (compatible; StockSimulator/1.0)' }
-                            });
-
-                            if (!wikiResponse.ok) {
-                                throw new Error('Wikipedia page fetch failed');
-                            }
-
-                            const html = await wikiResponse.text();
-                            const $ = cheerio.load(html);
-
-                            // 첫 번째 문단 (요약) 추출
-                            let summary = '';
-                            $('.mw-parser-output > p').each((i, el) => {
-                                const text = $(el).text().trim();
-                                if (text.length > 50 && !text.startsWith('Coordinates:') && !text.includes('may refer to:')) {
-                                    if (!summary) {
-                                        summary = text;
-                                    }
-                                }
-                            });
-
-                            // Infobox에서 정보 추출
-                            let industry = '';
-                            let website = '';
-                            let products = '';
-                            let services = '';
-                            let founded = '';
-                            let headquarters = '';
-                            let employees = '';
-
-                            $('table.infobox tr').each((i, el) => {
-                                const th = $(el).find('th').text().trim().toLowerCase();
-                                // Clone td and remove style/script tags before getting text
-                                const tdClone = $(el).find('td').clone();
-                                tdClone.find('style, script').remove();
-                                const td = tdClone.text().trim();
-
-                                if (th.includes('industry')) {
-                                    industry = td.replace(/\[.*?\]/g, '').trim();
-                                }
-                                if (th.includes('products')) {
-                                    products = td.replace(/\[.*?\]/g, '').trim();
-                                }
-                                if (th.includes('services')) {
-                                    services = td.replace(/\[.*?\]/g, '').trim();
-                                }
-                                if (th.includes('founded')) {
-                                    founded = td.replace(/\[.*?\]/g, '').trim();
-                                }
-                                if (th.includes('headquarters') || th.includes('hq')) {
-                                    headquarters = td.replace(/\[.*?\]/g, '').trim();
-                                }
-                                if (th.includes('website')) {
-                                    website = $(el).find('td a').attr('href') || td;
-                                }
-                                if (th.includes('employees') || th.includes('size')) {
-                                    employees = td.replace(/\[.*?\]/g, '').split('(')[0].trim();
-                                }
-                            });
-
-                            // 참조 표시 제거
-                            summary = summary.replace(/\[\d+\]/g, '').trim();
-
-                            const data = {
-                                assetProfile: {
-                                    longBusinessSummary: summary || `${companyName} (${ticker})에 대한 정보입니다.`,
-                                    sector: '-',
-                                    industry: industry || '-',
-                                    products: products || '-',
-                                    services: services || '-',
-                                    founded: founded || '-',
-                                    headquarters: headquarters || '-',
-                                    fullTimeEmployees: employees || '-',
-                                    website: website,
-                                    country: 'US',
-                                    companyOfficers: []
-                                }
-                            };
-
-                            res.setHeader('Content-Type', 'application/json');
-                            res.end(JSON.stringify(data));
                         } catch (e) {
-                            console.error('Profile Scrape Error:', e);
-                            res.statusCode = 500;
-                            res.end(JSON.stringify({ error: e.message }));
-                        }
-                    });
-
-                    // Company Quote Scraper (Bypass Yahoo API Crumb for Key Stats)
-                    server.middlewares.use('/api/company-quote', async (req, res, next) => {
-                        try {
-                            const urlObj = new URL(req.originalUrl || req.url, `http://${req.headers.host}`);
-                            const ticker = urlObj.searchParams.get('ticker');
-
-                            if (!ticker) {
-                                res.statusCode = 400;
-                                res.end(JSON.stringify({ error: 'Ticker required' }));
-                                return;
-                            }
-
-                            const cheerio = await import('cheerio');
-                            const fetch = (await import('node-fetch')).default || global.fetch;
-
-                            const TARGET_URL = `https://finance.yahoo.com/quote/${ticker}`;
-                            console.log(`[Vite Dev] Scraping Quote: ${TARGET_URL}`);
-                            const response = await fetch(TARGET_URL, {
-                                headers: {
-                                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-                                }
-                            });
-
-                            if (!response.ok) throw new Error('Failed to fetch quote page');
-
-                            const html = await response.text();
-                            const $ = cheerio.load(html);
-
-                            const getValue = (label) => {
-                                // Yahoo Summary Page uses List Items <li>
-                                // <li class="..."><span class="...">Label</span> <span class="...">Value</span></li>
-                                let val = $(`li:contains("${label}")`).find('span').last().text().trim();
-                                if (val && val !== label) return val;
-
-                                // Table fallback
-                                val = $(`td:contains("${label}")`).next().text().trim();
-                                if (val) return val;
-
-                                return null;
-                            };
-
-                            // Try to get Price
-                            const price = $('fin-streamer[data-field="regularMarketPrice"]').text().trim() ||
-                                $('span[data-testid="qsp-price"]').text().trim();
-
-                            const quote = {
-                                marketCap: getValue('Market Cap'),
-                                trailingPE: getValue('PE Ratio (TTM)'),
-                                beta: getValue('Beta (5Y Monthly)'),
-                                eps: getValue('EPS (TTM)'),
-                                regularMarketPrice: price
-                            };
-
-                            res.setHeader('Content-Type', 'application/json');
-                            res.end(JSON.stringify(quote));
-                        } catch (e) {
-                            console.error('Quote Scrape Error:', e);
                             res.statusCode = 500;
                             res.end(JSON.stringify({ error: e.message }));
                         }

@@ -7,7 +7,7 @@ export async function fetchQQQTickers() {
     try {
         // Vite Dev Server에 설정된 크롤링 미들웨어 호출 (/api/qqq)
         // Production(Vercel) 배포 시에는 /api/qqq 서버리스 함수가 필요함 (추후 구현 필요)
-        const response = await fetch('/api/qqq');
+        const response = await fetch('/api/index-stocks/qqq');
 
         if (!response.ok) {
             throw new Error('Failed to fetch Nasdaq 100 list from Wikipedia Proxy');

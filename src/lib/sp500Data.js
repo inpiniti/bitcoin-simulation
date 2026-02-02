@@ -7,7 +7,7 @@ export async function fetchSP500Tickers() {
     try {
         // Vite Dev Server에 설정된 크롤링 미들웨어 호출 (/api/sp500)
         // Production(Vercel) 배포 시에는 /api/sp500 서버리스 함수가 필요함 (추후 구현 필요)
-        const response = await fetch('/api/sp500');
+        const response = await fetch('/api/index-stocks/sp500');
 
         if (!response.ok) {
             throw new Error('Failed to fetch S&P 500 list from Wikipedia Proxy');
