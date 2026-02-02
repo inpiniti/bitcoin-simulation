@@ -46,9 +46,32 @@ export const useStore = create(
                 isRealtimeAnalysis: false,
                 realtimeAnalysisTickers: [], // tickers being analyzed
                 realtimeAnalysisData: {}, // { [ticker]: { data: [], ... } }
-                realtimeTrades: [], // [{ id, time, type:'BUY'|'SELL', ticker, price, quantity:1, profit, profitRate }]
+                realtimeTrades: [], // [{ id, time, type:'BUY'|'SELL', ticker, price, quantity:1, profit, profitRate }] - 최대 100개
                 realtimePositions: {}, // { [ticker]: { buyPrice, time } }
                 clearRealtimeTrades: () => set({ realtimeTrades: [], realtimePositions: {} }),
+
+                // 메모리 디버깅 함수 (개발 환경에서만 사용)
+                debugMemoryStats: () => {
+                    const state = get();
+                    const stats = {
+                        realtimeTrades: state.realtimeTrades.length,
+                        realtimePositions: Object.keys(state.realtimePositions).length,
+                        realtimePrices: Object.keys(state.realtimePrices).length,
+                        realtimeAnalysisData: Object.keys(state.realtimeAnalysisData).length,
+                        analysisResult: state.analysisResult.length,
+                        dataCacheSize: Object.keys(state.dataCache).length,
+                    };
+                    console.log('[메모리 통계]', stats);
+
+                    // 각 analysisData의 캔들 수 계산
+                    let totalCandles = 0;
+                    Object.values(state.realtimeAnalysisData).forEach(entry => {
+                        if (entry.data) totalCandles += entry.data.length;
+                    });
+                    console.log('[메모리 통계] 총 캔들 수:', totalCandles);
+
+                    return stats;
+                },
                 wsStatus: { connected: false, subscriptionCount: 0 },
                 setWsStatus: (status) => set(s => ({ wsStatus: { ...s.wsStatus, ...status } })),
 
@@ -219,6 +242,7 @@ export const useStore = create(
                     }
                 })),
                 batchUpdateRealtimePrices: (updates) => set(state => {
+                    // 성능 최적화: 업데이트할 티커만 새 객체로 생성
                     const newPrices = { ...state.realtimePrices };
                     let analysisUpdated = false;
                     let analysisData = state.realtimeAnalysisData;
@@ -228,7 +252,10 @@ export const useStore = create(
                     let tradesUpdated = false;
 
                     // Copy objects only if we need to modify them for analysis
-                    if (state.isRealtimeAnalysis) {
+                    // 최적화: 필요한 경우에만 얕은 복사를 수행
+                    const needsAnalysisUpdate = state.isRealtimeAnalysis && state.realtimeAnalysisTickers.some(t => updates[t]);
+
+                    if (needsAnalysisUpdate) {
                         analysisData = { ...analysisData };
                         newAnalysisResult = [...newAnalysisResult];
                         newTrades = [...newTrades];
@@ -351,6 +378,10 @@ export const useStore = create(
                                                 };
                                             }
 
+                                            // 메모리 누수 방지: 거래 로그 최대 100개 유지
+                                            if (newTrades.length >= 100) {
+                                                newTrades = newTrades.slice(0, 99);
+                                            }
                                             newTrades.unshift({
                                                 id: Date.now() + Math.random(),
                                                 time: new Date().toISOString(),
@@ -371,6 +402,10 @@ export const useStore = create(
                                     const profit = (price - avgPrice) * totalQty;
                                     const profitRate = ((price - avgPrice) / avgPrice) * 100;
 
+                                    // 메모리 누수 방지: 거래 로그 최대 100개 유지
+                                    if (newTrades.length >= 100) {
+                                        newTrades = newTrades.slice(0, 99);
+                                    }
                                     newTrades.unshift({
                                         id: Date.now() + Math.random(),
                                         time: timestamp,
@@ -1015,11 +1050,23 @@ export const useStore = create(
                 },
 
                 stopRealtimeAnalysis: () => {
-                    set({ isRealtimeAnalysis: false, isAnalyzing: false });
+                    console.log('[실시간 분석] 중지 및 메모리 정리 시작');
+
+                    // 메모리 정리: 실시간 분석 관련 데이터 초기화
+                    set({
+                        isRealtimeAnalysis: false,
+                        isAnalyzing: false,
+                        realtimeAnalysisData: {}, // 캔들 데이터 해제
+                        realtimeAnalysisTickers: [], // 분석 대상 티커 초기화
+                        // realtimeTrades, realtimePositions는 사용자가 참고할 수 있으므로 유지
+                    });
+
                     // WebSocket 구독 해제
                     import('@/lib/kisWebSocket').then(({ kisWebSocket }) => {
                         kisWebSocket.subscribeAnalysis([]);
                     });
+
+                    console.log('[실시간 분석] 메모리 정리 완료');
                 },
 
                 /**

@@ -341,11 +341,19 @@ class KISWebSocketManager {
 
     startFlushTimer() {
         this.stopFlushTimer();
+        let flushCount = 0;
         this.flushTimer = setInterval(() => {
             if (Object.keys(this.updateBatch).length > 0) {
                 const batch = this.updateBatch;
                 this.updateBatch = {};
                 useStore.getState().batchUpdateRealtimePrices(batch);
+
+                // 10회마다 메모리 상태 로깅 (약 5초마다)
+                flushCount++;
+                if (flushCount % 10 === 0) {
+                    const stats = useStore.getState().debugMemoryStats();
+                    console.log('[WS Flush]', flushCount, '회 실행, 배치 크기:', Object.keys(batch).length);
+                }
             }
         }, 500);
     }

@@ -349,7 +349,10 @@ export function Sidebar() {
                     {isAnalyzeMode && (
                         <button
                             disabled={!hasData || isAnalyzing}
-                            onClick={() => {
+                            onClick={(e) => {
+                                // aria-hidden 경고 방지를 위해 버튼 포커스 해제
+                                e.currentTarget.blur();
+
                                 if (isRealtimeAnalysis) {
                                     stopRealtimeAnalysis()
                                 } else {
