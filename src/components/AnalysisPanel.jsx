@@ -108,7 +108,7 @@ export function AnalysisPanel() {
 
 
                     <ScrollArea className="flex-1">
-                        <Table>
+                        <Table className="w-full table-fixed">
                             <TableHeader className="bg-[#2d2d2d] sticky top-0 z-10">
                                 <TableRow className="border-[#3e3e42] hover:bg-transparent">
                                     <TableHead className="text-[#9d9d9d] w-[140px]">Ticker</TableHead>

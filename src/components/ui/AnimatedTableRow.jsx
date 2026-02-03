@@ -1,5 +1,5 @@
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, memo } from "react"
 import { motion } from "framer-motion"
 import { cn } from "@/lib/utils"
 
@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils"
  * @param {Function} [props.onClick] - 행 클릭 이벤트 핸들러
  * @returns {JSX.Element} 애니메이션이 적용된 Table Row
  */
-export function AnimatedTableRow({ item, children, className, onClick, ...props }) {
+function AnimatedTableRowComponent({ item, children, className, onClick, ...props }) {
     const prevPrice = useRef(item.price)
     const [status, setStatus] = useState("idle") // 'idle' | 'rise' | 'fall'
 
@@ -101,3 +101,22 @@ export function AnimatedTableRow({ item, children, className, onClick, ...props 
         </motion.tr>
     )
 }
+
+// React.memo를 사용하여 불필요한 리렌더링 방지
+export const AnimatedTableRow = memo(AnimatedTableRowComponent, (prevProps, nextProps) => {
+    // children은 매번 새로운 객체이므로 비교에서 제외하고, 
+    // 실제 데이터(item)가 변경되었을 때만 리렌더링하도록 함.
+    // 이는 스크롤 성능 최적화에 중요함.
+    const prev = prevProps.item
+    const next = nextProps.item
+
+    return (
+        prev.ticker === next.ticker &&
+        prev.price === next.price &&
+        prev.changeRate === next.changeRate &&
+        prev.signal === next.signal &&
+        prev.sentiment === next.sentiment &&
+        prev.reason === next.reason &&
+        prevProps.className === nextProps.className
+    )
+})
