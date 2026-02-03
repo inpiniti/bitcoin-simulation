@@ -6,6 +6,8 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { KISOrderDialog } from "@/components/KISOrderDialog" // Import Dialog
 import { RealtimeTradeLog } from "@/components/RealtimeTradeLog"
 import { kisWebSocket } from "@/lib/kisWebSocket"
+import { AnimatedNumber } from "@/components/ui/AnimatedNumber"
+import { AnimatedTableRow } from "@/components/ui/AnimatedTableRow"
 
 /**
  * 시장 스캔 결과를 표 형태로 표시하는 컴포넌트입니다.
@@ -119,8 +121,9 @@ export function AnalysisPanel() {
                             </TableHeader>
                             <TableBody>
                                 {analysisResult.map((item) => (
-                                    <TableRow
+                                    <AnimatedTableRow
                                         key={item.ticker}
+                                        item={item}
                                         className="border-[#2d2d2d] hover:bg-[#2a2d2e] cursor-pointer transition-colors"
                                         onClick={() => handleRowClick(item.ticker)}
                                     >
@@ -151,10 +154,21 @@ export function AnalysisPanel() {
                                             </Badge>
                                         </TableCell>
                                         <TableCell className="text-right text-[#cccccc] font-mono">
-                                            {item.price ? item.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
+                                            {item.price ? (
+                                                <AnimatedNumber
+                                                    value={item.price}
+                                                    className="text-[#cccccc]"
+                                                />
+                                            ) : '-'}
                                         </TableCell>
                                         <TableCell className={`text-right font-mono font-medium ${item.changeRate > 0 ? 'text-[#f23645]' : item.changeRate < 0 ? 'text-[#089981]' : 'text-[#9d9d9d]'}`}>
-                                            {item.changeRate ? `${item.changeRate > 0 ? '+' : ''}${item.changeRate.toFixed(2)}%` : '-'}
+                                            {item.changeRate !== undefined ? (
+                                                <AnimatedNumber
+                                                    value={item.changeRate}
+                                                    format={v => `${v > 0 ? '+' : ''}${v.toFixed(2)}%`}
+                                                    flashOnUpdate={false}
+                                                />
+                                            ) : '-'}
                                         </TableCell>
                                         <TableCell className="text-center">
                                             {item.news && item.news.length > 0 ? (
@@ -168,7 +182,7 @@ export function AnalysisPanel() {
                                         <TableCell className="text-[#9d9d9d] text-xs">
                                             {item.reason}
                                         </TableCell>
-                                    </TableRow>
+                                    </AnimatedTableRow>
                                 ))}
                             </TableBody>
                         </Table>

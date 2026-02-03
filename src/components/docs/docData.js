@@ -13,6 +13,7 @@ import panelsMd from '@/docs/components/panels.md?raw'
 import financialQAMd from '@/docs/components/financialQA.md?raw'
 import chartsMd from '@/docs/components/charts.md?raw'
 import dialogsMd from '@/docs/components/dialogs.md?raw'
+import uiMd from '@/docs/components/ui.md?raw'
 
 import simUtilsMd from '@/docs/utils/simulation.md?raw'
 
@@ -225,6 +226,18 @@ export const DOCS_DATA = {
             { id: 'globalalertdialog', label: 'GlobalAlertDialog', type: 'component' },
             { id: 'autotradingdialog', label: 'AutoTradingDialog', type: 'component' },
             { id: 'kisorderdialog', label: 'KISOrderDialog', type: 'component' },
+        ]
+    },
+    'components/ui': {
+        id: 'components/ui',
+        title: 'Shared UI Components',
+        type: 'component',
+        path: 'src/components/ui/*.jsx',
+        description: 'Animated and reusable UI elements.',
+        content: uiMd,
+        children: [
+            { id: 'animatednumber', label: 'AnimatedNumber', type: 'method' },
+            { id: 'animatedtablerow', label: 'AnimatedTableRow', type: 'method' },
         ]
     },
 
