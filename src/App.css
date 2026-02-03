@@ -69,3 +69,35 @@ button:active {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-secondary);
 }
+
+/* 테이블 행 빛 스캔 애니메이션 (상승) */
+@keyframes scan-rise {
+  0% {
+    background: linear-gradient(90deg, transparent 0%, rgba(242, 54, 69, 0.3) 50%, transparent 100%);
+    background-size: 200% 100%;
+    background-position: -100% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* 테이블 행 빛 스캔 애니메이션 (하락) */
+@keyframes scan-fall {
+  0% {
+    background: linear-gradient(90deg, transparent 0%, rgba(8, 153, 129, 0.3) 50%, transparent 100%);
+    background-size: 200% 100%;
+    background-position: -100% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-scan-rise {
+  animation: scan-rise 0.8s ease-out;
+}
+
+.animate-scan-fall {
+  animation: scan-fall 0.8s ease-out;
+}

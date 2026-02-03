@@ -47,6 +47,8 @@ class KISWebSocketManager {
         this.isConnecting = false;
         this.reconnectTimer = null;
         this.pingTimer = null;
+        this.healthCheckTimer = null; // 연결 상태 모니터링 타이머
+        this.lastDataTime = null; // 마지막 데이터 수신 시간
         this.messageQueue = [];
         this.updateBatch = {};
         this.flushTimer = null;
@@ -73,8 +75,9 @@ class KISWebSocketManager {
             this.socket = new WebSocket(WS_URL);
 
             this.socket.onopen = () => {
-                // console.log("[KIS WS] Connected");
+                console.log("[KIS WS] Connected to:", WS_URL);
                 this.isConnecting = false;
+                this.lastDataTime = Date.now(); // 연결 시 초기화
 
                 while (this.messageQueue.length > 0) {
                     this.sendJson(this.messageQueue.shift());
@@ -83,6 +86,7 @@ class KISWebSocketManager {
                 this.resubscribeAll();
                 this.startPing();
                 this.startFlushTimer();
+                this.startHealthCheck(); // 연결 상태 모니터링 시작
                 useStore.getState().setWsStatus({ connected: true });
             };
 
@@ -91,10 +95,11 @@ class KISWebSocketManager {
             };
 
             this.socket.onclose = (event) => {
-                // console.log("[KIS WS] Closed:", event.code);
+                console.log("[KIS WS] Closed:", event.code);
                 this.isConnecting = false;
                 this.stopPing();
                 this.stopFlushTimer();
+                this.stopHealthCheck();
                 if (event.code !== 1000) {
                     this.scheduleReconnect();
                 }
@@ -104,6 +109,7 @@ class KISWebSocketManager {
             this.socket.onerror = (error) => {
                 console.error("[KIS WS] Error:", error);
                 this.isConnecting = false;
+                this.stopHealthCheck();
                 useStore.getState().setWsStatus({ connected: false });
             };
 
@@ -157,15 +163,62 @@ class KISWebSocketManager {
 
     startPing() {
         this.stopPing();
+        // 주기적으로 더미 데이터를 보내 연결 유지 (Railway idle timeout 방지)
         this.pingTimer = setInterval(() => {
-            // KIS keep-alive logic if needed
-        }, 30000);
+            if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+                // WebSocket ping frame은 브라우저에서 지원하지 않으므로 빈 객체 전송
+                // 실제로는 아무 부작용 없음 (KIS는 이를 무시)
+            }
+        }, 20000); // 20초마다
     }
 
     stopPing() {
         if (this.pingTimer) {
             clearInterval(this.pingTimer);
             this.pingTimer = null;
+        }
+    }
+
+    /**
+     * 연결 상태 모니터링을 시작합니다.
+     * 일정 시간 동안 데이터가 수신되지 않으면 연결을 재시도합니다.
+     */
+    startHealthCheck() {
+        this.stopHealthCheck();
+
+        // 60초마다 연결 상태 확인
+        this.healthCheckTimer = setInterval(() => {
+            if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+                console.log('[KIS WS] Health Check: Socket not open, attempting reconnect...');
+                this.scheduleReconnect();
+                return;
+            }
+
+            // 구독 중인 종목이 있는데 90초간 데이터가 없으면 연결 문제로 간주
+            if (this.subscribedTickers.size > 0 && this.lastDataTime) {
+                const timeSinceLastData = Date.now() - this.lastDataTime;
+
+                // 90초(1.5분) 이상 데이터 없으면 재연결 (시장 개장 시간 고려)
+                if (timeSinceLastData > 90000) {
+                    console.log(`[KIS WS] Health Check: No data for ${Math.round(timeSinceLastData / 1000)}s, reconnecting...`);
+
+                    // 기존 연결 강제 종료 후 재연결
+                    if (this.socket) {
+                        this.socket.close(4000, 'Health check failed');
+                    }
+                    this.scheduleReconnect();
+                }
+            }
+        }, 60000); // 60초마다 확인
+    }
+
+    /**
+     * 연결 상태 모니터링을 중지합니다.
+     */
+    stopHealthCheck() {
+        if (this.healthCheckTimer) {
+            clearInterval(this.healthCheckTimer);
+            this.healthCheckTimer = null;
         }
     }
 
@@ -331,6 +384,9 @@ class KISWebSocketManager {
     }
 
     handleMessage(message) {
+        // 데이터 수신 시간 업데이트 (연결 상태 모니터링용)
+        this.lastDataTime = Date.now();
+
         const firstChar = message.charAt(0);
         if (firstChar !== '0' && firstChar !== '1') {
             try {

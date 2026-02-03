@@ -61,7 +61,10 @@ function AnimatedTableRowComponent({ item, children, className, onClick, ...prop
     return (
         <motion.tr
             className={cn(
-                "border-b cursor-pointer transition-all relative",
+                "border-b cursor-pointer transition-all relative overflow-hidden",
+                // 빛 애니메이션을 위한 CSS 클래스 (테이블 구조 변경 없이)
+                status === 'rise' && "animate-scan-rise",
+                status === 'fall' && "animate-scan-fall",
                 className
             )}
             animate={getStyles()}
@@ -70,34 +73,6 @@ function AnimatedTableRowComponent({ item, children, className, onClick, ...prop
             {...props}
         >
             {children}
-
-            {/* 테두리 순환 효과 (Border Scanner) - 데이터 변경 시에만 활성화 */}
-            {status !== 'idle' && (
-                <motion.td
-                    colSpan={100}
-                    className="absolute inset-0 pointer-events-none p-0 border-none overflow-hidden"
-                    style={{ display: 'block' }} // tr 내부에서 렌더링되도록
-                >
-                    {/* 상단에서 오른쪽으로 지나가는 빛 */}
-                    <motion.div
-                        className={cn("absolute top-0 h-[1px] w-1/2 bg-gradient-to-r from-transparent to-transparent opacity-70",
-                            status === 'rise' ? "via-red-500" : "via-emerald-500"
-                        )}
-                        initial={{ left: "-50%" }}
-                        animate={{ left: "100%" }}
-                        transition={{ duration: 0.8, ease: "circOut" }}
-                    />
-                    {/* 하단에서 오른쪽으로 지나가는 빛 */}
-                    <motion.div
-                        className={cn("absolute bottom-0 h-[1px] w-1/2 bg-gradient-to-r from-transparent to-transparent opacity-70",
-                            status === 'rise' ? "via-red-500" : "via-emerald-500"
-                        )}
-                        initial={{ right: "100%" }}
-                        animate={{ right: "-50%" }}
-                        transition={{ duration: 0.8, ease: "circOut" }}
-                    />
-                </motion.td>
-            )}
         </motion.tr>
     )
 }
