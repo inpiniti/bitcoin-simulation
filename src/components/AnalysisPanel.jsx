@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { useStore } from "@/store/useStore"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
@@ -8,6 +8,7 @@ import { RealtimeTradeLog } from "@/components/RealtimeTradeLog"
 import { kisWebSocket } from "@/lib/kisWebSocket"
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber"
 import { AnimatedTableRow } from "@/components/ui/AnimatedTableRow"
+import { Sparkline } from "@/components/ui/Sparkline"
 
 /**
  * 시장 스캔 결과를 표 형태로 표시하는 컴포넌트입니다.
@@ -20,6 +21,7 @@ export function AnalysisPanel() {
     const analysisResult = useStore(state => state.analysisResult);
     const isAnalyzing = useStore(state => state.isAnalyzing);
     const isRealtimeAnalysis = useStore(state => state.isRealtimeAnalysis);
+    const realtimeAnalysisData = useStore(state => state.realtimeAnalysisData);
     const setTicker = useStore(state => state.setTicker);
     const setAnalysisMode = useStore(state => state.setAnalysisMode);
 
@@ -113,6 +115,9 @@ export function AnalysisPanel() {
                                 <TableRow className="border-[#3e3e42] hover:bg-transparent">
                                     <TableHead className="text-[#9d9d9d] w-[140px]">Ticker</TableHead>
                                     <TableHead className="text-[#9d9d9d] w-[100px]">Signal</TableHead>
+                                    {isRealtimeAnalysis && (
+                                        <TableHead className="text-[#9d9d9d] w-[90px] text-center">Chart</TableHead>
+                                    )}
                                     <TableHead className="text-[#9d9d9d] text-right">Price</TableHead>
                                     <TableHead className="text-[#9d9d9d] text-right">Change (24h)</TableHead>
                                     <TableHead className="text-[#9d9d9d] text-center w-[120px]">AI Sentiment</TableHead>
@@ -153,6 +158,15 @@ export function AnalysisPanel() {
                                                 {item.signal}
                                             </Badge>
                                         </TableCell>
+                                        {/* 스파크라인 차트 (실시간 분석 시에만 표시) */}
+                                        {isRealtimeAnalysis && (
+                                            <TableCell className="py-1">
+                                                <SparklineCell
+                                                    ticker={item.ticker}
+                                                    realtimeAnalysisData={realtimeAnalysisData}
+                                                />
+                                            </TableCell>
+                                        )}
                                         <TableCell className="text-right text-[#cccccc] font-mono">
                                             {item.price ? (
                                                 <AnimatedNumber
@@ -207,6 +221,35 @@ export function AnalysisPanel() {
     )
 }
 
+/**
+ * 스파크라인 셀 컴포넌트 (메모이제이션 적용)
+ * realtimeAnalysisData에서 해당 티커의 close 데이터를 추출하여 Sparkline으로 표시
+ */
+function SparklineCell({ ticker, realtimeAnalysisData }) {
+    // 해당 티커의 캔들 데이터에서 close 값만 추출 (메모이제이션)
+    const closeData = useMemo(() => {
+        const tickerData = realtimeAnalysisData[ticker];
+        if (!tickerData || !tickerData.data || tickerData.data.length < 2) {
+            return [];
+        }
+        // close 값만 추출 (최대 300개에서 샘플링은 Sparkline 내부에서 처리)
+        return tickerData.data.map(candle => candle.close);
+    }, [ticker, realtimeAnalysisData[ticker]?.data?.length, realtimeAnalysisData[ticker]?.data?.[realtimeAnalysisData[ticker]?.data?.length - 1]?.close]);
+
+    if (closeData.length < 2) {
+        return <span className="text-[10px] text-[#555]">-</span>;
+    }
+
+    return (
+        <Sparkline
+            data={closeData}
+            width={80}
+            height={24}
+            maxPoints={30}
+        />
+    );
+}
+
 function WSStatusIndicator() {
     const wsStatus = useStore(state => state.wsStatus);
     return (
@@ -220,6 +263,7 @@ function WSStatusIndicator() {
             <span className="text-[#888]">Active WS: {wsStatus.subscriptionCount}</span>
         </div>
     )
+
 }
 
 function getSignalColorClass(signal) {

@@ -143,7 +143,10 @@ export function TickerSelectionPanel() {
         // 과도한 구독 요청 방지를 위한 디바운싱
         if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
         debounceTimerRef.current = setTimeout(() => {
-            const currentVisible = Array.from(visibleStocksRef.current.values());
+            const currentVisible = Array.from(visibleStocksRef.current.values()).map(stock => ({
+                ...stock,
+                exchange: stock.exchange || 'NAS' // 기본값 설정
+            }));
             kisWebSocket.subscribeStocks(currentVisible);
         }, 200);
     }, []); // 의존성 없음 (Ref와 Singleton 사용)

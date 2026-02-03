@@ -55,8 +55,14 @@ class KISWebSocketManager {
 
     connect(approvalKey) {
         if (!approvalKey) return;
-        if (this.socket && (this.socket.readyState === WebSocket.OPEN || this.socket.readyState === WebSocket.CONNECTING)) {
-            return;
+
+        // 기존 연결이 있으면 무조건 먼저 끊기 (중복 연결 방지)
+        if (this.socket) {
+            console.log('[KIS WS] 기존 연결 감지, 재연결을 위해 종료합니다.');
+            this.socket.close(1000, 'Reconnecting');
+            this.socket = null;
+            this.stopPing();
+            this.stopFlushTimer();
         }
 
         this.approvalKey = approvalKey;
@@ -283,7 +289,12 @@ class KISWebSocketManager {
             if (ex === 'NYS' || ex === 'NYSE') marketCode = 'NYS';
             else if (ex === 'AMS' || ex === 'AMEX') marketCode = 'AMS';
             else if (ex === 'NAS' || ex === 'NASDAQ') marketCode = 'NAS';
-            return { tr_id: 'HDFSCNT0', tr_key: `D${marketCode}${ticker}` };
+
+            // 티커의 점(.)을 슬래시(/)로 변환, 하이픈(-)은 제거 (BRK.B → BRK/B)
+            const cleanTicker = ticker.replace(/\./g, '/').replace(/-/g, '');
+            const tr_key = `D${marketCode}${cleanTicker}`;
+            console.log(`[KIS WS] getTrInfo: ${ticker} (${exchange}) → ${tr_key}`);
+            return { tr_id: 'HDFSCNT0', tr_key };
         }
     }
 
@@ -326,6 +337,11 @@ class KISWebSocketManager {
                 const json = JSON.parse(message);
                 if (json.body && json.body.msg1) {
                     const msg = json.body.msg1;
+                    // BRK.B 관련 에러 확인
+                    const key = json.header?.tr_key || '';
+                    if (key.includes('BRKB') || key.includes('BRK_B') || key.includes('BRK/B')) {
+                        console.log('[KIS WS] BRK.B 관련 응답:', json);
+                    }
                     // console.log(`[KIS WS Msg] ${msg}`);
                 }
             } catch (e) { }
@@ -361,7 +377,18 @@ class KISWebSocketManager {
     parseOverseas(rawData) {
         const fields = rawData.split('^');
         if (fields.length < 15) return;
-        const ticker = fields[1];
+        let ticker = fields[1];
+
+        // 티커 정규화: KIS에서 BRK/B 등으로 올 경우 BRK.B로 변환하여 앱 내부 표준 유지
+        if (ticker.includes('/') || ticker.includes('_')) {
+            ticker = ticker.replace(/[\/_]/g, '.');
+        }
+
+        // BRK.B 디버깅
+        if (ticker === 'BRKB' || ticker === 'BRK_B' || ticker === 'BRK.B') {
+            console.log(`[KIS WS] ${ticker} 데이터 수신!`, fields.slice(0, 20));
+        }
+
         this.updateBatch[ticker] = {
             price: parseFloat(fields[11]),
             change: parseFloat(fields[13]),

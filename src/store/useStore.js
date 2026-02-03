@@ -969,6 +969,8 @@ export const useStore = create(
                             if (interval === '1m') {
                                 const { fetchStockMinuteData } = await import('@/lib/api');
                                 const fullData = await fetchStockMinuteData(stock.ticker);
+                                // 거래소 정보 보존 (slice 전에 추출!)
+                                if (fullData && fullData.exchange) exchange = fullData.exchange;
                                 // 최근 300개만 사용
                                 rawData = fullData.slice(-300);
                             } else {
@@ -1046,6 +1048,7 @@ export const useStore = create(
                         ticker: s.ticker,
                         exchange: analysisData[s.ticker]?.exchange || s.exchange || 'NAS'
                     }));
+                    console.log('[Realtime] WebSocket 구독 리스트:', subList.map(s => `${s.ticker}(${s.exchange})`).join(', '));
                     kisWebSocket.subscribeAnalysis(subList);
                 },
 
@@ -1083,10 +1086,27 @@ export const useStore = create(
 
                     set({ loadingRecommendations: true });
                     try {
-                        const { fetchRecommendedTickers } = await import('@/lib/api');
+                        const { fetchRecommendedTickers, fetchStockHistory } = await import('@/lib/api');
                         const stocks = await fetchRecommendedTickers();
+
+                        // 각 종목의 거래소 정보 보강 (Yahoo Finance에서 조회)
+                        console.log('[Store] Dataroma 종목 거래소 정보 조회 시작...');
+                        const enrichedStocks = await Promise.all(
+                            stocks.slice(0, 50).map(async (stock) => { // 최대 50개만 처리
+                                try {
+                                    const rawData = await fetchStockHistory(stock.ticker, 1); // 1일치만
+                                    const exchange = rawData?.exchange || 'NAS';
+                                    return { ...stock, exchange };
+                                } catch (e) {
+                                    console.warn(`${stock.ticker} 거래소 조회 실패, 기본값 NAS 사용`);
+                                    return { ...stock, exchange: 'NAS' };
+                                }
+                            })
+                        );
+                        console.log('[Store] 거래소 정보가 추가된 종목:', enrichedStocks.slice(0, 5).map(s => `${s.ticker}(${s.exchange})`).join(', '));
+
                         set({
-                            recommendedStocks: stocks,
+                            recommendedStocks: enrichedStocks,
                             lastRecommendedFetch: now,
                             loadingRecommendations: false
                         });
