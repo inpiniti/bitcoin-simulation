@@ -336,7 +336,7 @@ export const useStore = create(
                                                 // 손실률이 임계값보다 크면(덜 손실이면) 추가 매수 불가
                                                 if (currentLossRate > addBuyThreshold) {
                                                     canAddBuy = false;
-                                                    console.log(`[V-Martingale] ${ticker} 추가 매수 스킵: 손실률 ${currentLossRate.toFixed(2)}% > 임계값 ${addBuyThreshold}%`);
+                                                    // console.log(`[V-Martingale] ${ticker} 추가 매수 스킵: 손실률 ${currentLossRate.toFixed(2)}% > 임계값 ${addBuyThreshold}%`);
                                                 }
                                             }
                                         }
@@ -351,7 +351,7 @@ export const useStore = create(
                                             const qty = multiplier; // 가상 단위 수량
                                             const cost = price * qty;
 
-                                            console.log(`[Realtime Trade] ${ticker} BUY Signal! Entry #${entryCount + 1}, Qty: ${qty}`);
+                                            // console.log(`[Realtime Trade] ${ticker} BUY Signal! Entry #${entryCount + 1}, Qty: ${qty}`);
 
                                             if (!currentPosition) {
                                                 // 첫 매수
@@ -460,13 +460,13 @@ export const useStore = create(
                         if (result.success) {
                             // 2. WebSocket Approval Key 발급 (병렬 처리 가능하지만 순차 처리로 안전하게)
                             let approvalKey = '';
-                            console.log('[KIS] Access Token 발급 성공, WebSocket 키 발급 시도...');
+                            // console.log('[KIS] Access Token 발급 성공, WebSocket 키 발급 시도...');
                             try {
                                 const wsResult = await getWebSocketApprovalKey(appkey, appsecret);
-                                console.log('[KIS] WebSocket 키 발급 응답:', { success: wsResult.success, hasKey: !!wsResult.approval_key, error: wsResult.error });
+                                // console.log('[KIS] WebSocket 키 발급 응답:', { success: wsResult.success, hasKey: !!wsResult.approval_key, error: wsResult.error });
                                 if (wsResult.success) {
                                     approvalKey = wsResult.approval_key;
-                                    console.log('[KIS] WebSocket 키 발급 성공');
+                                    // console.log('[KIS] WebSocket 키 발급 성공');
                                 } else {
                                     console.warn('[KIS] 웹소켓 키 발급 실패 (REST API만 사용):', wsResult.error);
                                 }
@@ -474,7 +474,7 @@ export const useStore = create(
                                 console.error('[KIS] 웹소켓 키 발급 에러:', wsErr);
                             }
 
-                            console.log('[KIS] 최종 상태 - approvalKey:', approvalKey ? 'EXISTS' : 'EMPTY');
+                            // console.log('[KIS] 최종 상태 - approvalKey:', approvalKey ? 'EXISTS' : 'EMPTY');
                             set({
                                 kisAuth: {
                                     isLoggedIn: true,
@@ -550,7 +550,7 @@ export const useStore = create(
                             try {
                                 const { revokeAccessToken } = await import('@/lib/kisApi')
                                 await revokeAccessToken(appkey, appsecret, accessToken)
-                                console.log('[KIS] 기존 토큰 폐기 완료')
+                                // console.log('[KIS] 기존 토큰 폐기 완료')
                             } catch (error) {
                                 console.warn('[KIS] 토큰 폐기 실패 (계속 진행):', error.message)
                             }
@@ -563,13 +563,13 @@ export const useStore = create(
                         if (result.success) {
                             // 3. WebSocket Approval Key 발급 (재로그인 시에도 필요!)
                             let approvalKey = '';
-                            console.log('[KIS] 재로그인: Access Token 발급 성공, WebSocket 키 발급 시도...');
+                            // console.log('[KIS] 재로그인: Access Token 발급 성공, WebSocket 키 발급 시도...');
                             try {
                                 const wsResult = await getWebSocketApprovalKey(appkey, appsecret);
-                                console.log('[KIS] 재로그인: WebSocket 키 발급 응답:', { success: wsResult.success, hasKey: !!wsResult.approval_key, error: wsResult.error });
+                                // console.log('[KIS] 재로그인: WebSocket 키 발급 응답:', { success: wsResult.success, hasKey: !!wsResult.approval_key, error: wsResult.error });
                                 if (wsResult.success) {
                                     approvalKey = wsResult.approval_key;
-                                    console.log('[KIS] 재로그인: WebSocket 키 발급 성공');
+                                    // console.log('[KIS] 재로그인: WebSocket 재연결 요청 완료');
                                 } else {
                                     console.warn('[KIS] 재로그인: 웹소켓 키 발급 실패 (REST API만 사용):', wsResult.error);
                                 }
@@ -577,7 +577,7 @@ export const useStore = create(
                                 console.error('[KIS] 재로그인: 웹소켓 키 발급 에러:', wsErr);
                             }
 
-                            console.log('[KIS] 재로그인: 최종 상태 - approvalKey:', approvalKey ? 'EXISTS' : 'EMPTY');
+                            // console.log('[KIS] 재로그인: 최종 상태 - approvalKey:', approvalKey ? 'EXISTS' : 'EMPTY');
                             set({
                                 kisAuth: {
                                     isLoggedIn: true,
@@ -590,7 +590,7 @@ export const useStore = create(
                                     tokenExpiry: result.access_token_token_expired,
                                 }
                             })
-                            console.log('[KIS] 재로그인 성공')
+                            // console.log('[KIS] 재로그인 성공')
                             return { success: true }
                         } else {
                             // 토큰 발급 실패 시 로그아웃 상태로 변경
@@ -1050,7 +1050,7 @@ export const useStore = create(
                 },
 
                 stopRealtimeAnalysis: () => {
-                    console.log('[실시간 분석] 중지 및 메모리 정리 시작');
+                    // console.log('[실시간 분석] 중지 및 메모리 정리 시작');
 
                     // 메모리 정리: 실시간 분석 관련 데이터 초기화
                     set({
@@ -1066,7 +1066,7 @@ export const useStore = create(
                         kisWebSocket.subscribeAnalysis([]);
                     });
 
-                    console.log('[실시간 분석] 메모리 정리 완료');
+                    // console.log('[실시간 분석] 메모리 정리 완료');
                 },
 
                 /**
@@ -1193,7 +1193,7 @@ export const useStore = create(
                         if (state.mode === 'stock' && interval === '1d') {
                             const cachedEntry = state.dataCache[ticker];
                             if (cachedEntry && new Date(cachedEntry.timestamp).toISOString().split('T')[0] === today) {
-                                console.log(`[Store] Using cached data for ${ticker}`);
+                                // console.log(`[Store] Using cached data for ${ticker}`);
                                 rawData = cachedEntry.data;
                             }
                         }

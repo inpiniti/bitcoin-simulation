@@ -33,7 +33,7 @@ export function addPendingOrder(order) {
         addedAt: new Date().toISOString(),
         recorded: false  // DB 기록 여부
     })
-    console.log(`[OrderTracker] 주문 추적 추가: ${order.orderType} ${order.ticker} (${order.orderNo})`)
+    // console.log(`[OrderTracker] 주문 추적 추가: ${order.orderType} ${order.ticker} (${order.orderNo})`)
 }
 
 /**
@@ -41,7 +41,7 @@ export function addPendingOrder(order) {
  */
 export function clearPendingOrders() {
     pendingOrders = []
-    console.log('[OrderTracker] 추적 목록 초기화됨')
+    // console.log('[OrderTracker] 추적 목록 초기화됨')
 }
 
 /**
@@ -89,7 +89,7 @@ export async function processSettledOrders(kisAuth) {
             )
         }
     } catch (e) {
-        console.warn('[OrderTracker] 보유종목 조회 실패:', e.message)
+        // console.warn('[OrderTracker] 보유종목 조회 실패:', e.message)
     }
 
     // 3. 추적 목록에서 체결된 주문 확인 및 DB 기록
@@ -175,12 +175,12 @@ export async function processSettledOrders(kisAuth) {
  */
 export function startSettlementMonitoring(kisAuth, intervalMs = 600000) {
     if (isMonitoring) {
-        console.log('[OrderTracker] 이미 모니터링 중')
+        // console.log('[OrderTracker] 이미 모니터링 중')
         return
     }
 
     if (pendingOrders.length === 0) {
-        console.log('[OrderTracker] 추적할 주문 없음')
+        // console.log('[OrderTracker] 추적할 주문 없음')
         return
     }
 
@@ -238,7 +238,7 @@ export function stopSettlementMonitoring() {
     }
     isMonitoring = false
     clearPendingOrders()
-    console.log('[OrderTracker] 모니터링 중지 및 상태 초기화')
+    // console.log('[OrderTracker] 모니터링 중지 및 상태 초기화')
 }
 
 /**

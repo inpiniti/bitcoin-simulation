@@ -49,7 +49,7 @@ export async function insertBuyRecord({ accountNo, ticker, buyDate, buyPrice, bu
             return { success: false, error: error.message }
         }
 
-        console.log('[TradeHistory] 매수 기록 성공:', data)
+        // console.log('[TradeHistory] 매수 기록 성공:', data)
         return { success: true, data }
     } catch (e) {
         console.error('[TradeHistory] 매수 기록 예외:', e)
@@ -131,7 +131,7 @@ export async function upsertSellRecord({ accountNo, ticker, sellDate, sellPrice,
                 return { success: false, error: error.message }
             }
 
-            console.log('[TradeHistory] 매도 업데이트 성공:', data)
+            // console.log('[TradeHistory] 매도 업데이트 성공:', data)
             return { success: true, data }
         } else {
             // 기존 레코드 없음 → INSERT (프로그램 사용 전 보유 종목)
@@ -165,7 +165,7 @@ export async function upsertSellRecord({ accountNo, ticker, sellDate, sellPrice,
                 return { success: false, error: error.message }
             }
 
-            console.log('[TradeHistory] 매도 삽입 성공 (기존 보유종목):', data)
+            // console.log('[TradeHistory] 매도 삽입 성공 (기존 보유종목):', data)
             return { success: true, data }
         }
     } catch (e) {

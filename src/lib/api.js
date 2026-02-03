@@ -6,7 +6,7 @@ const UPBIT_DAILY_URL = "https://api.upbit.com/v1/candles/days";
  */
 export async function fetchCoinDailyData() {
     const url = `${UPBIT_DAILY_URL}?market=KRW-BTC&count=365`;
-    console.log('[API] Fetching Coin daily data from Upbit...');
+    // console.log('[API] Fetching Coin daily data from Upbit...');
 
     const response = await fetch(url);
     if (!response.ok) throw new Error("Failed to fetch Upbit daily candles");
@@ -23,7 +23,7 @@ export async function fetchCoinDailyData() {
         volume: c.candle_acc_trade_volume,
     })).reverse();
 
-    console.log(`[API] Coin daily data loaded: ${normalized.length} items`);
+    // console.log(`[API] Coin daily data loaded: ${normalized.length} items`);
     return normalized;
 }
 
@@ -55,7 +55,7 @@ export async function fetchStockData(ticker, interval = '1d', range = '365d', in
 
     // CORS 문제를 회피하기 위해 Vite Proxy(/api/yahoo)를 사용합니다.
     const url = `/api/yahoo/v8/finance/chart/${formattedTicker}?interval=${interval}&range=${range}&includePrePost=${includePrePost}`;
-    console.log(`Fetching stock data from: ${url}`);
+    // console.log(`Fetching stock data from: ${url}`);
 
     const response = await fetch(url);
     if (!response.ok) {
@@ -129,7 +129,7 @@ export async function fetchStockData(ticker, interval = '1d', range = '365d', in
         normalized.exchange = exchangeName;
     }
 
-    console.log(`[API] Stock data loaded: ${normalized.length} items for ${formattedTicker} (${range})`);
+    // console.log(`[API] Stock data loaded: ${normalized.length} items for ${formattedTicker} (${range})`);
     return normalized;
 }
 
@@ -332,7 +332,7 @@ export async function fetchForecast(symbol, interval = 'day') {
         }
 
         const data = await response.json();
-        console.log(`[API] Forecast loaded for ${symbol}:`, data.predictionCount, 'predictions');
+        // console.log(`[API] Forecast loaded for ${symbol}:`, data.predictionCount, 'predictions');
         return data;
     } catch (err) {
         // 네트워크 에러 등 (Failed to fetch)
@@ -365,7 +365,7 @@ export async function fetchWhaleAnalysis(symbol, interval = 'day') {
         }
 
         const data = await response.json();
-        console.log(`[API] Whale analysis loaded for ${symbol}`);
+        // console.log(`[API] Whale analysis loaded for ${symbol}`);
         return data;
     } catch (err) {
         console.error('Whale API Error:', err);

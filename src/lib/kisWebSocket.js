@@ -50,6 +50,7 @@ class KISWebSocketManager {
         this.messageQueue = [];
         this.updateBatch = {};
         this.flushTimer = null;
+        this.flushCount = 0; // 메모리 디버깅용 카운터 (클래스 멤버로 이동)
     }
 
     connect(approvalKey) {
@@ -62,11 +63,11 @@ class KISWebSocketManager {
         this.isConnecting = true;
 
         try {
-            console.log("[KIS WS] Connecting to", WS_URL);
+            // console.log("[KIS WS] Connecting to", WS_URL);
             this.socket = new WebSocket(WS_URL);
 
             this.socket.onopen = () => {
-                console.log("[KIS WS] Connected");
+                // console.log("[KIS WS] Connected");
                 this.isConnecting = false;
 
                 while (this.messageQueue.length > 0) {
@@ -84,7 +85,7 @@ class KISWebSocketManager {
             };
 
             this.socket.onclose = (event) => {
-                console.log("[KIS WS] Closed:", event.code);
+                // console.log("[KIS WS] Closed:", event.code);
                 this.isConnecting = false;
                 this.stopPing();
                 this.stopFlushTimer();
@@ -121,6 +122,33 @@ class KISWebSocketManager {
         this.reconnectTimer = setTimeout(() => this.connect(this.approvalKey), 5000);
     }
 
+    /**
+     * 새 approvalKey로 WebSocket 재연결 (재로그인 시 호출)
+     * @param {string} newApprovalKey - 새로 발급받은 WebSocket 인증 키
+     */
+    reconnectWithNewKey(newApprovalKey) {
+        // console.log('[KIS WS] 새 approvalKey로 재연결 시작...');
+
+        // 1. 기존 연결 종료 (정상 종료 코드 1000으로 종료하여 재연결 스케줄 방지)
+        if (this.socket) {
+            this.socket.close(1000, 'Reconnecting with new key');
+            this.socket = null;
+        }
+
+        // 2. 모든 타이머 정리
+        this.stopPing();
+        this.stopFlushTimer();
+        if (this.reconnectTimer) {
+            clearTimeout(this.reconnectTimer);
+            this.reconnectTimer = null;
+        }
+
+        // 3. 새 키로 연결 시작
+        this.approvalKey = newApprovalKey;
+        this.isConnecting = false; // connect 함수에서 체크하므로 초기화
+        this.connect(newApprovalKey);
+    }
+
     startPing() {
         this.stopPing();
         this.pingTimer = setInterval(() => {
@@ -129,7 +157,10 @@ class KISWebSocketManager {
     }
 
     stopPing() {
-        if (this.pingTimer) clearInterval(this.pingTimer);
+        if (this.pingTimer) {
+            clearInterval(this.pingTimer);
+            this.pingTimer = null;
+        }
     }
 
     /**
@@ -295,7 +326,7 @@ class KISWebSocketManager {
                 const json = JSON.parse(message);
                 if (json.body && json.body.msg1) {
                     const msg = json.body.msg1;
-                    console.log(`[KIS WS Msg] ${msg}`);
+                    // console.log(`[KIS WS Msg] ${msg}`);
                 }
             } catch (e) { }
             return;
@@ -341,25 +372,30 @@ class KISWebSocketManager {
 
     startFlushTimer() {
         this.stopFlushTimer();
-        let flushCount = 0;
         this.flushTimer = setInterval(() => {
             if (Object.keys(this.updateBatch).length > 0) {
                 const batch = this.updateBatch;
                 this.updateBatch = {};
                 useStore.getState().batchUpdateRealtimePrices(batch);
 
-                // 10회마다 메모리 상태 로깅 (약 5초마다)
-                flushCount++;
-                if (flushCount % 10 === 0) {
-                    const stats = useStore.getState().debugMemoryStats();
-                    console.log('[WS Flush]', flushCount, '회 실행, 배치 크기:', Object.keys(batch).length);
-                }
+                // 120회마다 메모리 상태 로깅 (약 1분마다) - 콘솔 로그 축적 방지
+                this.flushCount++;
+                // 메모리 디버깅 로그 완전 비활성화
+                // if (this.flushCount % 120 === 0) {
+                //     const stats = useStore.getState().debugMemoryStats();
+                //     console.log('[WS Flush]', this.flushCount, '회 실행, 메모리:', stats);
+                // }
             }
         }, 500);
     }
 
     stopFlushTimer() {
-        if (this.flushTimer) clearInterval(this.flushTimer);
+        if (this.flushTimer) {
+            clearInterval(this.flushTimer);
+            this.flushTimer = null;
+        }
+        // 배치 데이터도 정리
+        this.updateBatch = {};
     }
 }
 
