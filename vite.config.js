@@ -630,6 +630,64 @@ export default defineConfig(({ mode }) => {
                             res.end(JSON.stringify({ error: e.message }));
                         }
                     });
+
+                    // XGBoost API 미들웨어 (E2BIG 에러 방지를 위해 프록시 대신 미들웨어 사용)
+                    server.middlewares.use('/api/xgb', async (req, res, next) => {
+                        res.setHeader('Access-Control-Allow-Origin', '*');
+                        res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
+                        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+                        if (req.method === 'OPTIONS') {
+                            res.statusCode = 200;
+                            res.end();
+                            return;
+                        }
+
+                        if (req.method !== 'POST') {
+                            res.statusCode = 405;
+                            res.end(JSON.stringify({ error: 'Method Not Allowed' }));
+                            return;
+                        }
+
+                        try {
+                            // 요청 본문을 스트림으로 수집
+                            const buffers = [];
+                            for await (const chunk of req) {
+                                buffers.push(chunk);
+                            }
+                            const bodyStr = Buffer.concat(buffers).toString();
+                            const body = JSON.parse(bodyStr);
+
+                            // 경로 추출 (예: /api/xgb/train -> /v1/xgb/train)
+                            const urlObj = new URL(req.originalUrl || req.url, `http://${req.headers.host}`);
+                            const subPath = urlObj.pathname.replace(/^\/api\/xgb/, '');
+                            const targetUrl = `https://younginpiniti-bitcoin-ai-backend.hf.space/v1/xgb${subPath}`;
+
+                            console.log('[XGB Middleware] Forwarding to:', targetUrl);
+                            console.log('[XGB Middleware] Body size:', bodyStr.length, 'bytes');
+
+                            const fetch = (await import('node-fetch')).default || global.fetch;
+                            const apiResponse = await fetch(targetUrl, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'User-Agent': 'Motia/1.0'
+                                },
+                                body: bodyStr
+                            });
+
+                            const responseText = await apiResponse.text();
+                            console.log('[XGB Middleware] Response status:', apiResponse.status);
+
+                            res.statusCode = apiResponse.status;
+                            res.setHeader('Content-Type', 'application/json');
+                            res.end(responseText);
+                        } catch (e) {
+                            console.error('[XGB Middleware] Error:', e);
+                            res.statusCode = 500;
+                            res.end(JSON.stringify({ error: 'Failed to spawn process: ' + e.message }));
+                        }
+                    });
                 }
             }
         ],
@@ -726,17 +784,7 @@ export default defineConfig(({ mode }) => {
                         });
                     },
                 },
-                '/api/xgb': {
-                    target: 'https://younginpiniti-bitcoin-ai-backend.hf.space',
-                    changeOrigin: true,
-                    secure: false,
-                    rewrite: (path) => path.replace(/^\/api\/xgb/, '/v1/xgb'),
-                    configure: (proxy, _options) => {
-                        proxy.on('proxyReq', (proxyReq, req, _res) => {
-                            proxyReq.setHeader('User-Agent', 'Motia/1.0');
-                        });
-                    },
-                },
+                // '/api/xgb'는 위 configureServer 미들웨어에서 처리 (E2BIG 에러 방지)
                 '/api/yahoo-conversation': {
                     target: 'https://api-v2.spot.im',
                     changeOrigin: true,

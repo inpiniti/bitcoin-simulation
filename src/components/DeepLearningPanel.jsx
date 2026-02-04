@@ -86,8 +86,8 @@ export function DeepLearningPanel() {
                 return
             }
 
-            // E2BIG 방지를 위해 서버로 보내는 샘플 수 제한 (최대 5,000개)
-            const MAX_SAMPLES = 5000
+            // Supabase를 통한 데이터 전달로 E2BIG 문제 해결됨 -> 샘플 수 제한 대폭 상향 (최대 50,000개)
+            const MAX_SAMPLES = 50000
             if (allFeatures.length > MAX_SAMPLES) {
                 console.log(`[XGB] Downsampling: ${allFeatures.length} -> ${MAX_SAMPLES}`)
 
@@ -120,20 +120,53 @@ export function DeepLearningPanel() {
         setTrainProgress(0)
 
         try {
-            // API 호출
-            const response = await fetch("/api/xgb/train", {
+            // 1. Supabase에 학습 데이터 업로드
+            const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
+            const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+            if (!SUPABASE_URL || !SUPABASE_KEY) {
+                throw new Error("Supabase 환경 변수가 설정되지 않았습니다.")
+            }
+
+            console.log("[XGB] Uploading training data to Supabase...")
+
+            // Supabase REST API 호출
+            const uploadRes = await fetch(`${SUPABASE_URL}/rest/v1/training_datasets`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                    "apikey": SUPABASE_KEY,
+                    "Authorization": `Bearer ${SUPABASE_KEY}`,
+                    "Content-Type": "application/json",
+                    "Prefer": "return=representation"
+                },
                 body: JSON.stringify({
                     features: trainData.features,
                     labels: trainData.labels
                 })
             })
 
+            if (!uploadRes.ok) {
+                const errText = await uploadRes.text()
+                throw new Error(`Failed to upload training data: ${errText}`)
+            }
+
+            const uploadData = await uploadRes.json()
+            const datasetId = uploadData[0].id
+            console.log(`[XGB] Training data uploaded. ID: ${datasetId}`)
+
+            // 2. 백엔드에 학습 요청 (데이터셋 ID 전달)
+            const response = await fetch("/api/xgb/train", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    datasetId: datasetId
+                })
+            })
+
             if (!response.ok) throw new Error("Train API Failed")
 
             const result = await response.json()
-            setTrainResult(result) // { modelJson, accuracy, ... }
+            setTrainResult(result) // { modelId, accuracy, ... }
 
             const identifier = trainMode === 'single' ? trainTicker : tickerGroup.toUpperCase()
             setModelName(`XGB_${identifier}_${new Date().toISOString().slice(0, 10)}`)
@@ -147,12 +180,12 @@ export function DeepLearningPanel() {
         }
     }
 
-    // 3. 모델 저장
+    // 3. 모델 저장 (서버에 저장된 modelId만 저장, 대용량 modelJson 제거)
     const handleSaveModel = () => {
         if (!trainResult || !modelName) return
         saveMLModel({
             name: modelName,
-            modelJson: trainResult.modelJson,
+            modelId: trainResult.modelId,  // modelJson 대신 modelId만 저장
             accuracy: trainResult.accuracy,
             featureCount: trainResult.featureCount
         })
@@ -181,12 +214,12 @@ export function DeepLearningPanel() {
             // 전처리 (Prediction용)
             const { feature, date } = processStockDataForPrediction(candles)
 
-            // API 호출
+            // API 호출 (modelId만 전송, E2BIG 에러 방지)
             const response = await fetch("/api/xgb/predict", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    modelJson: model.modelJson,
+                    modelId: model.modelId,  // modelJson 대신 modelId 전송
                     features: [feature]
                 })
             })
