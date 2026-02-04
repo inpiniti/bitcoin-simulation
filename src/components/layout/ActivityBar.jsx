@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils"
 import { useStore } from "@/store/useStore"
-import { Play, Table2, LineChart, Search, Loader2, MessageSquare, BookOpen, Newspaper, Bot, Activity, PieChart, Zap, Book } from "lucide-react"
+import { Play, Table2, LineChart, Search, Loader2, MessageSquare, BookOpen, Newspaper, Bot, Activity, PieChart, Zap, Book, Brain } from "lucide-react"
 import {
     Tooltip,
     TooltipContent,
@@ -19,6 +19,7 @@ const VIEW_MODES = [
     { key: 'discussion', label: '종목 토론', icon: MessageSquare },
     { key: 'qa', label: 'AI 질문', icon: Bot },
     { key: 'earnings', label: '실적 임팩트 분석', icon: Zap },
+    { key: 'deepLearning', label: '딥러닝 Studio', icon: Brain },
 ]
 
 

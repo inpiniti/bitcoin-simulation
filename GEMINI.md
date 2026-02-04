@@ -114,6 +114,7 @@ const API_BASE_URL = 'https://external-api.com'
 - **Yahoo (OpenWeb)**: `/api/yahoo-conversation` → `https://api-v2.spot.im`
 - **Gemini (Google)**: `/api/gemini` → `https://generativelanguage.googleapis.com`
 - **종목토론 통합 API**: `/api/discussion` → Naver/Stocktwits/Reddit/Yahoo/Toss 통합 조회
+- **XGBoost (BTC-AI)**: `/api/xgb` → `https://younginpiniti-bitcoin-ai-backend.hf.space/v1/xgb`
 
 ### 5. 새로운 외부 API 추가 시
 1. `vite.config.js`에 프록시 설정 추가

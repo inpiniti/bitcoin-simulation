@@ -726,6 +726,17 @@ export default defineConfig(({ mode }) => {
                         });
                     },
                 },
+                '/api/xgb': {
+                    target: 'https://younginpiniti-bitcoin-ai-backend.hf.space',
+                    changeOrigin: true,
+                    secure: false,
+                    rewrite: (path) => path.replace(/^\/api\/xgb/, '/v1/xgb'),
+                    configure: (proxy, _options) => {
+                        proxy.on('proxyReq', (proxyReq, req, _res) => {
+                            proxyReq.setHeader('User-Agent', 'Motia/1.0');
+                        });
+                    },
+                },
                 '/api/yahoo-conversation': {
                     target: 'https://api-v2.spot.im',
                     changeOrigin: true,

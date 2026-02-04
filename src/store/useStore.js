@@ -165,6 +165,19 @@ export const useStore = create(
                     autoTradeStatus: { ...state.autoTradeStatus, lastRunDate: dateStr }
                 })),
 
+                // Machine Learning Models
+                mlModels: [],
+                saveMLModel: (model) => set(state => ({
+                    mlModels: [...state.mlModels, {
+                        id: Date.now().toString(),
+                        createdAt: new Date().toISOString(),
+                        ...model
+                    }]
+                })),
+                deleteMLModel: (id) => set(state => ({
+                    mlModels: state.mlModels.filter(m => m.id !== id)
+                })),
+
                 // Market Analysis State & Actions
                 analysisResult: [],
                 isAnalyzing: false,

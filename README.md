@@ -39,6 +39,7 @@
 - 🔍 분석 (Analyze): 전체 종목 스캔 및 매매 신호
 - 🏆 실적 임팩트 (Earnings): 실적 발표 캘린더 + 변동성 예측 (AI)
 - 💬 종목 토론 (Discussion): Naver/Stocktwits 실시간 토론
+- 🧠 딥러닝 Studio (DeepLearning): XGBoost 기반 학습 및 예측
 ```
 
 ## 주요 기능 (Features)
@@ -58,8 +59,33 @@
 - **결과 분석**: 수익률, 승률, 최대 배율, 사이클 수 등 상세 지표 제공.
 - **거래 내역**: 시간별 구매/판매 상세 내역 리스트 출력.
 - **AI 가격 예측**: TimesFM 모델 기반 30일 미래 가격 예측 차트 표시.
+- **딥러닝 예측 (XGBoost)**: 사용자가 직접 데이터를 수집하고 XGBoost 모델을 학습/저장/예측할 수 있는 스튜디오 제공.
 
 ## 상세 구현 명세 (Implementation Details)
+
+### 딥러닝 Studio (XGBoost Workflow) - New
+
+사용자가 직접 주식 데이터를 수집하여 모델을 학습시키고 미래를 예측하는 워크플로우를 제공합니다.
+
+#### 1. 아키텍처
+*   **Frontend**: React + Zustand (데이터 수집, 전처리, 모델 관리, 결과 시각화)
+*   **Backend**: Python (XGBoost 학습 및 추론 엔진)
+*   **통신**: API Gateway (`/v1/xgb/train`, `/v1/xgb/predict`)
+
+#### 2. 데이터 파이프라인
+1.  **수집 (Ingestion)**: Yahoo Finance API를 통해 과거 1년치 일봉 데이터 수집.
+2.  **전처리 (Preprocessing)**:
+    *   **Features**: 연속 등락일수, 1일/7일/30일 변화율, 보조지표 등.
+    *   **Labels**: 다음날 2% 이상 상승 여부 (Binary Classification).
+3.  **학습 (Training)**:
+    *   데이터를 백엔드로 전송.
+    *   `XGBClassifier`로 학습 (Train/Test Split 적용).
+    *   학습된 모델을 JSON 형태로 직렬화하여 프론트엔드로 반환.
+4.  **저장 (Storage)**:
+    *   프론트엔드 `IndexedDB`에 학습된 모델 JSON 저장.
+5.  **예측 (Prediction)**:
+    *   저장된 모델과 최신 데이터를 백엔드로 전송하여 내일 상승 확률 예측.
+    *   결과를 게이지 차트와 확률(%)로 시각화.
 
 ### 1. 주요 함수 및 로직 (Core Logic)
 
