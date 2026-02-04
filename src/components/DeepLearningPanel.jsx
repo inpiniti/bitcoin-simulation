@@ -12,7 +12,39 @@ import { Brain, Activity, Save, Play, CheckCircle, Database, BarChart2, Loader2,
 
 
 export function DeepLearningPanel() {
-    const { mlModels, saveMLModel, deleteMLModel, tickerGroup, setTickerGroup, fetchGroupStocks, groupStocks } = useStore()
+    const { tickerGroup, setTickerGroup, fetchGroupStocks, groupStocks } = useStore()
+
+    // 서버 모델 목록 상태
+    const [serverModels, setServerModels] = useState([])
+    const [loadingModels, setLoadingModels] = useState(false)
+
+    // Supabase에서 모델 목록 불러오기
+    const fetchModelsFromSupabase = async () => {
+        setLoadingModels(true)
+        try {
+            const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
+            const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+            const res = await fetch(`${SUPABASE_URL}/rest/v1/ml_models?select=id,name,accuracy,created_at&order=created_at.desc`, {
+                headers: {
+                    "apikey": SUPABASE_KEY,
+                    "Authorization": `Bearer ${SUPABASE_KEY}`
+                }
+            })
+            if (res.ok) {
+                const data = await res.json()
+                setServerModels(data)
+            }
+        } catch (e) {
+            console.error("Failed to load models:", e)
+        } finally {
+            setLoadingModels(false)
+        }
+    }
+
+    useEffect(() => {
+        fetchModelsFromSupabase()
+    }, [])
 
     // 학습 상태
     const [trainMode, setTrainMode] = useState("single") // "single" | "group"
@@ -62,21 +94,42 @@ export function DeepLearningPanel() {
                     return
                 }
 
-                // 너무 많은 종목은 브라우저 부하가 크므로 최대 40개로 제한 (또는 슬라이싱)
-                const targetStocks = groupStocks.slice(0, 40)
+                // 종목 수 제한 해제 (기존 40개 제한 제거)
+                const targetStocks = groupStocks
                 const total = targetStocks.length
+                const BATCH_SIZE = 5 // 한 번에 5개씩 병렬 요청 (Rate Limit 고려)
 
-                for (let i = 0; i < total; i++) {
-                    const stock = targetStocks[i]
-                    try {
-                        const candles = await fetchStockHistory(stock.ticker, 365)
-                        const { features, labels } = processStockDataForML(candles)
-                        allFeatures = [...allFeatures, ...features]
-                        allLabels = [...allLabels, ...labels]
-                    } catch (err) {
-                        console.warn(`Failed to fetch ${stock.ticker}:`, err)
-                    }
-                    setTrainProgress(Math.round(((i + 1) / total) * 100))
+                console.log(`[XGB] Fetching data for ${total} stocks...`)
+
+                for (let i = 0; i < total; i += BATCH_SIZE) {
+                    const batch = targetStocks.slice(i, i + BATCH_SIZE)
+
+                    // 병렬 데이터 수집
+                    const results = await Promise.all(batch.map(async (stock) => {
+                        try {
+                            const candles = await fetchStockHistory(stock.ticker, 365)
+                            if (!candles || candles.length === 0) return null
+                            return processStockDataForML(candles)
+                        } catch (err) {
+                            console.warn(`Failed to fetch ${stock.ticker}:`, err)
+                            return null
+                        }
+                    }))
+
+                    // 결과 병합
+                    results.forEach(res => {
+                        if (res) {
+                            allFeatures = [...allFeatures, ...res.features]
+                            allLabels = [...allLabels, ...res.labels]
+                        }
+                    })
+
+                    // 진행률 업데이트
+                    const currentProgress = Math.min(Math.round(((i + BATCH_SIZE) / total) * 100), 99)
+                    setTrainProgress(currentProgress)
+
+                    // 약간의 딜레이 (너무 빠른 요청 방지)
+                    if (i + BATCH_SIZE < total) await new Promise(r => setTimeout(r, 100))
                 }
             }
 
@@ -86,24 +139,18 @@ export function DeepLearningPanel() {
                 return
             }
 
-            // Supabase를 통한 데이터 전달로 E2BIG 문제 해결됨 -> 샘플 수 제한 대폭 상향 (최대 50,000개)
-            const MAX_SAMPLES = 50000
-            if (allFeatures.length > MAX_SAMPLES) {
-                console.log(`[XGB] Downsampling: ${allFeatures.length} -> ${MAX_SAMPLES}`)
+            // 사용자 요청: 모든 데이터 학습 (제한 없음)
+            console.log(`[XGB] Total samples collected: ${allFeatures.length}`)
+            // MAX_SAMPLES 제한 제거함
 
-                // 무작위 다운샘플링
-                const indices = Array.from({ length: allFeatures.length }, (_, i) => i)
-                for (let i = indices.length - 1; i > 0; i--) {
-                    const j = Math.floor(Math.random() * (i + 1));
-                    [indices[i], indices[j]] = [indices[j], indices[i]]
-                }
-                const selectedIndices = indices.slice(0, MAX_SAMPLES)
-                allFeatures = selectedIndices.map(i => allFeatures[i])
-                allLabels = selectedIndices.map(i => allLabels[i])
-            }
 
 
             setTrainData({ features: allFeatures, labels: allLabels, count: allFeatures.length })
+
+            // 모델 이름 미리 생성 (사용자가 수정 가능)
+            const identifier = trainMode === 'single' ? trainTicker : tickerGroup.toUpperCase()
+            setModelName(`XGB_${identifier}_${new Date().toISOString().slice(0, 10)}`)
+
             setTrainProgress(100)
         } catch (e) {
             console.error(e)
@@ -154,12 +201,13 @@ export function DeepLearningPanel() {
             const datasetId = uploadData[0].id
             console.log(`[XGB] Training data uploaded. ID: ${datasetId}`)
 
-            // 2. 백엔드에 학습 요청 (데이터셋 ID 전달)
+            // 2. 백엔드에 학습 요청 (데이터셋 ID + 모델 이름 전달)
             const response = await fetch("/api/xgb/train", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    datasetId: datasetId
+                    datasetId: datasetId,
+                    modelName: modelName // 사용자가 지정한 이름 전송
                 })
             })
 
@@ -168,9 +216,11 @@ export function DeepLearningPanel() {
             const result = await response.json()
             setTrainResult(result) // { modelId, accuracy, ... }
 
-            const identifier = trainMode === 'single' ? trainTicker : tickerGroup.toUpperCase()
-            setModelName(`XGB_${identifier}_${new Date().toISOString().slice(0, 10)}`)
             setTrainProgress(100)
+
+            // 목록 갱신 및 완료 알림
+            await fetchModelsFromSupabase()
+            alert("모델 학습이 완료되었으며, 서버에 자동 저장되었습니다.")
 
         } catch (e) {
             console.error(e)
@@ -180,19 +230,7 @@ export function DeepLearningPanel() {
         }
     }
 
-    // 3. 모델 저장 (서버에 저장된 modelId만 저장, 대용량 modelJson 제거)
-    const handleSaveModel = () => {
-        if (!trainResult || !modelName) return
-        saveMLModel({
-            name: modelName,
-            modelId: trainResult.modelId,  // modelJson 대신 modelId만 저장
-            accuracy: trainResult.accuracy,
-            featureCount: trainResult.featureCount
-        })
-        alert("모델이 저장되었습니다.")
-        setTrainResult(null)
-        setTrainData(null)
-    }
+    // handleSaveModel 삭제됨 (서버 자동 저장)
 
     // 4. 예측 요청
     const handlePredict = async () => {
@@ -359,12 +397,22 @@ export function DeepLearningPanel() {
                                             <div className="text-lg font-bold text-[#007acc]">{trainData.features[0].length}</div>
                                         </div>
                                     </div>
+                                    <div className="space-y-2 pt-2 border-t border-[#3c3c3c]">
+                                        <label className="text-xs text-[#888888]">모델 이름 지정</label>
+                                        <Input
+                                            value={modelName}
+                                            onChange={e => setModelName(e.target.value)}
+                                            className="bg-[#252526] border-[#3c3c3c]"
+                                            placeholder="저장할 모델 이름을 입력하세요"
+                                        />
+                                    </div>
+
                                     <Button
                                         onClick={handleTrain}
-                                        disabled={training}
+                                        disabled={training || !modelName}
                                         className="w-full bg-[#007acc] hover:bg-[#0063a5] py-6 text-lg font-bold shadow-lg"
                                     >
-                                        {training ? "XGBoost 학습 중..." : "AI 모델 학습 시작 (XGBoost)"}
+                                        {training ? "AI 모델 학습 진행 중..." : "AI 모델 학습 시작 (서버 저장)"}
                                     </Button>
                                 </div>
                             )}
@@ -391,18 +439,13 @@ export function DeepLearningPanel() {
                                     </div>
                                 </div>
 
-                                <div className="space-y-2">
-                                    <label className="text-xs text-[#888888]">모델 이름</label>
-                                    <div className="flex gap-2">
-                                        <Input
-                                            value={modelName}
-                                            onChange={e => setModelName(e.target.value)}
-                                            className="bg-[#1e1e1e] border-[#3c3c3c]"
-                                        />
-                                        <Button onClick={handleSaveModel} className="bg-green-600 hover:bg-green-700 font-bold px-6">
-                                            저장하기
-                                        </Button>
+                                <div className="space-y-2 text-center pt-2">
+                                    <div className="text-sm text-green-500 font-bold mb-2">
+                                        모델이 서버({modelName})에 안전하게 저장되었습니다.
                                     </div>
+                                    <Button onClick={() => { setTrainResult(null); setTrainData(null); }} variant="outline" className="border-[#3c3c3c]">
+                                        새로운 학습 시작하기
+                                    </Button>
                                 </div>
                             </CardContent>
                         </Card>
@@ -426,9 +469,9 @@ export function DeepLearningPanel() {
                                         onChange={e => setSelectedModelId(e.target.value)}
                                     >
                                         <option value="">모델을 선택하세요</option>
-                                        {mlModels.map(m => (
+                                        {serverModels.map(m => (
                                             <option key={m.id} value={m.id}>
-                                                {m.name} (정확도: {(m.accuracy * 100).toFixed(0)}%)
+                                                [{new Date(m.created_at).toLocaleDateString()}] {m.name} (정확도: {(m.accuracy * 100).toFixed(1)}%)
                                             </option>
                                         ))}
                                     </select>
