@@ -25,7 +25,7 @@ export function DeepLearningPanel() {
             const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
             const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
 
-            const res = await fetch(`${SUPABASE_URL}/rest/v1/ml_models?select=id,name,accuracy,created_at&order=created_at.desc`, {
+            const res = await fetch(`${SUPABASE_URL}/rest/v1/ml_models?select=*&order=created_at.desc`, {
                 headers: {
                     "apikey": SUPABASE_KEY,
                     "Authorization": `Bearer ${SUPABASE_KEY}`
@@ -230,7 +230,33 @@ export function DeepLearningPanel() {
         }
     }
 
-    // handleSaveModel 삭제됨 (서버 자동 저장)
+    // 3. 모델 삭제 (Supabase)
+    const handleDeleteModel = async (id) => {
+        if (!confirm("이 모델을 삭제하시겠습니까? (Supabase 서버에서도 삭제됩니다)")) return
+
+        try {
+            const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
+            const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+            const res = await fetch(`${SUPABASE_URL}/rest/v1/ml_models?id=eq.${id}`, {
+                method: "DELETE",
+                headers: {
+                    "apikey": SUPABASE_KEY,
+                    "Authorization": `Bearer ${SUPABASE_KEY}`
+                }
+            })
+
+            if (res.ok) {
+                await fetchModelsFromSupabase()
+                alert("모델이 삭제되었습니다.")
+            } else {
+                throw new Error("삭제 실패")
+            }
+        } catch (e) {
+            console.error(e)
+            alert("모델 삭제 중 오류 발생")
+        }
+    }
 
     // 4. 예측 요청
     const handlePredict = async () => {
@@ -242,7 +268,7 @@ export function DeepLearningPanel() {
         setPredResult(null)
 
         try {
-            const model = mlModels.find(m => m.id === selectedModelId)
+            const model = serverModels.find(m => m.id === selectedModelId)
             if (!model) throw new Error("Model not found")
 
             // 데이터 수집
@@ -257,7 +283,7 @@ export function DeepLearningPanel() {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    modelId: model.modelId,  // modelJson 대신 modelId 전송
+                    modelId: model.model_id || model.modelId,  // Supabase(model_id) or Backend response(modelId)
                     features: [feature]
                 })
             })
@@ -289,9 +315,9 @@ export function DeepLearningPanel() {
                     Deep Learning Studio (XGBoost)
                 </h1>
                 <div className="flex gap-2">
-                    {mlModels.length > 0 && (
+                    {serverModels.length > 0 && (
                         <Badge variant="outline" className="text-[#007acc] border-[#007acc]">
-                            저장된 모델: {mlModels.length}개
+                            저장된 모델: {serverModels.length}개
                         </Badge>
                     )}
                 </div>
@@ -561,16 +587,16 @@ export function DeepLearningPanel() {
                     <Card className="bg-[#252526] border-[#3c3c3c] text-[#e1e1e1]">
                         <CardHeader>
                             <CardTitle>저장된 모델 리스트</CardTitle>
-                            <CardDescription className="text-[#888888]">브라우저(IndexedDB)에 저장된 AI 모델들을 관리합니다.</CardDescription>
+                            <CardDescription className="text-[#888888]">Supabase 서버에 저장된 AI 모델들을 관리합니다.</CardDescription>
                         </CardHeader>
                         <CardContent>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {mlModels.length === 0 ? (
+                                {serverModels.length === 0 ? (
                                     <div className="col-span-full text-center p-12 text-[#666666] border border-dashed border-[#3c3c3c] rounded-lg">
                                         저장된 모델이 없습니다. 먼저 학습을 진행해 주세요.
                                     </div>
                                 ) : (
-                                    mlModels.map(model => (
+                                    serverModels.map(model => (
                                         <div key={model.id} className="p-4 bg-[#1e1e1e] rounded border border-[#3c3c3c] hover:border-[#007acc] transition-colors group">
                                             <div className="flex justify-between items-start mb-2">
                                                 <div className="font-bold truncate mr-2" title={model.name}>{model.name}</div>
@@ -578,9 +604,7 @@ export function DeepLearningPanel() {
                                                     variant="ghost"
                                                     size="icon"
                                                     className="h-6 w-6 text-red-500 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                    onClick={() => {
-                                                        if (confirm("이 모델을 삭제하시겠습니까?")) deleteMLModel(model.id)
-                                                    }}
+                                                    onClick={() => handleDeleteModel(model.id)}
                                                 >
                                                     <span className="text-xs">✕</span>
                                                 </Button>
@@ -591,12 +615,12 @@ export function DeepLearningPanel() {
                                                     <span className="text-green-500 font-bold">{(model.accuracy * 100).toFixed(1)}%</span>
                                                 </div>
                                                 <div className="flex justify-between">
-                                                    <span>피처 수:</span>
-                                                    <span className="text-[#e1e1e1]">{model.featureCount}</span>
+                                                    <span>샘플 수:</span>
+                                                    <span className="text-[#e1e1e1]">{model.sample_count || model.sampleCount || '-'}</span>
                                                 </div>
                                                 <div className="flex justify-between">
                                                     <span>만든 날짜:</span>
-                                                    <span className="text-[#e1e1e1]">{new Date(model.createdAt).toLocaleDateString()}</span>
+                                                    <span className="text-[#e1e1e1]">{new Date(model.created_at || model.createdAt).toLocaleDateString()}</span>
                                                 </div>
                                             </div>
                                         </div>
