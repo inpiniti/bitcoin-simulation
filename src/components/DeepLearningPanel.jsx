@@ -387,7 +387,12 @@ export function DeepLearningPanel() {
                 predictions = apiResult.predictions
             }
 
-            // D. 결과 병합
+            // D. 결과 병합 및 검증
+            if (!predictions || !Array.isArray(predictions)) {
+                console.error("Invalid prediction result:", predictions)
+                throw new Error("예측 결과를 받아오지 못했습니다.")
+            }
+
             const finalResults = predictions.map((p, idx) => ({
                 ...p,
                 ...metadataList[idx]
