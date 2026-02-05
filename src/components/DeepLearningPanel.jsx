@@ -338,7 +338,6 @@ export function DeepLearningPanel() {
                     name: `Prediction-${Date.now()}`, // 필수 필드일 가능성 높음
                     features: allFeatures,
                     labels: [], // 예측용이라 레이블 없음
-                    feature_names: ['consecutive', 'change1d', 'change7d', 'change30d'],
                     created_at: new Date().toISOString()
                 }
 
