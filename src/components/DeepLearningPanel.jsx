@@ -72,35 +72,44 @@ export function DeepLearningPanel() {
 
     // 자동 최적 범위 계산
     const optimalRange = useMemo(() => {
-        if (allPredResults.length < 10) return null
-
         // 유효한 결과만 필터링 (actual이 존재하는 것)
-        const validResults = allPredResults.filter(r => r.actual !== null)
-        if (validResults.length < 10) return null
+        const validResults = allPredResults.filter(r => r.actual !== null && r.actual !== undefined)
 
-        // 다양한 임계값 조합 테스트
-        let bestResult = { buyThreshold: 50, sellThreshold: 50, buySum: 0, sellSum: 0, score: -Infinity }
+        // 디버깅용 로그
+        console.log(`[OptimalRange] Total: ${allPredResults.length}, Valid (with actual): ${validResults.length}`)
 
-        for (let bt = 40; bt <= 90; bt += 5) {
-            for (let st = 10; st <= bt; st += 5) {
+        // 데이터가 없으면 null
+        if (validResults.length === 0) return null
+
+        // 다양한 임계값 조합 테스트 (더 넓은 범위)
+        let bestResult = null
+        let bestScore = -Infinity
+
+        for (let bt = 50; bt <= 95; bt += 5) {
+            for (let st = 5; st <= 50; st += 5) {
                 // 매수 범위: bt% 이상
                 const buyResults = validResults.filter(r => r.probability * 100 >= bt)
-                const buySum = buyResults.reduce((sum, r) => sum + r.actual, 0)
                 const buyCount = buyResults.length
 
                 // 매도 범위: st% 미만
                 const sellResults = validResults.filter(r => r.probability * 100 < st)
-                const sellSum = sellResults.reduce((sum, r) => sum + r.actual, 0)
                 const sellCount = sellResults.length
 
-                // 점수: 매수 합산 - 매도 합산 (매수는 높을수록, 매도는 낮을수록 좋음)
-                // 샘플이 너무 적으면 패널티
-                const minSamples = Math.max(5, validResults.length * 0.05)
-                if (buyCount < minSamples || sellCount < minSamples) continue
+                // 최소 1건 이상 있어야 평균 계산 가능
+                if (buyCount === 0 || sellCount === 0) continue
 
-                const score = (buySum / buyCount) - (sellSum / sellCount) // 평균 수익률 차이 최대화
+                const buySum = buyResults.reduce((sum, r) => sum + r.actual, 0)
+                const sellSum = sellResults.reduce((sum, r) => sum + r.actual, 0)
+                const buyAvg = buySum / buyCount
+                const sellAvg = sellSum / sellCount
 
-                if (score > bestResult.score) {
+                // 점수: 매수 평균 - 매도 평균 (매수는 높을수록, 매도는 낮을수록 좋음)
+                // 샘플 수에 따른 신뢰도 가중치 (로그 스케일)
+                const sampleWeight = Math.log10(Math.min(buyCount, sellCount) + 1)
+                const score = (buyAvg - sellAvg) * sampleWeight
+
+                if (score > bestScore) {
+                    bestScore = score
                     bestResult = {
                         buyThreshold: bt,
                         sellThreshold: st,
@@ -108,16 +117,39 @@ export function DeepLearningPanel() {
                         sellSum,
                         buyCount,
                         sellCount,
-                        buyAvg: buySum / buyCount,
-                        sellAvg: sellSum / sellCount,
+                        buyAvg,
+                        sellAvg,
                         score
                     }
                 }
             }
         }
 
-        return bestResult.score > -Infinity ? bestResult : null
+        // 결과가 없으면 기본값 제공 (50/50 기준)
+        if (!bestResult) {
+            const buyResults = validResults.filter(r => r.probability >= 0.5)
+            const sellResults = validResults.filter(r => r.probability < 0.5)
+            const buyCount = buyResults.length || 1
+            const sellCount = sellResults.length || 1
+            const buySum = buyResults.reduce((sum, r) => sum + r.actual, 0)
+            const sellSum = sellResults.reduce((sum, r) => sum + r.actual, 0)
+
+            bestResult = {
+                buyThreshold: 50,
+                sellThreshold: 50,
+                buySum,
+                sellSum,
+                buyCount,
+                sellCount,
+                buyAvg: buySum / buyCount,
+                sellAvg: sellSum / sellCount,
+                score: 0
+            }
+        }
+
+        return bestResult
     }, [allPredResults])
+
 
     // 현재 슬라이더 설정에 따른 합산 계산
     const currentRangeStats = useMemo(() => {
@@ -844,11 +876,11 @@ export function DeepLearningPanel() {
                                                         <span className="text-xs text-green-400 font-medium">매수 범위</span>
                                                     </div>
                                                     <div className="text-2xl font-bold text-green-400">{optimalRange.buyThreshold}% 이상</div>
-                                                    <div className="text-xs text-[#888888] mt-1">
-                                                        {optimalRange.buyCount}건 / 평균 {optimalRange.buyAvg >= 0 ? '+' : ''}{optimalRange.buyAvg.toFixed(2)}%
-                                                    </div>
                                                     <div className="text-lg font-bold text-green-300 mt-2">
-                                                        합산: {optimalRange.buySum >= 0 ? '+' : ''}{optimalRange.buySum.toFixed(1)}%
+                                                        평균: {optimalRange.buyAvg >= 0 ? '+' : ''}{optimalRange.buyAvg.toFixed(2)}%
+                                                    </div>
+                                                    <div className="text-xs text-[#888888] mt-1">
+                                                        {optimalRange.buyCount}건 (합계 {optimalRange.buySum >= 0 ? '+' : ''}{optimalRange.buySum.toFixed(1)}%)
                                                     </div>
                                                 </div>
                                                 <div className="bg-red-900/30 rounded-lg p-4 border border-red-700/50">
@@ -857,11 +889,11 @@ export function DeepLearningPanel() {
                                                         <span className="text-xs text-red-400 font-medium">매도 범위</span>
                                                     </div>
                                                     <div className="text-2xl font-bold text-red-400">{optimalRange.sellThreshold}% 미만</div>
-                                                    <div className="text-xs text-[#888888] mt-1">
-                                                        {optimalRange.sellCount}건 / 평균 {optimalRange.sellAvg >= 0 ? '+' : ''}{optimalRange.sellAvg.toFixed(2)}%
-                                                    </div>
                                                     <div className="text-lg font-bold text-red-300 mt-2">
-                                                        합산: {optimalRange.sellSum >= 0 ? '+' : ''}{optimalRange.sellSum.toFixed(1)}%
+                                                        평균: {optimalRange.sellAvg >= 0 ? '+' : ''}{optimalRange.sellAvg.toFixed(2)}%
+                                                    </div>
+                                                    <div className="text-xs text-[#888888] mt-1">
+                                                        {optimalRange.sellCount}건 (합계 {optimalRange.sellSum >= 0 ? '+' : ''}{optimalRange.sellSum.toFixed(1)}%)
                                                     </div>
                                                 </div>
                                             </div>
@@ -938,18 +970,18 @@ export function DeepLearningPanel() {
                                     {currentRangeStats && (
                                         <div className="grid grid-cols-2 gap-3 pt-4 border-t border-[#3c3c3c]">
                                             <div className="text-center p-3 bg-green-900/20 rounded-lg">
-                                                <div className="text-xs text-[#888888]">매수 시 합산</div>
-                                                <div className={`text-xl font-bold ${currentRangeStats.buySum >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                                    {currentRangeStats.buySum >= 0 ? '+' : ''}{currentRangeStats.buySum.toFixed(1)}%
+                                                <div className="text-xs text-[#888888]">매수 시 평균</div>
+                                                <div className={`text-xl font-bold ${currentRangeStats.buyAvg >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                                    {currentRangeStats.buyAvg >= 0 ? '+' : ''}{currentRangeStats.buyAvg.toFixed(2)}%
                                                 </div>
-                                                <div className="text-xs text-[#666666]">{currentRangeStats.buyCount}건</div>
+                                                <div className="text-xs text-[#666666]">{currentRangeStats.buyCount}건 (합 {currentRangeStats.buySum.toFixed(0)}%)</div>
                                             </div>
                                             <div className="text-center p-3 bg-red-900/20 rounded-lg">
-                                                <div className="text-xs text-[#888888]">매도 시 합산</div>
-                                                <div className={`text-xl font-bold ${currentRangeStats.sellSum >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                                    {currentRangeStats.sellSum >= 0 ? '+' : ''}{currentRangeStats.sellSum.toFixed(1)}%
+                                                <div className="text-xs text-[#888888]">매도 시 평균</div>
+                                                <div className={`text-xl font-bold ${currentRangeStats.sellAvg >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                                    {currentRangeStats.sellAvg >= 0 ? '+' : ''}{currentRangeStats.sellAvg.toFixed(2)}%
                                                 </div>
-                                                <div className="text-xs text-[#666666]">{currentRangeStats.sellCount}건</div>
+                                                <div className="text-xs text-[#666666]">{currentRangeStats.sellCount}건 (합 {currentRangeStats.sellSum.toFixed(0)}%)</div>
                                             </div>
                                         </div>
                                     )}
