@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useStore } from "@/store/useStore"
 import { fetchStockHistory } from "@/lib/api"
 import { processStockDataForML, processStockDataForPrediction } from "@/lib/mlProcessor"
@@ -8,7 +8,9 @@ import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { Brain, Activity, Save, Play, CheckCircle, Database, BarChart2, Loader2, AlertCircle } from "lucide-react"
+import { Slider } from "@/components/ui/slider"
+import { Brain, Activity, Save, Play, CheckCircle, Database, BarChart2, Loader2, AlertCircle, TrendingUp, TrendingDown, Target, Zap } from "lucide-react"
+
 
 
 export function DeepLearningPanel() {
@@ -64,12 +66,84 @@ export function DeepLearningPanel() {
     const [predTargetType, setPredTargetType] = useState("single") // "single" | "group"
     const [predAllTime, setPredAllTime] = useState(false) // 전체 기간 예측 여부
 
+    // 매수/매도 범위 설정 (슬라이더용)
+    const [buyThreshold, setBuyThreshold] = useState(50) // 이 확률 이상이면 매수
+    const [sellThreshold, setSellThreshold] = useState(50) // 이 확률 미만이면 매도
+
+    // 자동 최적 범위 계산
+    const optimalRange = useMemo(() => {
+        if (allPredResults.length < 10) return null
+
+        // 유효한 결과만 필터링 (actual이 존재하는 것)
+        const validResults = allPredResults.filter(r => r.actual !== null)
+        if (validResults.length < 10) return null
+
+        // 다양한 임계값 조합 테스트
+        let bestResult = { buyThreshold: 50, sellThreshold: 50, buySum: 0, sellSum: 0, score: -Infinity }
+
+        for (let bt = 40; bt <= 90; bt += 5) {
+            for (let st = 10; st <= bt; st += 5) {
+                // 매수 범위: bt% 이상
+                const buyResults = validResults.filter(r => r.probability * 100 >= bt)
+                const buySum = buyResults.reduce((sum, r) => sum + r.actual, 0)
+                const buyCount = buyResults.length
+
+                // 매도 범위: st% 미만
+                const sellResults = validResults.filter(r => r.probability * 100 < st)
+                const sellSum = sellResults.reduce((sum, r) => sum + r.actual, 0)
+                const sellCount = sellResults.length
+
+                // 점수: 매수 합산 - 매도 합산 (매수는 높을수록, 매도는 낮을수록 좋음)
+                // 샘플이 너무 적으면 패널티
+                const minSamples = Math.max(5, validResults.length * 0.05)
+                if (buyCount < minSamples || sellCount < minSamples) continue
+
+                const score = (buySum / buyCount) - (sellSum / sellCount) // 평균 수익률 차이 최대화
+
+                if (score > bestResult.score) {
+                    bestResult = {
+                        buyThreshold: bt,
+                        sellThreshold: st,
+                        buySum,
+                        sellSum,
+                        buyCount,
+                        sellCount,
+                        buyAvg: buySum / buyCount,
+                        sellAvg: sellSum / sellCount,
+                        score
+                    }
+                }
+            }
+        }
+
+        return bestResult.score > -Infinity ? bestResult : null
+    }, [allPredResults])
+
+    // 현재 슬라이더 설정에 따른 합산 계산
+    const currentRangeStats = useMemo(() => {
+        const validResults = allPredResults.filter(r => r.actual !== null)
+        if (validResults.length === 0) return null
+
+        const buyResults = validResults.filter(r => r.probability * 100 >= buyThreshold)
+        const sellResults = validResults.filter(r => r.probability * 100 < sellThreshold)
+
+        return {
+            buySum: buyResults.reduce((sum, r) => sum + r.actual, 0),
+            buyCount: buyResults.length,
+            buyAvg: buyResults.length > 0 ? buyResults.reduce((sum, r) => sum + r.actual, 0) / buyResults.length : 0,
+            sellSum: sellResults.reduce((sum, r) => sum + r.actual, 0),
+            sellCount: sellResults.length,
+            sellAvg: sellResults.length > 0 ? sellResults.reduce((sum, r) => sum + r.actual, 0) / sellResults.length : 0
+        }
+    }, [allPredResults, buyThreshold, sellThreshold])
+
     // 그룹 데이터 로드 감시 (학습/예측 모드 둘 다 대응)
     useEffect(() => {
         if (trainMode === 'group' || predTargetType === 'group') {
             fetchGroupStocks()
         }
     }, [trainMode, predTargetType, tickerGroup])
+
 
     // 1. 데이터 수집 및 전처리
     const handleFetchAndProcess = async () => {
@@ -746,8 +820,147 @@ export function DeepLearningPanel() {
                         </Card>
                     </div>
 
+                    {/* 최적 범위 분석 (백테스팅 결과가 있을 때만) */}
+                    {allPredResults.length > 1 && (
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-6">
+                            {/* AI 자동 추천 범위 */}
+                            <Card className="bg-gradient-to-br from-[#1a1a2e] to-[#16213e] border-[#3c3c3c] text-[#e1e1e1]">
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="flex items-center gap-2 text-lg">
+                                        <Zap className="w-5 h-5 text-yellow-400" />
+                                        AI 최적 범위 추천
+                                    </CardTitle>
+                                    <CardDescription className="text-[#888888]">
+                                        백테스팅 데이터를 분석하여 최적의 매수/매도 임계값을 자동 계산합니다.
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    {optimalRange ? (
+                                        <div className="space-y-4">
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="bg-green-900/30 rounded-lg p-4 border border-green-700/50">
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        <TrendingUp className="w-4 h-4 text-green-400" />
+                                                        <span className="text-xs text-green-400 font-medium">매수 범위</span>
+                                                    </div>
+                                                    <div className="text-2xl font-bold text-green-400">{optimalRange.buyThreshold}% 이상</div>
+                                                    <div className="text-xs text-[#888888] mt-1">
+                                                        {optimalRange.buyCount}건 / 평균 {optimalRange.buyAvg >= 0 ? '+' : ''}{optimalRange.buyAvg.toFixed(2)}%
+                                                    </div>
+                                                    <div className="text-lg font-bold text-green-300 mt-2">
+                                                        합산: {optimalRange.buySum >= 0 ? '+' : ''}{optimalRange.buySum.toFixed(1)}%
+                                                    </div>
+                                                </div>
+                                                <div className="bg-red-900/30 rounded-lg p-4 border border-red-700/50">
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        <TrendingDown className="w-4 h-4 text-red-400" />
+                                                        <span className="text-xs text-red-400 font-medium">매도 범위</span>
+                                                    </div>
+                                                    <div className="text-2xl font-bold text-red-400">{optimalRange.sellThreshold}% 미만</div>
+                                                    <div className="text-xs text-[#888888] mt-1">
+                                                        {optimalRange.sellCount}건 / 평균 {optimalRange.sellAvg >= 0 ? '+' : ''}{optimalRange.sellAvg.toFixed(2)}%
+                                                    </div>
+                                                    <div className="text-lg font-bold text-red-300 mt-2">
+                                                        합산: {optimalRange.sellSum >= 0 ? '+' : ''}{optimalRange.sellSum.toFixed(1)}%
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="w-full border-yellow-600/50 text-yellow-400 hover:bg-yellow-900/20"
+                                                onClick={() => {
+                                                    setBuyThreshold(optimalRange.buyThreshold)
+                                                    setSellThreshold(optimalRange.sellThreshold)
+                                                }}
+                                            >
+                                                <Target className="w-4 h-4 mr-2" />
+                                                최적값 적용하기
+                                            </Button>
+                                        </div>
+                                    ) : (
+                                        <div className="text-center text-[#666666] py-8">
+                                            <AlertCircle className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                                            <p className="text-sm">최적 범위를 계산하려면 더 많은 데이터가 필요합니다.</p>
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+
+                            {/* 수동 범위 조절 */}
+                            <Card className="bg-[#252526] border-[#3c3c3c] text-[#e1e1e1]">
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="flex items-center gap-2 text-lg">
+                                        <Activity className="w-5 h-5" />
+                                        수동 범위 조절
+                                    </CardTitle>
+                                    <CardDescription className="text-[#888888]">
+                                        슬라이더로 매수/매도 임계값을 직접 조정해보세요.
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-6">
+                                    <div className="space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <label className="text-sm flex items-center gap-2">
+                                                <TrendingUp className="w-4 h-4 text-green-400" />
+                                                매수 범위
+                                            </label>
+                                            <span className="text-green-400 font-bold">{buyThreshold}% 이상</span>
+                                        </div>
+                                        <Slider
+                                            value={[buyThreshold]}
+                                            onValueChange={(v) => setBuyThreshold(v[0])}
+                                            min={10}
+                                            max={100}
+                                            step={5}
+                                            className="[&_[role=slider]]:bg-green-500"
+                                        />
+                                    </div>
+                                    <div className="space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <label className="text-sm flex items-center gap-2">
+                                                <TrendingDown className="w-4 h-4 text-red-400" />
+                                                매도 범위
+                                            </label>
+                                            <span className="text-red-400 font-bold">{sellThreshold}% 미만</span>
+                                        </div>
+                                        <Slider
+                                            value={[sellThreshold]}
+                                            onValueChange={(v) => setSellThreshold(v[0])}
+                                            min={0}
+                                            max={90}
+                                            step={5}
+                                            className="[&_[role=slider]]:bg-red-500"
+                                        />
+                                    </div>
+
+                                    {/* 현재 설정에 따른 결과 */}
+                                    {currentRangeStats && (
+                                        <div className="grid grid-cols-2 gap-3 pt-4 border-t border-[#3c3c3c]">
+                                            <div className="text-center p-3 bg-green-900/20 rounded-lg">
+                                                <div className="text-xs text-[#888888]">매수 시 합산</div>
+                                                <div className={`text-xl font-bold ${currentRangeStats.buySum >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                                    {currentRangeStats.buySum >= 0 ? '+' : ''}{currentRangeStats.buySum.toFixed(1)}%
+                                                </div>
+                                                <div className="text-xs text-[#666666]">{currentRangeStats.buyCount}건</div>
+                                            </div>
+                                            <div className="text-center p-3 bg-red-900/20 rounded-lg">
+                                                <div className="text-xs text-[#888888]">매도 시 합산</div>
+                                                <div className={`text-xl font-bold ${currentRangeStats.sellSum >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                                    {currentRangeStats.sellSum >= 0 ? '+' : ''}{currentRangeStats.sellSum.toFixed(1)}%
+                                                </div>
+                                                <div className="text-xs text-[#666666]">{currentRangeStats.sellCount}건</div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </div>
+                    )}
+
                     {/* 백테스팅 결과 테이블 */}
                     {allPredResults.length > 1 && (
+
                         <Card className="bg-[#252526] border-[#3c3c3c] text-[#e1e1e1] mt-6">
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
