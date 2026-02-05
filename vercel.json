@@ -15,6 +15,10 @@
         {
             "source": "/api/hf",
             "destination": "/api/hf"
+        },
+        {
+            "source": "/api/xgb/:path*",
+            "destination": "/api/xgb"
         }
     ]
 }
