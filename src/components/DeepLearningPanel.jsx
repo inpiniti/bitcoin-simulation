@@ -60,13 +60,15 @@ export function DeepLearningPanel() {
     const [selectedModelId, setSelectedModelId] = useState("")
     const [predicting, setPredicting] = useState(false)
     const [predResult, setPredResult] = useState(null)
+    const [predTargetType, setPredTargetType] = useState("single") // "single" | "group"
+    const [predAllTime, setPredAllTime] = useState(false) // 전체 기간 예측 여부
 
-    // 그룹 데이터 로드 감시
+    // 그룹 데이터 로드 감시 (학습/예측 모드 둘 다 대응)
     useEffect(() => {
-        if (trainMode === 'group') {
+        if (trainMode === 'group' || predTargetType === 'group') {
             fetchGroupStocks()
         }
-    }, [trainMode, tickerGroup])
+    }, [trainMode, predTargetType, tickerGroup])
 
     // 1. 데이터 수집 및 전처리
     const handleFetchAndProcess = async () => {
@@ -268,40 +270,143 @@ export function DeepLearningPanel() {
         setPredResult(null)
 
         try {
-            // selectedModelId는 문자열이므로 타입 일치를 위해 toString() 사용
             const model = serverModels.find(m => m.id.toString() === selectedModelId.toString())
             if (!model) {
                 console.error("Selected Model not found in list:", selectedModelId, serverModels)
                 throw new Error("선택한 모델을 찾을 수 없습니다.")
             }
 
-            // 데이터 수집
-            const candles = await fetchStockHistory(predTicker, 60)
-            if (!candles || candles.length < 30) throw new Error("데이터 부족")
+            let predictionTargets = []
 
-            // 전처리 (Prediction용)
-            const { feature, date } = processStockDataForPrediction(candles)
+            // A. 예측 대상 수집
+            if (predTargetType === 'single') {
+                predictionTargets = [predTicker]
+            } else {
+                if (!groupStocks || groupStocks.length === 0) throw new Error("그룹 종목이 없습니다.")
+                predictionTargets = groupStocks.map(s => s.ticker)
+            }
 
-            // API 호출 (modelId만 전송, E2BIG 에러 방지)
-            const response = await fetch("/api/xgb/predict", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    modelId: model.id || model.model_id || model.modelId,
-                    features: [feature]
+            // B. 데이터 수집 및 전처리 (병렬 처리)
+            const BATCH_SIZE = 5
+            let allFeatures = []
+            let metadataList = [] // 결과 매핑용 (ticker, date)
+
+            for (let i = 0; i < predictionTargets.length; i += BATCH_SIZE) {
+                const batch = predictionTargets.slice(i, i + BATCH_SIZE)
+                await Promise.all(batch.map(async (ticker) => {
+                    try {
+                        // 전체 기간이면 365일치, 아니면 60일치만 가져와서 최소화
+                        const days = predAllTime ? 365 : 60
+                        const candles = await fetchStockHistory(ticker, days)
+
+                        if (candles && candles.length > 30) {
+                            // mlProcessor 수정된 함수 사용 (두번째 인자: allHistory)
+                            const processed = processStockDataForPrediction(candles, predAllTime)
+
+                            // 배열인지 단일 객체인지 확인하여 정규화
+                            const features = processed.features || [processed.feature]
+                            const dates = processed.dates || [processed.date]
+
+                            features.forEach((feat, idx) => {
+                                allFeatures.push(feat)
+                                metadataList.push({
+                                    ticker,
+                                    date: dates[idx]
+                                })
+                            })
+                        }
+                    } catch (err) {
+                        console.warn(`Failed to fetch/process for ${ticker}`, err)
+                    }
+                }))
+            }
+
+            if (allFeatures.length === 0) throw new Error("유효한 데이터가 없습니다.")
+
+            console.log(`[Prediction] Total features: ${allFeatures.length}`)
+
+            // C. 예측 실행 (데이터 크기에 따른 분기)
+            let predictions = []
+            const USE_DATASET_UPLOAD = allFeatures.length > 50 // 50개 이상이면 Supabase 업로드 방식 사용
+
+            if (USE_DATASET_UPLOAD) {
+                // 1. Supabase 업로드
+                const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
+                const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+                const datasetPayload = {
+                    features: allFeatures,
+                    labels: [], // 예측용이라 레이블 없음
+                    feature_names: ['consecutive', 'change1d', 'change7d', 'change30d'],
+                    created_at: new Date().toISOString()
+                }
+
+                const uploadRes = await fetch(`${SUPABASE_URL}/rest/v1/training_datasets`, {
+                    method: "POST",
+                    headers: {
+                        "apikey": SUPABASE_KEY,
+                        "Authorization": `Bearer ${SUPABASE_KEY}`,
+                        "Content-Type": "application/json",
+                        "Prefer": "return=representation"
+                    },
+                    body: JSON.stringify(datasetPayload)
                 })
-            })
 
-            if (!response.ok) throw new Error("Predict API Failed")
+                if (!uploadRes.ok) throw new Error("데이터 업로드 실패")
+                const uploadResult = await uploadRes.json()
+                const datasetId = uploadResult[0].id
 
-            const result = await response.json()
-            const p = result.predictions[0]
+                // 2. API 호출 (datasetId 전송)
+                const apiRes = await fetch("/api/xgb/predict", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        modelId: model.id || model.model_id || model.modelId,
+                        datasetId: datasetId
+                    })
+                })
 
-            setPredResult({
+                if (!apiRes.ok) throw new Error("Predict API Failed")
+                const apiResult = await apiRes.json()
+                predictions = apiResult.predictions
+
+            } else {
+                // 2. 직접 전송 (소량 데이터)
+                const apiRes = await fetch("/api/xgb/predict", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        modelId: model.id || model.model_id || model.modelId,
+                        features: allFeatures
+                    })
+                })
+
+                if (!apiRes.ok) throw new Error("Predict API Failed")
+                const apiResult = await apiRes.json()
+                predictions = apiResult.predictions
+            }
+
+            // D. 결과 병합
+            const finalResults = predictions.map((p, idx) => ({
                 ...p,
-                date,
-                ticker: predTicker
-            })
+                ...metadataList[idx]
+            }))
+
+            // 결과 정렬 (확률 높은 순)
+            finalResults.sort((a, b) => b.probability - a.probability)
+
+            // 단일 결과 호환성 유지 (UI 표시용)
+            // 여러 개일 경우 리스트 처리가 필요하지만 일단 첫 번째(가장 높은 확률 or 단일)를 메인으로 설정
+            // TODO: UI에 리스트 뷰 추가 필요
+            setPredResult(finalResults[0])
+
+            // 전체 결과는 콘솔이나 별도 상태로 저장 가능 (추후 UI 확장 시 사용)
+            console.log("Prediction Results:", finalResults)
+
+            // 결과가 여러개인 경우 알림
+            if (finalResults.length > 1) {
+                alert(`총 ${finalResults.length}건의 예측이 완료되었습니다. 상위 결과: ${finalResults[0].ticker} (${(finalResults[0].probability * 100).toFixed(1)}%)`)
+            }
 
         } catch (e) {
             console.error(e)
@@ -506,22 +611,71 @@ export function DeepLearningPanel() {
                                         ))}
                                     </select>
                                 </div>
-                                <div className="space-y-2">
-                                    <label className="text-xs text-[#888888]">예측할 티커</label>
-                                    <Input
-                                        value={predTicker}
-                                        onChange={e => setPredTicker(e.target.value)}
-                                        className="bg-[#1e1e1e] border-[#3c3c3c]"
-                                        placeholder="BTC-USD"
-                                    />
+
+                                <Tabs value={predTargetType} onValueChange={setPredTargetType} className="w-full">
+                                    <TabsList className="grid w-full grid-cols-2 bg-[#1e1e1e] border border-[#3c3c3c] mb-4">
+                                        <TabsTrigger value="single">단일 종목</TabsTrigger>
+                                        <TabsTrigger value="group">티커 그룹</TabsTrigger>
+                                    </TabsList>
+
+                                    {predTargetType === 'single' ? (
+                                        <div className="space-y-2">
+                                            <label className="text-xs text-[#888888]">예측할 티커</label>
+                                            <Input
+                                                value={predTicker}
+                                                onChange={e => setPredTicker(e.target.value)}
+                                                className="bg-[#1e1e1e] border-[#3c3c3c]"
+                                                placeholder="BTC-USD"
+                                            />
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            <label className="text-xs text-[#888888]">대상 그룹 선택</label>
+                                            <select
+                                                className="w-full bg-[#1e1e1e] border border-[#3c3c3c] rounded p-2 text-sm"
+                                                value={tickerGroup}
+                                                onChange={e => setTickerGroup(e.target.value)}
+                                            >
+                                                <option value="superinvestor">Super Investors (DataRoma)</option>
+                                                <option value="sp500">S&P 500</option>
+                                                <option value="qqq">Nasdaq 100 (QQQ)</option>
+                                                <option value="kospi200">KOSPI 200</option>
+                                                <option value="kosdaq150">KOSDAQ 150</option>
+                                                <option value="myholdings">내 보유 종목</option>
+                                            </select>
+                                            <div className="text-xs text-[#888888] flex justify-between">
+                                                <span>로드된 종목 수:</span>
+                                                <span className="text-[#007acc] font-bold">{groupStocks.length}개</span>
+                                            </div>
+                                        </div>
+                                    )}
+                                </Tabs>
+
+                                <div className="space-y-2 pt-2 border-t border-[#3c3c3c]">
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="checkbox"
+                                            id="predAllTime"
+                                            checked={predAllTime}
+                                            onChange={e => setPredAllTime(e.target.checked)}
+                                            className="w-4 h-4 rounded border-gray-300 text-[#007acc] focus:ring-[#007acc]"
+                                        />
+                                        <label htmlFor="predAllTime" className="text-sm text-[#e1e1e1] cursor-pointer selection:bg-none">
+                                            전체 과거 내역 예측 (Trend Backtesting)
+                                        </label>
+                                    </div>
+                                    <p className="text-xs text-[#888888] pl-6">
+                                        체크 시 과거 모든 데이터에 대해 예측을 수행합니다. (시간이 더 소요될 수 있습니다)
+                                    </p>
                                 </div>
+
                                 <Button
                                     onClick={handlePredict}
-                                    disabled={predicting}
-                                    className="w-full bg-[#007acc] hover:bg-[#0063a5] py-6 text-lg font-bold"
+                                    disabled={predicting || !selectedModelId || (predTargetType === 'group' && groupStocks.length === 0)}
+                                    className="w-full bg-[#007acc] hover:bg-[#0063a5] py-6 text-lg font-bold shadow-lg mt-4"
                                 >
-                                    {predicting ? <Loader2 className="animate-spin mr-2" /> : <Play className="w-4 h-4 mr-2" />}
-                                    상승 확률 예측하기
+                                    {predicting ? <Loader2 className="animate-spin mr-2" /> : <Activity className="w-5 h-5 mr-2" />}
+                                    {predicting ? "AI 예측 분석 중..." : "예측 실행"}
                                 </Button>
                             </CardContent>
                         </Card>

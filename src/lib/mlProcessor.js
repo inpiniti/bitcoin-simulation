@@ -69,53 +69,66 @@ export function processStockDataForML(candles) {
 /**
  * 예측용 데이터 전처리 (Label 없음, 마지막 날짜까지 포함)
  */
-export function processStockDataForPrediction(candles) {
+export function processStockDataForPrediction(candles, allHistory = false) {
+    if (!candles || candles.length <= 30) return { features: [], dates: [] };
+
     const features = [];
     const dates = [];
 
-    // 마지막 날짜 데이터까지 Feature 생성
-    // (학습때는 내일 데이터가 필요해서 length-1까지만 했지만, 예측은 오늘 데이터로 내일을 예측하므로 끝까지 사용)
+    // allHistory가 true면 30번째부터 끝까지, false면 마지막 하나만 처리
+    const startIndex = allHistory ? 30 : candles.length - 1;
 
-    if (!candles || candles.length <= 30) return { features: [], dates: [] };
+    for (let i = startIndex; i < candles.length; i++) {
+        const today = candles[i];
 
-    // 마지막 1개만 필요하지만, 시각화를 위해 전체 다 변환해도 됨.
-    // 여기서는 마지막 1개(가장 최근 일자)만 추출해서 리턴하도록 함.
-
-    const i = candles.length - 1;
-    const today = candles[i];
-
-    let consecutiveDays = 0;
-    if (today.close > candles[i - 1].close) {
-        let temp = 1;
-        while (i - temp > 0 && candles[i - temp].close > candles[i - temp - 1].close) {
-            consecutiveDays++;
-            temp++;
+        // 1. 연속 상승/하락 일수 계산
+        let consecutiveDays = 0;
+        if (today.close > candles[i - 1].close) {
+            let temp = 1;
+            while (i - temp > 0 && candles[i - temp].close > candles[i - temp - 1].close) {
+                consecutiveDays++;
+                temp++;
+            }
+            if (consecutiveDays === 0) consecutiveDays = 1;
+        } else if (today.close < candles[i - 1].close) {
+            let temp = 1;
+            while (i - temp > 0 && candles[i - temp].close < candles[i - temp - 1].close) {
+                consecutiveDays--;
+                temp++;
+            }
+            if (consecutiveDays === 0) consecutiveDays = -1;
         }
-        if (consecutiveDays === 0) consecutiveDays = 1;
-    } else if (today.close < candles[i - 1].close) {
-        let temp = 1;
-        while (i - temp > 0 && candles[i - temp].close < candles[i - temp - 1].close) {
-            consecutiveDays--;
-            temp++;
-        }
-        if (consecutiveDays === 0) consecutiveDays = -1;
+
+        // 2. 변화율 (1일, 7일, 30일)
+        const getChangePct = (days) => {
+            const past = candles[i - days];
+            if (!past || past.close === 0) return 0;
+            return ((today.close - past.close) / past.close) * 100;
+        };
+
+        const vector = [
+            consecutiveDays,
+            parseFloat(getChangePct(1).toFixed(2)),
+            parseFloat(getChangePct(7).toFixed(2)),
+            parseFloat(getChangePct(30).toFixed(2))
+        ];
+
+        features.push(vector);
+        dates.push(today.timestamp || today.date);
     }
 
-    const getChangePct = (days) => {
-        const past = candles[i - days];
-        if (!past || past.close === 0) return 0;
-        return ((today.close - past.close) / past.close) * 100;
-    };
-
-    const vector = [
-        consecutiveDays,
-        parseFloat(getChangePct(1).toFixed(2)),
-        parseFloat(getChangePct(7).toFixed(2)),
-        parseFloat(getChangePct(30).toFixed(2))
-    ];
+    // 기존 호환성 유지: allHistory가 false면 단일 객체 리턴 구조 (feature, date) 대신,
+    // 이 함수의 스펙을 변경하여 항상 배열을 리턴하되, 호출부에서 처리하도록 하거나
+    // 기존 리턴 구조를 유지하려면 다음과 같이 처리:
+    if (!allHistory) {
+        return {
+            feature: features[0],
+            date: dates[0]
+        };
+    }
 
     return {
-        feature: vector,
-        date: today.timestamp || today.date
+        features,
+        dates
     };
 }
