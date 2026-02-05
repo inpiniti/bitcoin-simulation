@@ -70,16 +70,20 @@ export function processStockDataForML(candles) {
  * 예측용 데이터 전처리 (Label 없음, 마지막 날짜까지 포함)
  */
 export function processStockDataForPrediction(candles, allHistory = false) {
-    if (!candles || candles.length <= 30) return { features: [], dates: [] };
+    if (!candles || candles.length <= 30) return { features: [], dates: [], actuals: [], rawFeatures: [] };
 
     const features = [];
     const dates = [];
+    const actuals = []; // 실제 다음날 변동률 (백테스팅용)
+    const rawFeatures = []; // 개별 feature 값들 (테이블 표시용)
 
-    // allHistory가 true면 30번째부터 끝까지, false면 마지막 하나만 처리
+    // allHistory가 true면 30번째부터 끝-1까지 (다음날 데이터 필요), false면 마지막 하나만 처리
     const startIndex = allHistory ? 30 : candles.length - 1;
+    const endIndex = allHistory ? candles.length - 1 : candles.length; // 백테스팅 시 마지막 제외
 
-    for (let i = startIndex; i < candles.length; i++) {
+    for (let i = startIndex; i < endIndex; i++) {
         const today = candles[i];
+        const tomorrow = candles[i + 1]; // 백테스팅용 실제 결과
 
         // 1. 연속 상승/하락 일수 계산
         let consecutiveDays = 0;
@@ -106,29 +110,46 @@ export function processStockDataForPrediction(candles, allHistory = false) {
             return ((today.close - past.close) / past.close) * 100;
         };
 
-        const vector = [
-            consecutiveDays,
-            parseFloat(getChangePct(1).toFixed(2)),
-            parseFloat(getChangePct(7).toFixed(2)),
-            parseFloat(getChangePct(30).toFixed(2))
-        ];
+        const change1d = parseFloat(getChangePct(1).toFixed(2));
+        const change7d = parseFloat(getChangePct(7).toFixed(2));
+        const change30d = parseFloat(getChangePct(30).toFixed(2));
+
+        const vector = [consecutiveDays, change1d, change7d, change30d];
 
         features.push(vector);
         dates.push(today.timestamp || today.date);
+
+        // 개별 feature 저장 (테이블 표시용)
+        rawFeatures.push({
+            consecutiveDays,
+            change1d,
+            change7d,
+            change30d
+        });
+
+        // 실제 다음날 변동률 계산
+        if (tomorrow) {
+            const actualChange = ((tomorrow.close - today.close) / today.close) * 100;
+            actuals.push(parseFloat(actualChange.toFixed(2)));
+        } else {
+            actuals.push(null); // 다음날 데이터 없음
+        }
     }
 
-    // 기존 호환성 유지: allHistory가 false면 단일 객체 리턴 구조 (feature, date) 대신,
-    // 이 함수의 스펙을 변경하여 항상 배열을 리턴하되, 호출부에서 처리하도록 하거나
-    // 기존 리턴 구조를 유지하려면 다음과 같이 처리:
+    // 기존 호환성 유지
     if (!allHistory) {
         return {
             feature: features[0],
-            date: dates[0]
+            date: dates[0],
+            rawFeature: rawFeatures[0],
+            actual: actuals[0]
         };
     }
 
     return {
         features,
-        dates
+        dates,
+        actuals,
+        rawFeatures
     };
 }

@@ -60,6 +60,7 @@ export function DeepLearningPanel() {
     const [selectedModelId, setSelectedModelId] = useState("")
     const [predicting, setPredicting] = useState(false)
     const [predResult, setPredResult] = useState(null)
+    const [allPredResults, setAllPredResults] = useState([]) // 전체 백테스팅 결과
     const [predTargetType, setPredTargetType] = useState("single") // "single" | "group"
     const [predAllTime, setPredAllTime] = useState(false) // 전체 기간 예측 여부
 
@@ -306,12 +307,16 @@ export function DeepLearningPanel() {
                             // 배열인지 단일 객체인지 확인하여 정규화
                             const features = processed.features || [processed.feature]
                             const dates = processed.dates || [processed.date]
+                            const rawFeatures = processed.rawFeatures || [processed.rawFeature]
+                            const actuals = processed.actuals || [processed.actual]
 
                             features.forEach((feat, idx) => {
                                 allFeatures.push(feat)
                                 metadataList.push({
                                     ticker,
-                                    date: dates[idx]
+                                    date: dates[idx],
+                                    rawFeature: rawFeatures[idx], // 개별 feature 값
+                                    actual: actuals[idx] // 실제 다음날 변동률
                                 })
                             })
                         }
@@ -335,10 +340,8 @@ export function DeepLearningPanel() {
                 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
 
                 const datasetPayload = {
-                    name: `Prediction-${Date.now()}`, // 필수 필드일 가능성 높음
                     features: allFeatures,
-                    labels: [], // 예측용이라 레이블 없음
-                    created_at: new Date().toISOString()
+                    labels: [] // 예측용이라 레이블 없음
                 }
 
                 const uploadRes = await fetch(`${SUPABASE_URL}/rest/v1/training_datasets`, {
@@ -352,7 +355,11 @@ export function DeepLearningPanel() {
                     body: JSON.stringify(datasetPayload)
                 })
 
-                if (!uploadRes.ok) throw new Error("데이터 업로드 실패")
+                if (!uploadRes.ok) {
+                    const errorBody = await uploadRes.text()
+                    console.error("Supabase Upload Error:", errorBody)
+                    throw new Error(`데이터 업로드 실패: ${errorBody}`)
+                }
                 const uploadResult = await uploadRes.json()
                 const datasetId = uploadResult[0].id
 
@@ -400,18 +407,13 @@ export function DeepLearningPanel() {
             // 결과 정렬 (확률 높은 순)
             finalResults.sort((a, b) => b.probability - a.probability)
 
-            // 단일 결과 호환성 유지 (UI 표시용)
-            // 여러 개일 경우 리스트 처리가 필요하지만 일단 첫 번째(가장 높은 확률 or 단일)를 메인으로 설정
-            // TODO: UI에 리스트 뷰 추가 필요
+            // 전체 결과 저장 (테이블 표시용)
+            setAllPredResults(finalResults)
+
+            // 첫 번째 결과는 요약 카드에 표시
             setPredResult(finalResults[0])
 
-            // 전체 결과는 콘솔이나 별도 상태로 저장 가능 (추후 UI 확장 시 사용)
-            console.log("Prediction Results:", finalResults)
-
-            // 결과가 여러개인 경우 알림
-            if (finalResults.length > 1) {
-                alert(`총 ${finalResults.length}건의 예측이 완료되었습니다. 상위 결과: ${finalResults[0].ticker} (${(finalResults[0].probability * 100).toFixed(1)}%)`)
-            }
+            console.log(`[Prediction] ${finalResults.length}건 예측 완료`)
 
         } catch (e) {
             console.error(e)
@@ -743,6 +745,80 @@ export function DeepLearningPanel() {
                             </CardContent>
                         </Card>
                     </div>
+
+                    {/* 백테스팅 결과 테이블 */}
+                    {allPredResults.length > 1 && (
+                        <Card className="bg-[#252526] border-[#3c3c3c] text-[#e1e1e1] mt-6">
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2">
+                                    <BarChart2 className="w-5 h-5" />
+                                    백테스팅 결과 ({allPredResults.length.toLocaleString()}건)
+                                </CardTitle>
+                                <CardDescription className="text-[#888888]">
+                                    과거 데이터에 대한 예측 결과와 실제 변동률을 비교합니다.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
+                                    <table className="w-full text-sm">
+                                        <thead className="sticky top-0 bg-[#1e1e1e]">
+                                            <tr className="border-b border-[#3c3c3c] text-left">
+                                                <th className="p-2 text-[#888888]">날짜</th>
+                                                <th className="p-2 text-[#888888]">티커</th>
+                                                <th className="p-2 text-[#888888] text-center">연속일</th>
+                                                <th className="p-2 text-[#888888] text-right">30일%</th>
+                                                <th className="p-2 text-[#888888] text-right">7일%</th>
+                                                <th className="p-2 text-[#888888] text-right">1일%</th>
+                                                <th className="p-2 text-[#888888] text-right">예측확률</th>
+                                                <th className="p-2 text-[#888888] text-right">실제변동</th>
+                                                <th className="p-2 text-[#888888] text-center">적중</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {allPredResults.slice(0, 500).map((r, idx) => {
+                                                const isHit = r.actual !== null && (
+                                                    (r.prediction === 1 && r.actual >= 2) ||
+                                                    (r.prediction === 0 && r.actual < 2)
+                                                )
+                                                return (
+                                                    <tr key={idx} className="border-b border-[#2c2c2c] hover:bg-[#2a2a2a]">
+                                                        <td className="p-2 text-[#e1e1e1]">{new Date(r.date).toLocaleDateString()}</td>
+                                                        <td className="p-2 font-mono text-[#007acc]">{r.ticker}</td>
+                                                        <td className={`p-2 text-center ${r.rawFeature?.consecutiveDays > 0 ? 'text-green-400' : r.rawFeature?.consecutiveDays < 0 ? 'text-red-400' : ''}`}>
+                                                            {r.rawFeature?.consecutiveDays || 0}
+                                                        </td>
+                                                        <td className={`p-2 text-right ${r.rawFeature?.change30d > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                                            {r.rawFeature?.change30d?.toFixed(1) || '0.0'}%
+                                                        </td>
+                                                        <td className={`p-2 text-right ${r.rawFeature?.change7d > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                                            {r.rawFeature?.change7d?.toFixed(1) || '0.0'}%
+                                                        </td>
+                                                        <td className={`p-2 text-right ${r.rawFeature?.change1d > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                                            {r.rawFeature?.change1d?.toFixed(1) || '0.0'}%
+                                                        </td>
+                                                        <td className={`p-2 text-right font-bold ${r.probability > 0.5 ? 'text-green-400' : 'text-red-400'}`}>
+                                                            {(r.probability * 100).toFixed(1)}%
+                                                        </td>
+                                                        <td className={`p-2 text-right font-bold ${r.actual >= 2 ? 'text-green-400' : r.actual !== null ? 'text-red-400' : 'text-[#666]'}`}>
+                                                            {r.actual !== null ? `${r.actual >= 0 ? '+' : ''}${r.actual.toFixed(1)}%` : '-'}
+                                                        </td>
+                                                        <td className="p-2 text-center">
+                                                            {r.actual !== null ? (
+                                                                isHit ? <span className="text-green-400">✓</span> : <span className="text-red-400">✗</span>
+                                                            ) : '-'}
+                                                        </td>
+                                                    </tr>
+                                                )
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {allPredResults.length > 500 && (
+                                    <p className="text-xs text-[#666666] mt-2 text-center">상위 500건만 표시됩니다. (총 {allPredResults.length.toLocaleString()}건)</p>
+                                )}
+                            </CardContent>
+                        </Card>
+                    )}
                 </TabsContent>
 
                 {/* 모델 관리 탭 */}
