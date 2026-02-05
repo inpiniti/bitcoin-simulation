@@ -268,8 +268,12 @@ export function DeepLearningPanel() {
         setPredResult(null)
 
         try {
-            const model = serverModels.find(m => m.id === selectedModelId)
-            if (!model) throw new Error("Model not found")
+            // selectedModelId는 문자열이므로 타입 일치를 위해 toString() 사용
+            const model = serverModels.find(m => m.id.toString() === selectedModelId.toString())
+            if (!model) {
+                console.error("Selected Model not found in list:", selectedModelId, serverModels)
+                throw new Error("선택한 모델을 찾을 수 없습니다.")
+            }
 
             // 데이터 수집
             const candles = await fetchStockHistory(predTicker, 60)
@@ -283,7 +287,7 @@ export function DeepLearningPanel() {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    modelId: model.model_id || model.modelId,  // Supabase(model_id) or Backend response(modelId)
+                    modelId: model.id || model.model_id || model.modelId,
                     features: [feature]
                 })
             })
