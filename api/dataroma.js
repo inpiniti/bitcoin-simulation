@@ -15,7 +15,16 @@ export default async function handler(request, response) {
 
     try {
         console.log(`Fetching Dataroma: ${TARGET_URL}`);
-        const apiResponse = await fetch(TARGET_URL);
+        const apiResponse = await fetch(TARGET_URL, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.9,ko-KR;q=0.8,ko;q=0.7',
+                'Referer': 'https://www.dataroma.com/',
+                'Cache-Control': 'no-cache',
+                'Pragma': 'no-cache'
+            }
+        });
 
         if (!apiResponse.ok) {
             throw new Error(`Failed to fetch dataroma: ${apiResponse.statusText}`);
