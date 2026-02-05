@@ -85,8 +85,8 @@ export function DeepLearningPanel() {
         let bestResult = null
         let bestScore = -Infinity
 
-        for (let bt = 50; bt <= 95; bt += 5) {
-            for (let st = 5; st <= 50; st += 5) {
+        for (let bt = 50; bt <= 95; bt += 1) {
+            for (let st = 5; st <= 50; st += 1) {
                 // 매수 범위: bt% 이상
                 const buyResults = validResults.filter(r => r.probability * 100 >= bt)
                 const buyCount = buyResults.length
@@ -944,7 +944,7 @@ export function DeepLearningPanel() {
                                             onValueChange={(v) => setBuyThreshold(v[0])}
                                             min={10}
                                             max={100}
-                                            step={5}
+                                            step={1}
                                             className="[&_[role=slider]]:bg-green-500"
                                         />
                                     </div>
@@ -961,7 +961,7 @@ export function DeepLearningPanel() {
                                             onValueChange={(v) => setSellThreshold(v[0])}
                                             min={0}
                                             max={90}
-                                            step={5}
+                                            step={1}
                                             className="[&_[role=slider]]:bg-red-500"
                                         />
                                     </div>
