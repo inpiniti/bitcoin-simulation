@@ -43,7 +43,8 @@ export function processStockDataForML(candles) {
         const getChangePct = (days) => {
             const past = candles[i - days];
             if (!past || past.close === 0) return 0;
-            return ((today.close - past.close) / past.close) * 100;
+            const pct = ((today.close - past.close) / past.close) * 100;
+            return Number.isFinite(pct) ? pct : 0;
         };
 
         const change1d = getChangePct(1);
@@ -107,7 +108,8 @@ export function processStockDataForPrediction(candles, allHistory = false) {
         const getChangePct = (days) => {
             const past = candles[i - days];
             if (!past || past.close === 0) return 0;
-            return ((today.close - past.close) / past.close) * 100;
+            const pct = ((today.close - past.close) / past.close) * 100;
+            return Number.isFinite(pct) ? pct : 0;
         };
 
         const change1d = parseFloat(getChangePct(1).toFixed(2));

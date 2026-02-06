@@ -1,8 +1,10 @@
 import { create } from 'zustand'
 import { devtools, persist, createJSONStorage } from 'zustand/middleware'
 import { get as idbGet, set as idbSet, del as idbDel } from 'idb-keyval'
+import { getSupabaseClient } from '@/lib/supabaseClient'
 import { fetchCoinDailyData, fetchStockHistory, fetchStockNews, getSentimentScore } from '@/lib/api'
-import { addDerivedData, generateIntegratedTrades, calculateFixedQuantityResult, calculateCumulativeResult, calculateMartingaleResult, analyzeSignal } from '@/lib/dataProcessor'
+import { addDerivedData, generateIntegratedTrades, generateAiTrades, calculateFixedQuantityResult, calculateCumulativeResult, calculateMartingaleResult, analyzeSignal } from '@/lib/dataProcessor'
+import { processStockDataForPrediction } from '@/lib/mlProcessor'
 
 // IndexedDB 스토리지 어댑터
 const indexedDBStorage = {
@@ -102,8 +104,16 @@ export const useStore = create(
                 // Global Error State (for AlertDialog)
                 globalError: null,
 
+                // AI Models
+                aiModels: [],
+                loadingAiModels: false,
+
                 // Strategy Options
                 strategyOptions: {
+                    strategyMode: 'rule', // 'rule' | 'ai'
+                    aiModelId: '',
+                    aiBuyThreshold: 0.6,
+                    aiSellThreshold: 0.4,
                     moneyManagement: 'fixed', // 'fixed' | 'cumulative'
                     isCompound: false,
                     useBB: false,
@@ -516,6 +526,16 @@ export const useStore = create(
                  */
                 logoutKIS: async () => {
                     const state = get()
+
+                    // WebSocket 연결 명시적 종료
+                    try {
+                        const { kisWebSocket } = await import('@/lib/kisWebSocket');
+                        kisWebSocket.disconnect();
+                        console.log('[KIS] 로그아웃에 따른 WebSocket 연결 종료');
+                    } catch (wsErr) {
+                        console.warn('WebSocket 종료 중 오류:', wsErr);
+                    }
+
                     if (state.kisAuth.accessToken) {
                         try {
                             const { revokeAccessToken } = await import('@/lib/kisApi')
@@ -1129,6 +1149,29 @@ export const useStore = create(
                     }
                 },
 
+                fetchAiModels: async () => {
+                    set({ loadingAiModels: true });
+                    try {
+                        const supabase = getSupabaseClient();
+                        if (!supabase) {
+                            console.warn('Supabase client not available');
+                            set({ loadingAiModels: false });
+                            return;
+                        }
+
+                        const { data, error } = await supabase
+                            .from('ml_models')
+                            .select('*')
+                            .order('created_at', { ascending: false });
+
+                        if (error) throw error;
+                        set({ aiModels: data, loadingAiModels: false });
+                    } catch (error) {
+                        console.error('Failed to load AI models:', error);
+                        set({ loadingAiModels: false });
+                    }
+                },
+
                 setMode: (mode) => {
                     const currentMode = get().mode;
                     if (currentMode !== mode) {
@@ -1295,7 +1338,123 @@ export const useStore = create(
 
                     const options = state.strategyOptions;
 
-                    const trades = generateIntegratedTrades(data, options);
+                    let trades = [];
+
+                    if (options.strategyMode === 'ai') {
+                        // AI 딥러닝 시뮬레이션
+                        if (!options.aiModelId) {
+                            get().setGlobalError('선택된 AI 모델이 없습니다.');
+                            set({ loadingSimul: { ...state.loadingSimul, [key]: false } }); // 로딩 해제 필요 (여기선 key 생성 전이라 애매하지만 runSimulation 상단에 isLoading 넣어야 함. 일단 패스)
+                            return;
+                        }
+
+                        // 1. Feature 추출
+                        const { features, dates, rawFeatures } = processStockDataForPrediction(data, true); // true = allHistory
+
+                        if (features.length === 0) {
+                            get().setGlobalError('데이터 부족으로 Feature를 생성할 수 없습니다.');
+                            return;
+                        }
+
+                        // 2. Predict API 호출
+                        // Vercel 환경에선 /api/xgb/predict, 로컬에선 vite proxy
+                        try {
+                            // 로딩 상태 표시 (간이)
+                            // 실제로는 loadingSimul을 사용하는 게 좋음. UI Blocking은 아님.
+
+                            // 선택된 모델 정보 가져오기 (이름 조회용)
+                            if (!options.aiModelId) {
+                                throw new Error('AI 모델이 선택되지 않았습니다. 사이드바에서 모델을 선택해주세요.');
+                            }
+
+                            if (!features || features.length === 0) {
+                                throw new Error('예측을 위한 데이터가 부족합니다 (최소 30봉 필요)');
+                            }
+
+                            let payload = { modelId: options.aiModelId };
+
+                            if (features.length > 50) {
+                                console.log('[AI Sim] Large dataset detected, uploading to Supabase...', features.length);
+                                const supabase = getSupabaseClient();
+                                if (!supabase) throw new Error('Supabase client unavailable');
+
+                                const { data: dsData, error: dsError } = await supabase
+                                    .from('training_datasets')
+                                    .insert([{ features: features, labels: [] }])
+                                    .select();
+
+                                if (dsError) {
+                                    console.error('[AI Sim] Supabase Upload Error:', dsError);
+                                    throw new Error(`Data upload failed: ${dsError.message}`);
+                                }
+                                if (!dsData || dsData.length === 0) throw new Error('Data upload returned no ID');
+
+                                payload.datasetId = dsData[0].id;
+                                console.log('[AI Sim] Using datasetId:', payload.datasetId);
+                            } else {
+                                payload.features = features;
+                                console.log('[AI Sim] Using inline features:', features.length);
+                            }
+
+                            const response = await fetch('/api/xgb/predict', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(payload)
+                            });
+
+                            if (!response.ok) {
+                                const errText = await response.text();
+                                console.error('[AI Sim] Prediction Server Error:', response.status, errText);
+                                throw new Error(`AI 서버 오류 (${response.status}): ${errText}`);
+                            }
+
+                            const resultData = await response.json();
+                            if (!resultData.predictions || !Array.isArray(resultData.predictions)) {
+                                throw new Error('서버로부터 올바른 예측 데이터를 받지 못했습니다.');
+                            }
+
+                            // 중요: 서버 응답에는 날짜 정보가 없으므로 dates와 매핑해야 generateAiTrades에서 인식 가능
+                            // 중요: 서버 응답에는 날짜 정보가 없으므로 dates와 매핑해야 generateAiTrades에서 인식 가능
+                            const predictions = resultData.predictions.map((p, idx) => {
+                                // 다양한 서버 응답 형식 대응 (XGBoost는 보통 [prob_0, prob_1] 또는 {probability: p} 반환)
+                                let prob = 0;
+                                if (typeof p === 'number') prob = p;
+                                else if (Array.isArray(p)) prob = p[1] !== undefined ? p[1] : p[0];
+                                else if (p && typeof p === 'object') prob = p.probability !== undefined ? p.probability : (p[1] !== undefined ? p[1] : (p.prob || 0));
+
+                                return {
+                                    ...(typeof p === 'object' && !Array.isArray(p) ? p : {}),
+                                    probability: prob,
+                                    date: dates[idx]
+                                };
+                            });
+
+                            const maxProb = Math.max(...predictions.map(p => p.probability));
+                            const minProb = Math.min(...predictions.map(p => p.probability));
+                            console.log(`[AI Sim] Received ${predictions.length} predictions. Range: ${minProb.toFixed(3)}~${maxProb.toFixed(3)}, BuyThreshold: ${options.aiBuyThreshold}`);
+
+                            // Trade 생성 (AI 전용 전략: 보조지표 등 기타 조건 무시)
+                            trades = generateAiTrades(data, predictions, {
+                                buyThreshold: options.aiBuyThreshold,
+                                sellThreshold: options.aiSellThreshold,
+                                useStopLoss: options.useStopLoss,
+                                stopLossPcnt: options.stopLossPcnt,
+                                useTakeProfit: options.useTakeProfit,
+                                takeProfitPcnt: options.takeProfitPcnt,
+                                useTrailingStop: options.useTrailingStop,
+                                trailingStopPcnt: options.trailingStopPcnt
+                            });
+
+                        } catch (e) {
+                            console.error('AI Simulation Failed:', e);
+                            get().setGlobalError({ title: 'AI 예측 실패', description: e.message });
+                            return;
+                        }
+
+                    } else {
+                        // 기존 룰 베이스
+                        trades = generateIntegratedTrades(data, options);
+                    }
 
                     if (trades.length === 0) {
                         get().setGlobalError('해당 조건으로 발생한 매매 내역이 없습니다.');

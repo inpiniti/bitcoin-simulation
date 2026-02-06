@@ -129,9 +129,28 @@ class KISWebSocketManager {
         if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     }
 
+    /**
+     * 재연결을 스케줄링합니다.
+     * 단, 사용자가 명시적으로 로그아웃했거나 인증키가 없는 경우 재연결을 중단합니다.
+     */
     scheduleReconnect() {
         if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
-        this.reconnectTimer = setTimeout(() => this.connect(this.approvalKey), 5000);
+
+        // 스토어 상태 확인
+        const { kisAuth } = useStore.getState();
+        if (!kisAuth.isLoggedIn) {
+            console.log('[KIS WS] 재연결 중단: 로그아웃 상태입니다.');
+            return;
+        }
+
+        // 최신 키 확인
+        const keyToUse = kisAuth.approvalKey || this.approvalKey;
+        if (!keyToUse) {
+            console.log('[KIS WS] 재연결 중단: WebSocket 인증키가 없습니다.');
+            return;
+        }
+
+        this.reconnectTimer = setTimeout(() => this.connect(keyToUse), 5000);
     }
 
     /**

@@ -400,6 +400,158 @@ export function generateIntegratedTrades(data, options = {}) {
     return trades;
 }
 
+/**
+ * AI Deep Learning 예측 기반 매매 엔진
+ * @param {Array<Object>} data - 캔들 데이터 (원본)
+ * @param {Array<Object>} predictions - AI 예측 데이터 배열 [{ date, probability, ... }]
+ * @param {Object} options - 전략 옵션
+ * @returns {Array<Object>} 생성된 매매 내역 배열
+ */
+export function generateAiTrades(data, predictions, options = {}) {
+    const {
+        buyThreshold = 0.6, // 60%
+        sellThreshold = 0.4, // 40%
+        useStopLoss = false,
+        stopLossPcnt = -2.0,
+        useTakeProfit = false,
+        takeProfitPcnt = 5.0,
+        useTrailingStop = false,
+        trailingStopPcnt = -2.0,
+    } = options;
+
+    const trades = [];
+    let currentPosition = null;
+    let buyRecord = null;
+    let highestPriceDuringTrade = 0;
+
+    // 날짜 형식 안전 변환 헬퍼
+    const toDate = (val) => {
+        if (!val) return new Date();
+        // KIS 날짜 형식 (YYYYMMDD) 대응
+        if (typeof val === 'string' && val.length === 8 && /^\d+$/.test(val)) {
+            return new Date(`${val.substring(0, 4)}-${val.substring(4, 6)}-${val.substring(6, 8)}`);
+        }
+        return new Date(val);
+    };
+
+    // 날짜별 예측 데이터 매핑 (빠른 조회를 위해 Map 사용)
+    const predMap = new Map();
+    predictions.forEach(p => {
+        if (!p.date || p.probability === undefined) return;
+        const d = toDate(p.date);
+        d.setHours(0, 0, 0, 0);
+        predMap.set(d.getTime(), p.probability);
+    });
+
+    console.log('[AI Trade] Prediction map created:', predMap.size, 'entries');
+    console.log('[AI Trade] First 3 predictions:', Array.from(predMap.entries()).slice(0, 3).map(([ts, prob]) => ({
+        date: new Date(ts).toISOString().split('T')[0],
+        prob: prob.toFixed(3)
+    })));
+    console.log('[AI Trade] Thresholds - Buy:', buyThreshold, 'Sell:', sellThreshold);
+
+    let matchedCount = 0;
+    let buyCount = 0;
+    let sellCount = 0;
+
+    for (let i = 0; i < data.length; i++) {
+        const curr = data[i];
+        const d = toDate(curr.timestamp || curr.date);
+        d.setHours(0, 0, 0, 0);
+        const prob = predMap.get(d.getTime());
+
+        // 예측 데이터가 없으면 건너뜀
+        if (prob === undefined) {
+            if (i < 3) console.log(`[AI Trade] Candle ${i}: No prediction match for`, new Date(d.getTime()).toISOString().split('T')[0]);
+            continue;
+        }
+
+        matchedCount++;
+        if (i < 3) console.log(`[AI Trade] Candle ${i}: Matched! Date=${new Date(d.getTime()).toISOString().split('T')[0]}, Prob=${prob.toFixed(3)}`);
+
+        // --- 매수 판단 ---
+        if (currentPosition === null) {
+            if (prob >= buyThreshold) {
+                buyCount++;
+                if (buyCount <= 3) console.log(`[AI Trade] BUY #${buyCount} at index ${i}: Prob=${(prob * 100).toFixed(1)}% >= Threshold=${(buyThreshold * 100).toFixed(1)}%`);
+
+                buyRecord = {
+                    type: 'buy',
+                    timestamp: curr.timestamp || curr.date,
+                    price: curr.close,
+                    index: i,
+                    reason: `AI Prob: ${(prob * 100).toFixed(1)}%`
+                };
+                currentPosition = 'long';
+                highestPriceDuringTrade = curr.close;
+            }
+        }
+
+        // --- 매도/청산 판단 ---
+        if (currentPosition === 'long') {
+            let sellSignal = prob < sellThreshold;
+            let sellReason = `AI Prob: ${(prob * 100).toFixed(1)}%`;
+
+            if (curr.high > highestPriceDuringTrade) {
+                highestPriceDuringTrade = curr.high;
+            }
+
+            // 손절/익절/트레일링스탑
+            const currentProfitRate = ((curr.close - buyRecord.price) / buyRecord.price) * 100;
+            const dropFromPeakPcnt = ((curr.close - highestPriceDuringTrade) / highestPriceDuringTrade) * 100;
+
+            if (useStopLoss && currentProfitRate <= stopLossPcnt) {
+                sellSignal = true;
+                sellReason = `Stop Loss (${stopLossPcnt}%)`;
+            } else if (useTakeProfit && currentProfitRate >= takeProfitPcnt) {
+                sellSignal = true;
+                sellReason = `Take Profit (${takeProfitPcnt}%)`;
+            } else if (useTrailingStop && dropFromPeakPcnt <= trailingStopPcnt) {
+                sellSignal = true;
+                sellReason = `Trailing Stop (${trailingStopPcnt}%)`;
+            }
+
+            if (sellSignal) {
+                sellCount++;
+                if (sellCount <= 3) console.log(`[AI Trade] SELL #${sellCount} at index ${i}: ${sellReason}`);
+
+                const sellRecord = {
+                    type: 'sell',
+                    timestamp: curr.timestamp || curr.date,
+                    price: curr.close,
+                    index: i,
+                    reason: sellReason
+                };
+
+                const profit = sellRecord.price - buyRecord.price;
+                const profitRate = (profit / buyRecord.price) * 100;
+
+                trades.push({
+                    cycle: trades.length + 1,
+                    buy: buyRecord,
+                    sell: sellRecord,
+                    profit,
+                    profitRate,
+                });
+
+                currentPosition = null;
+                buyRecord = null;
+            }
+        }
+    }
+
+    console.log(`[AI Trade] Summary - Total candles: ${data.length}, Matched: ${matchedCount}, Buys: ${buyCount}, Sells: ${sellCount}, Closed trades: ${trades.length}`);
+    if (trades.length === 0 && matchedCount > 0) {
+        console.warn('[AI Trade] WARNING: 날짜는 매칭되었지만 거래가 발생하지 않았습니다. 임계값을 확인하세요.');
+    } else if (matchedCount === 0) {
+        console.error('[AI Trade] ERROR: 예측 데이터와 캔들 데이터의 날짜가 하나도 매칭되지 않았습니다!');
+        console.error('[AI Trade] First candle date:', data[0] ? new Date(toDate(data[0].timestamp || data[0].date).setHours(0, 0, 0, 0)).toISOString() : 'N/A');
+        console.error('[AI Trade] Prediction dates:', Array.from(predMap.keys()).slice(0, 3).map(ts => new Date(ts).toISOString()));
+    }
+
+    return trades;
+}
+
 export function generateTrades(dataWithSlope, strategy = 'standard') {
     if (strategy === 'fixedQtyBB') {
         return generateIntegratedTrades(dataWithSlope, { useBB: true });

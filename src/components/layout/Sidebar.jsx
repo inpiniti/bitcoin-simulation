@@ -1,7 +1,8 @@
 import { cn } from "@/lib/utils"
 import { useStore } from "@/store/useStore"
-import { Loader2, Lock, TrendingUp, Zap, Coins, ShieldAlert, Target, BarChart3, List, Settings2 } from "lucide-react"
-import { useState } from "react"
+import { Loader2, Lock, TrendingUp, Zap, Coins, ShieldAlert, Target, BarChart3, List, Settings2, Brain, Database, Activity } from "lucide-react"
+import { useState, useEffect } from "react"
+import { Slider } from "@/components/ui/slider"
 import { TickerSelectionPanel } from "./TickerSelectionPanel"
 import { DocsSidebarContent } from "../docs/DocsSidebarContent"
 
@@ -20,8 +21,15 @@ export function Sidebar() {
         isRealtimeAnalysis,
         interval,
         wsStatus,
-        setGlobalError
+        setGlobalError,
+        aiModels,
+        loadingAiModels,
+        fetchAiModels
     } = useStore()
+
+    useEffect(() => {
+        fetchAiModels()
+    }, [])
 
     const [activeTab, setActiveTab] = useState('strategy') // 'strategy' | 'ticker'
     const [prevViewMode, setPrevViewMode] = useState(viewMode)
@@ -120,77 +128,215 @@ export function Sidebar() {
                                 </div>
                             </section>
 
-                            {/* 2. 진입/청산 필터 */}
+                            {/* 2. 전략 모드 선택 */}
                             <section className="space-y-2">
                                 <h3 className="text-[12px] font-bold text-[#cccccc] flex items-center gap-2">
-                                    <TrendingUp className="w-3.5 h-3.5" /> 진입/청산 필터
+                                    <Target className="w-3.5 h-3.5" /> 전략 모델
                                 </h3>
-                                <div className="space-y-2">
-                                    {[
-                                        { id: 'useBB', label: '볼린저 밴드 (BB -2)', desc: '하단 이탈 시 매수' },
-                                        { id: 'useTrend', label: '추세 필터 (MA50)', desc: '장기 추세 위일 때 매수' },
-                                        { id: 'useTrend20', label: '추세 필터 (MA20)', desc: '단기 추세 위일 때 매수' },
-                                        { id: 'useRSI', label: 'RSI 필터 (70미만)', desc: '과매수 시 매수 금지' },
-                                        { id: 'useVolumeFilter', label: '거래량 필터', desc: '평균(VMA20) 이상 시 매수' },
-                                    ].map(item => (
-                                        <label key={item.id} className="flex items-center gap-3 group cursor-pointer">
-                                            <div className="relative flex items-center">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={strategyOptions[item.id]}
-                                                    onChange={(e) => handleOptionChange(item.id, e.target.checked)}
-                                                    className="sr-only"
-                                                />
-                                                <div className={cn(
-                                                    "w-4 h-4 rounded border transition-colors flex items-center justify-center",
-                                                    strategyOptions[item.id] ? "bg-[#007acc] border-[#007acc]" : "border-[#555555] group-hover:border-[#777777]"
-                                                )}>
-                                                    {strategyOptions[item.id] && <div className="w-2 h-2 bg-white rounded-sm" />}
-                                                </div>
-                                            </div>
-                                            <div className="flex flex-col">
-                                                <span className="text-[13px] text-[#cccccc]">{item.label}</span>
-                                                <span className="text-[10px] text-[#666666]">{item.desc}</span>
-                                            </div>
-                                        </label>
-                                    ))}
+                                <div className="grid grid-cols-2 gap-2 bg-[#1e1e1e] p-1 rounded border border-[#333]">
+                                    <button
+                                        onClick={() => handleOptionChange('strategyMode', 'rule')}
+                                        className={cn(
+                                            "py-1.5 text-[11px] rounded transition-colors font-medium",
+                                            strategyOptions.strategyMode !== 'ai' // Default to rule if undefined
+                                                ? "bg-[#333] text-white shadow-sm"
+                                                : "text-[#888] hover:text-[#ccc]"
+                                        )}
+                                    >
+                                        일반 (Rule)
+                                    </button>
+                                    <button
+                                        onClick={() => handleOptionChange('strategyMode', 'ai')}
+                                        className={cn(
+                                            "py-1.5 text-[11px] rounded transition-colors font-medium flex items-center justify-center gap-1",
+                                            strategyOptions.strategyMode === 'ai'
+                                                ? "bg-[#0e639c] text-white shadow-sm"
+                                                : "text-[#888] hover:text-[#ccc]"
+                                        )}
+                                    >
+                                        <Brain className="w-3 h-3" />
+                                        AI 딥러닝
+                                    </button>
                                 </div>
                             </section>
 
-                            {/* 3. 익절/손절/추적 */}
-                            <section className="space-y-2">
-                                <h3 className="text-[12px] font-bold text-[#cccccc] flex items-center gap-2">
-                                    <ShieldAlert className="w-3.5 h-3.5" /> 리스크 관리
-                                </h3>
-                                <div className="space-y-2">
-                                    {[
-                                        { id: 'useStopLoss', label: '손절매 (-2%)', desc: '도달 시 즉시 손절' },
-                                        { id: 'useTakeProfit', label: '익절매 (+5%)', desc: '도달 시 즉시 익절' },
-                                        { id: 'useTrailingStop', label: '추적 손절매 (-2%)', desc: '최고점 대비 하락 시' },
-                                    ].map(item => (
-                                        <label key={item.id} className="flex items-center gap-3 group cursor-pointer">
-                                            <div className="relative flex items-center">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={strategyOptions[item.id]}
-                                                    onChange={(e) => handleOptionChange(item.id, e.target.checked)}
-                                                    className="sr-only"
-                                                />
-                                                <div className={cn(
-                                                    "w-4 h-4 rounded border transition-colors flex items-center justify-center",
-                                                    strategyOptions[item.id] ? "bg-[#ce9178] border-[#ce9178]" : "border-[#555555] group-hover:border-[#777777]"
-                                                )}>
-                                                    {strategyOptions[item.id] && <div className="w-2 h-2 bg-white rounded-sm" />}
-                                                </div>
+                            {strategyOptions.strategyMode === 'ai' ? (
+                                // --- AI Deep Learning UI ---
+                                <div className="space-y-6 animate-in fade-in slide-in-from-left-4 duration-300">
+                                    <section className="space-y-2">
+                                        <h3 className="text-[12px] font-bold text-[#cccccc] flex items-center gap-2">
+                                            <Database className="w-3.5 h-3.5" /> 모델 선택
+                                        </h3>
+                                        <select
+                                            value={strategyOptions.aiModelId || ''}
+                                            onChange={(e) => handleOptionChange('aiModelId', e.target.value)}
+                                            className="w-full bg-[#3c3c3c] border border-[#555555] text-[12px] text-[#cccccc] p-2 rounded focus:outline-none focus:border-[#007acc]"
+                                        >
+                                            <option value="">모델을 선택하세요</option>
+                                            {loadingAiModels ? (
+                                                <option disabled>로딩 중...</option>
+                                            ) : (
+                                                aiModels.length > 0 ? (
+                                                    aiModels.map(model => (
+                                                        <option key={model.id} value={model.id}>
+                                                            {model.name} ({new Date(model.created_at).toLocaleDateString()})
+                                                        </option>
+                                                    ))
+                                                ) : (
+                                                    <option disabled>사용 가능한 모델 없음</option>
+                                                )
+                                            )}
+                                        </select>
+                                    </section>
+
+                                    <section className="space-y-4">
+                                        <h3 className="text-[12px] font-bold text-[#cccccc] flex items-center gap-2">
+                                            <Activity className="w-3.5 h-3.5" /> 확률 임계값 설정
+                                        </h3>
+
+                                        {/* 매수 임계값 */}
+                                        <div className="space-y-2">
+                                            <div className="flex justify-between text-[11px]">
+                                                <span className="text-[#888]">매수 조건 (이상)</span>
+                                                <span className="text-green-400 font-bold">
+                                                    {Math.round((strategyOptions.aiBuyThreshold ?? 0.6) * 100)}%
+                                                </span>
                                             </div>
-                                            <div className="flex flex-col">
-                                                <span className="text-[13px] text-[#cccccc]">{item.label}</span>
-                                                <span className="text-[10px] text-[#666666]">{item.desc}</span>
+                                            <Slider
+                                                value={[Math.round((strategyOptions.aiBuyThreshold ?? 0.6) * 100)]}
+                                                onValueChange={(v) => handleOptionChange('aiBuyThreshold', v[0] / 100)}
+                                                max={100}
+                                                step={1}
+                                                className="[&_[role=slider]]:bg-green-500"
+                                            />
+                                        </div>
+
+                                        {/* 매도 임계값 */}
+                                        <div className="space-y-2">
+                                            <div className="flex justify-between text-[11px]">
+                                                <span className="text-[#888]">매도 조건 (미만)</span>
+                                                <span className="text-red-400 font-bold">
+                                                    {Math.round((strategyOptions.aiSellThreshold ?? 0.4) * 100)}%
+                                                </span>
                                             </div>
-                                        </label>
-                                    ))}
+                                            <Slider
+                                                value={[Math.round((strategyOptions.aiSellThreshold ?? 0.4) * 100)]}
+                                                onValueChange={(v) => handleOptionChange('aiSellThreshold', v[0] / 100)}
+                                                max={100}
+                                                step={1}
+                                                className="[&_[role=slider]]:bg-red-500"
+                                            />
+                                        </div>
+                                    </section>
+
+                                    <section className="space-y-2 pt-2 border-t border-[#3c3c3c]">
+                                        <h3 className="text-[12px] font-bold text-[#cccccc] flex items-center gap-2">
+                                            <ShieldAlert className="w-3.5 h-3.5" /> 리스크 관리 (AI 공통)
+                                        </h3>
+                                        <div className="space-y-2">
+                                            {[
+                                                { id: 'useStopLoss', label: '손절매 (-2%)', desc: '도달 시 즉시 손절' },
+                                                { id: 'useTakeProfit', label: '익절매 (+5%)', desc: '도달 시 즉시 익절' }
+                                            ].map(item => (
+                                                <label key={item.id} className="flex items-center gap-3 group cursor-pointer">
+                                                    <div className="relative flex items-center">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={strategyOptions[item.id]}
+                                                            onChange={(e) => handleOptionChange(item.id, e.target.checked)}
+                                                            className="sr-only"
+                                                        />
+                                                        <div className={cn(
+                                                            "w-4 h-4 rounded border transition-colors flex items-center justify-center",
+                                                            strategyOptions[item.id] ? "bg-[#ce9178] border-[#ce9178]" : "border-[#555555] group-hover:border-[#777777]"
+                                                        )}>
+                                                            {strategyOptions[item.id] && <div className="w-2 h-2 bg-white rounded-sm" />}
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex flex-col">
+                                                        <span className="text-[13px] text-[#cccccc]">{item.label}</span>
+                                                    </div>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </section>
                                 </div>
-                            </section>
+                            ) : (
+                                // --- Existing Rule-Based UI ---
+                                <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+                                    {/* 2. 진입/청산 필터 */}
+                                    <section className="space-y-2">
+                                        <h3 className="text-[12px] font-bold text-[#cccccc] flex items-center gap-2">
+                                            <TrendingUp className="w-3.5 h-3.5" /> 진입/청산 필터
+                                        </h3>
+                                        <div className="space-y-2">
+                                            {[
+                                                { id: 'useBB', label: '볼린저 밴드 (BB -2)', desc: '하단 이탈 시 매수' },
+                                                { id: 'useTrend', label: '추세 필터 (MA50)', desc: '장기 추세 위일 때 매수' },
+                                                { id: 'useTrend20', label: '추세 필터 (MA20)', desc: '단기 추세 위일 때 매수' },
+                                                { id: 'useRSI', label: 'RSI 필터 (70미만)', desc: '과매수 시 매수 금지' },
+                                                { id: 'useVolumeFilter', label: '거래량 필터', desc: '평균(VMA20) 이상 시 매수' },
+                                            ].map(item => (
+                                                <label key={item.id} className="flex items-center gap-3 group cursor-pointer">
+                                                    <div className="relative flex items-center">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={strategyOptions[item.id]}
+                                                            onChange={(e) => handleOptionChange(item.id, e.target.checked)}
+                                                            className="sr-only"
+                                                        />
+                                                        <div className={cn(
+                                                            "w-4 h-4 rounded border transition-colors flex items-center justify-center",
+                                                            strategyOptions[item.id] ? "bg-[#007acc] border-[#007acc]" : "border-[#555555] group-hover:border-[#777777]"
+                                                        )}>
+                                                            {strategyOptions[item.id] && <div className="w-2 h-2 bg-white rounded-sm" />}
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex flex-col">
+                                                        <span className="text-[13px] text-[#cccccc]">{item.label}</span>
+                                                        <span className="text-[10px] text-[#666666]">{item.desc}</span>
+                                                    </div>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </section>
+
+                                    {/* 3. 익절/손절/추적 */}
+                                    <section className="space-y-2">
+                                        <h3 className="text-[12px] font-bold text-[#cccccc] flex items-center gap-2">
+                                            <ShieldAlert className="w-3.5 h-3.5" /> 리스크 관리
+                                        </h3>
+                                        <div className="space-y-2">
+                                            {[
+                                                { id: 'useStopLoss', label: '손절매 (-2%)', desc: '도달 시 즉시 손절' },
+                                                { id: 'useTakeProfit', label: '익절매 (+5%)', desc: '도달 시 즉시 익절' },
+                                                { id: 'useTrailingStop', label: '추적 손절매 (-2%)', desc: '최고점 대비 하락 시' },
+                                            ].map(item => (
+                                                <label key={item.id} className="flex items-center gap-3 group cursor-pointer">
+                                                    <div className="relative flex items-center">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={strategyOptions[item.id]}
+                                                            onChange={(e) => handleOptionChange(item.id, e.target.checked)}
+                                                            className="sr-only"
+                                                        />
+                                                        <div className={cn(
+                                                            "w-4 h-4 rounded border transition-colors flex items-center justify-center",
+                                                            strategyOptions[item.id] ? "bg-[#ce9178] border-[#ce9178]" : "border-[#555555] group-hover:border-[#777777]"
+                                                        )}>
+                                                            {strategyOptions[item.id] && <div className="w-2 h-2 bg-white rounded-sm" />}
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex flex-col">
+                                                        <span className="text-[13px] text-[#cccccc]">{item.label}</span>
+                                                        <span className="text-[10px] text-[#666666]">{item.desc}</span>
+                                                    </div>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </section>
+                                </div>
+                            )}
 
                             {/* 4. V-Martingale */}
                             <section className="space-y-2">
