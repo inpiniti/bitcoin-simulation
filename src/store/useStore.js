@@ -1445,6 +1445,46 @@ export const useStore = create(
                                 trailingStopPcnt: options.trailingStopPcnt
                             });
 
+                            // [유저 요청] 데이터 뷰를 위한 상세 데이터 구성
+                            const aiData = predictions.map((p, idx) => ({
+                                date: dates[idx],
+                                probability: p.probability,
+                                ...(rawFeatures[idx] || {})
+                            })).sort((a, b) => new Date(b.date) - new Date(a.date));
+
+                            const resultObj = {
+                                aiData, // 상세 데이터 저장
+                                strategyMode: 'ai'
+                            };
+
+                            // 결과 계산 후 메타데이터 합치기
+                            let finalResult;
+                            if (options.useVMartingale) {
+                                const { calculateVMartingaleResult } = await import('@/lib/dataProcessor');
+                                finalResult = calculateVMartingaleResult(trades, options.baseQuantity);
+                            } else if (options.martingaleMultiplier > 1.0) {
+                                finalResult = calculateMartingaleResult(trades, options.baseQuantity, options.martingaleMultiplier);
+                            } else if (options.moneyManagement === 'cumulative') {
+                                finalResult = calculateCumulativeResult(trades, options.baseQuantity);
+                            } else {
+                                finalResult = calculateFixedQuantityResult(trades, options.baseQuantity);
+                            }
+
+                            const key = `sim_${Date.now()}`;
+                            const resultWithMeta = {
+                                ...finalResult,
+                                ...resultObj,
+                                options: { ...options }
+                            };
+
+                            set(s => ({
+                                simul: { ...s.simul, [key]: resultWithMeta },
+                                selectedResult: { key, ...resultWithMeta },
+                                viewMode: 'simulation'
+                            }));
+
+                            return; // AI 경로는 여기서 종료
+
                         } catch (e) {
                             console.error('AI Simulation Failed:', e);
                             get().setGlobalError({ title: 'AI 예측 실패', description: e.message });

@@ -11,8 +11,10 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table"
-import { FileCode, X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, LineChart as LineChartIcon, TableIcon, Play, Loader2 } from "lucide-react"
+import { FileCode, X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, LineChart as LineChartIcon, TableIcon, Play, Loader2, Database, List, BarChart2 } from "lucide-react"
 import { TickerTabBar } from "./TickerTabBar"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Badge } from "@/components/ui/badge"
 
 // 패널들을 지연 로딩(Lazy Loading)으로 전환하여 초기 번들 크기 최적화
 const ChartView = lazy(() => import("../ChartView").then(m => ({ default: m.ChartView })))
@@ -279,7 +281,7 @@ export function EditorArea() {
             )
         }
 
-        const { summary, trades } = selectedResult
+        const { summary, trades, aiData, options } = selectedResult
 
         // 페이징 계산
         const totalItems = trades?.length || 0
@@ -376,82 +378,188 @@ export function EditorArea() {
                     </div>
                 </div>
 
-                {/* Trade Table */}
-                <div className="flex-1 flex flex-col">
-                    <div className="px-4 py-2 border-b border-[#3c3c3c] flex items-center justify-between">
-                        <h3 className="text-[11px] text-[#569cd6] uppercase tracking-wider">
-                            거래 내역 ({totalItems}건)
-                        </h3>
-                    </div>
-                    <ScrollArea className="flex-1">
-                        <Table>
-                            <TableHeader>
-                                <TableRow className="border-[#3c3c3c] hover:bg-transparent">
-                                    <TableHead className="text-[#569cd6] text-[11px] h-8 sticky top-0 bg-[#1e1e1e]">#</TableHead>
-                                    <TableHead className="text-[#569cd6] text-[11px] h-8 sticky top-0 bg-[#1e1e1e]">매수 시간</TableHead>
-                                    <TableHead className="text-[#569cd6] text-[11px] h-8 text-right sticky top-0 bg-[#1e1e1e]">구매액</TableHead>
-                                    <TableHead className="text-[#569cd6] text-[11px] h-8 text-right sticky top-0 bg-[#1e1e1e]">매수 시세</TableHead>
-                                    <TableHead className="text-[#569cd6] text-[11px] h-8 sticky top-0 bg-[#1e1e1e]">매도 시간</TableHead>
-                                    <TableHead className="text-[#569cd6] text-[11px] h-8 text-right sticky top-0 bg-[#1e1e1e]">판매액</TableHead>
-                                    <TableHead className="text-[#569cd6] text-[11px] h-8 text-right sticky top-0 bg-[#1e1e1e]">매도 시세</TableHead>
-                                    <TableHead className="text-[#569cd6] text-[11px] h-8 text-right sticky top-0 bg-[#1e1e1e]">손익</TableHead>
-                                    <TableHead className="text-[#569cd6] text-[11px] h-8 text-right sticky top-0 bg-[#1e1e1e]">수익률</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {currentTrades.map((trade, idx) => (
-                                    <TableRow key={startIndex + idx} className="border-[#3c3c3c] hover:bg-[#2a2a2a]">
-                                        <TableCell className="font-mono text-[#d4d4d4] text-xs py-1.5">{trade.cycle}</TableCell>
-                                        <TableCell className="font-mono text-[#4fc1ff] text-xs py-1.5">{formatDateTime(trade.buy.timestamp)}</TableCell>
-                                        <TableCell className="font-mono text-[#d4d4d4] text-xs text-right py-1.5">{trade.buyCost?.toLocaleString(undefined, { maximumFractionDigits: 0 })}</TableCell>
-                                        <TableCell className="font-mono text-[#dcdcaa] text-xs text-right py-1.5">{formatBtcPrice(trade.buy.price)}</TableCell>
-                                        <TableCell className="font-mono text-[#ce9178] text-xs py-1.5">{formatDateTime(trade.sell.timestamp)}</TableCell>
-                                        <TableCell className="font-mono text-[#d4d4d4] text-xs text-right py-1.5">{trade.sellRevenue?.toLocaleString(undefined, { maximumFractionDigits: 0 })}</TableCell>
-                                        <TableCell className="font-mono text-[#dcdcaa] text-xs text-right py-1.5">{formatBtcPrice(trade.sell.price)}</TableCell>
-                                        <TableCell className={cn(
-                                            "font-mono text-xs text-right py-1.5 font-semibold",
-                                            trade.realProfit >= 0 ? "text-[#4ec9b0]" : "text-[#f14c4c]"
-                                        )}>
-                                            {trade.realProfit >= 0 ? '+' : ''}{Math.round(trade.realProfit)?.toLocaleString()}
-                                        </TableCell>
-                                        <TableCell className={cn(
-                                            "font-mono text-xs text-right py-1.5 font-semibold",
-                                            trade.realProfitRate >= 0 ? "text-[#4ec9b0]" : "text-[#f14c4c]"
-                                        )}>
-                                            {trade.realProfitRate >= 0 ? '+' : ''}{trade.realProfitRate?.toFixed(2)}%
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </ScrollArea>
-
-                    {/* 페이징 컨트롤 */}
-                    {totalPages > 1 && (
-                        <div className="px-4 py-2 border-t border-[#3c3c3c] flex items-center justify-between shrink-0">
-                            <div className="text-[11px] text-[#6a6a6a]">
-                                {startIndex + 1} - {Math.min(endIndex, totalItems)} / {totalItems}건
-                            </div>
-                            <div className="flex items-center gap-1">
-                                <Button variant="ghost" size="icon" className="h-7 w-7 text-[#cccccc] hover:bg-[#3c3c3c] disabled:opacity-30" onClick={() => handlePageChange(1)} disabled={currentPage === 1}>
-                                    <ChevronsLeft className="h-4 w-4" />
-                                </Button>
-                                <Button variant="ghost" size="icon" className="h-7 w-7 text-[#cccccc] hover:bg-[#3c3c3c] disabled:opacity-30" onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1}>
-                                    <ChevronLeft className="h-4 w-4" />
-                                </Button>
-                                <div className="text-[11px] text-[#cccccc] px-2">{currentPage} / {totalPages}</div>
-                                <Button variant="ghost" size="icon" className="h-7 w-7 text-[#cccccc] hover:bg-[#3c3c3c] disabled:opacity-30" onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === totalPages}>
-                                    <ChevronRight className="h-4 w-4" />
-                                </Button>
-                                <Button variant="ghost" size="icon" className="h-7 w-7 text-[#cccccc] hover:bg-[#3c3c3c] disabled:opacity-30" onClick={() => handlePageChange(totalPages)} disabled={currentPage === totalPages}>
-                                    <ChevronsRight className="h-4 w-4" />
-                                </Button>
-                            </div>
+                {/* Trade Table with Tabs */}
+                <div className="flex-1 flex flex-col overflow-hidden">
+                    <Tabs defaultValue="trades" className="flex-1 flex flex-col overflow-hidden">
+                        <div className="px-4 py-2 border-b border-[#3c3c3c] flex items-center gap-4">
+                            <TabsList className="bg-transparent h-7 gap-0 p-0">
+                                <TabsTrigger
+                                    value="trades"
+                                    className="data-[state=active]:bg-[#1e1e1e] data-[state=active]:text-[#569cd6] rounded-none border-b-2 border-transparent data-[state=active]:border-[#569cd6] h-7 px-3 text-[11px] flex items-center gap-1"
+                                >
+                                    <List className="w-3 h-3" /> 거래내역 ({totalItems})
+                                </TabsTrigger>
+                                {aiData && (
+                                    <TabsTrigger
+                                        value="data"
+                                        className="data-[state=active]:bg-[#1e1e1e] data-[state=active]:text-[#569cd6] rounded-none border-b-2 border-transparent data-[state=active]:border-[#569cd6] h-7 px-3 text-[11px] flex items-center gap-1"
+                                    >
+                                        <Database className="w-3 h-3" /> 데이터 뷰 ({aiData.length})
+                                    </TabsTrigger>
+                                )}
+                            </TabsList>
                         </div>
-                    )}
+
+                        {/* 거래내역 탭 */}
+                        <TabsContent value="trades" className="flex-1 flex flex-col overflow-hidden m-0 p-0">
+                            <ScrollArea className="flex-1">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow className="border-[#3c3c3c] hover:bg-transparent">
+                                            <TableHead className="text-[#569cd6] text-[11px] h-8 sticky top-0 bg-[#1e1e1e]">#</TableHead>
+                                            <TableHead className="text-[#569cd6] text-[11px] h-8 sticky top-0 bg-[#1e1e1e]">매수 시간</TableHead>
+                                            <TableHead className="text-[#569cd6] text-[11px] h-8 text-right sticky top-0 bg-[#1e1e1e]">구매액</TableHead>
+                                            <TableHead className="text-[#569cd6] text-[11px] h-8 text-right sticky top-0 bg-[#1e1e1e]">매수 시세</TableHead>
+                                            <TableHead className="text-[#569cd6] text-[11px] h-8 sticky top-0 bg-[#1e1e1e]">매도 시간</TableHead>
+                                            <TableHead className="text-[#569cd6] text-[11px] h-8 text-right sticky top-0 bg-[#1e1e1e]">판매액</TableHead>
+                                            <TableHead className="text-[#569cd6] text-[11px] h-8 text-right sticky top-0 bg-[#1e1e1e]">매도 시세</TableHead>
+                                            <TableHead className="text-[#569cd6] text-[11px] h-8 text-right sticky top-0 bg-[#1e1e1e]">손익</TableHead>
+                                            <TableHead className="text-[#569cd6] text-[11px] h-8 text-right sticky top-0 bg-[#1e1e1e]">수익률</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {currentTrades.map((trade, idx) => (
+                                            <TableRow key={startIndex + idx} className="border-[#3c3c3c] hover:bg-[#2a2a2a]">
+                                                <TableCell className="font-mono text-[#d4d4d4] text-xs py-1.5">{trade.cycle}</TableCell>
+                                                <TableCell className="font-mono text-[#4fc1ff] text-xs py-1.5">{formatDateTime(trade.buy.timestamp)}</TableCell>
+                                                <TableCell className="font-mono text-[#d4d4d4] text-xs text-right py-1.5">{trade.buyCost?.toLocaleString(undefined, { maximumFractionDigits: 0 })}</TableCell>
+                                                <TableCell className="font-mono text-[#dcdcaa] text-xs text-right py-1.5">{formatBtcPrice(trade.buy.price)}</TableCell>
+                                                <TableCell className="font-mono text-[#ce9178] text-xs py-1.5">{formatDateTime(trade.sell.timestamp)}</TableCell>
+                                                <TableCell className="font-mono text-[#d4d4d4] text-xs text-right py-1.5">{trade.sellRevenue?.toLocaleString(undefined, { maximumFractionDigits: 0 })}</TableCell>
+                                                <TableCell className="font-mono text-[#dcdcaa] text-xs text-right py-1.5">{formatBtcPrice(trade.sell.price)}</TableCell>
+                                                <TableCell className={cn(
+                                                    "font-mono text-xs text-right py-1.5 font-semibold",
+                                                    trade.realProfit >= 0 ? "text-[#4ec9b0]" : "text-[#f14c4c]"
+                                                )}>
+                                                    {trade.realProfit >= 0 ? '+' : ''}{Math.round(trade.realProfit)?.toLocaleString()}
+                                                </TableCell>
+                                                <TableCell className={cn(
+                                                    "font-mono text-xs text-right py-1.5 font-semibold",
+                                                    trade.realProfitRate >= 0 ? "text-[#4ec9b0]" : "text-[#f14c4c]"
+                                                )}>
+                                                    {trade.realProfitRate >= 0 ? '+' : ''}{trade.realProfitRate?.toFixed(2)}%
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </ScrollArea>
+
+                            {/* 페이징 컨트롤 */}
+                            {totalPages > 1 && (
+                                <div className="px-4 py-2 border-t border-[#3c3c3c] flex items-center justify-between shrink-0">
+                                    <div className="text-[11px] text-[#6a6a6a]">
+                                        {startIndex + 1} - {Math.min(endIndex, totalItems)} / {totalItems}건
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                        <Button variant="ghost" size="icon" className="h-7 w-7 text-[#cccccc] hover:bg-[#3c3c3c] disabled:opacity-30" onClick={() => handlePageChange(1)} disabled={currentPage === 1}>
+                                            <ChevronsLeft className="h-4 w-4" />
+                                        </Button>
+                                        <Button variant="ghost" size="icon" className="h-7 w-7 text-[#cccccc] hover:bg-[#3c3c3c] disabled:opacity-30" onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1}>
+                                            <ChevronLeft className="h-4 w-4" />
+                                        </Button>
+                                        <div className="text-[11px] text-[#cccccc] px-2">{currentPage} / {totalPages}</div>
+                                        <Button variant="ghost" size="icon" className="h-7 w-7 text-[#cccccc] hover:bg-[#3c3c3c] disabled:opacity-30" onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === totalPages}>
+                                            <ChevronRight className="h-4 w-4" />
+                                        </Button>
+                                        <Button variant="ghost" size="icon" className="h-7 w-7 text-[#cccccc] hover:bg-[#3c3c3c] disabled:opacity-30" onClick={() => handlePageChange(totalPages)} disabled={currentPage === totalPages}>
+                                            <ChevronsRight className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+                        </TabsContent>
+
+                        {/* 데이터 뷰 탭 (AI 전용) */}
+                        {aiData && (
+                            <TabsContent value="data" className="flex-1 flex flex-col overflow-hidden m-0 p-0">
+                                <ScrollArea className="flex-1">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow className="border-[#3c3c3c] hover:bg-transparent">
+                                                <TableHead className="text-[#569cd6] text-[11px] h-8 sticky top-0 bg-[#1e1e1e]">날짜</TableHead>
+                                                <TableHead className="text-[#569cd6] text-[11px] h-8 text-right sticky top-0 bg-[#1e1e1e]">예측 확률</TableHead>
+                                                <TableHead className="text-[#569cd6] text-[11px] h-8 text-center sticky top-0 bg-[#1e1e1e]">신호</TableHead>
+                                                <TableHead className="text-[#569cd6] text-[11px] h-8 text-right sticky top-0 bg-[#1e1e1e]">연속일</TableHead>
+                                                <TableHead className="text-[#569cd6] text-[11px] h-8 text-right sticky top-0 bg-[#1e1e1e]">1일%</TableHead>
+                                                <TableHead className="text-[#569cd6] text-[11px] h-8 text-right sticky top-0 bg-[#1e1e1e]">7일%</TableHead>
+                                                <TableHead className="text-[#569cd6] text-[11px] h-8 text-right sticky top-0 bg-[#1e1e1e]">30일%</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {aiData.slice(0, 500).map((item, idx) => {
+                                                const isBuy = item.probability >= (options?.aiBuyThreshold || 0.6)
+                                                const isSell = item.probability < (options?.aiSellThreshold || 0.4)
+                                                return (
+                                                    <TableRow
+                                                        key={idx}
+                                                        className={cn(
+                                                            "border-[#3c3c3c] hover:bg-[#2a2a2a]",
+                                                            isBuy ? "bg-[#4ec9b0]/5" : isSell ? "bg-[#f14c4c]/5" : ""
+                                                        )}
+                                                    >
+                                                        <TableCell className="font-mono text-[#4fc1ff] text-xs py-1.5">
+                                                            {new Date(item.date).toLocaleDateString()}
+                                                        </TableCell>
+                                                        <TableCell className={cn(
+                                                            "font-mono text-xs text-right py-1.5 font-bold",
+                                                            item.probability > 0.5 ? "text-[#4ec9b0]" : "text-[#f14c4c]"
+                                                        )}>
+                                                            {(item.probability * 100).toFixed(1)}%
+                                                        </TableCell>
+                                                        <TableCell className="text-center py-1.5">
+                                                            {isBuy ? (
+                                                                <Badge className="bg-[#4ec9b0] text-black text-[10px] hover:bg-[#4ec9b0]/80">BUY</Badge>
+                                                            ) : isSell ? (
+                                                                <Badge className="bg-[#f14c4c] text-white text-[10px] hover:bg-[#f14c4c]/80">SELL</Badge>
+                                                            ) : (
+                                                                <span className="text-[#808080] text-[10px]">HOLD</span>
+                                                            )}
+                                                        </TableCell>
+                                                        <TableCell className={cn(
+                                                            "font-mono text-xs text-right py-1.5",
+                                                            (item.consecutiveDays || 0) > 0 ? "text-[#4ec9b0]" : (item.consecutiveDays || 0) < 0 ? "text-[#f14c4c]" : "text-[#808080]"
+                                                        )}>
+                                                            {item.consecutiveDays || 0}
+                                                        </TableCell>
+                                                        <TableCell className={cn(
+                                                            "font-mono text-xs text-right py-1.5",
+                                                            (item.change1d || 0) > 0 ? "text-[#4ec9b0]" : "text-[#f14c4c]"
+                                                        )}>
+                                                            {(item.change1d || 0).toFixed(1)}%
+                                                        </TableCell>
+                                                        <TableCell className={cn(
+                                                            "font-mono text-xs text-right py-1.5",
+                                                            (item.change7d || 0) > 0 ? "text-[#4ec9b0]" : "text-[#f14c4c]"
+                                                        )}>
+                                                            {(item.change7d || 0).toFixed(1)}%
+                                                        </TableCell>
+                                                        <TableCell className={cn(
+                                                            "font-mono text-xs text-right py-1.5",
+                                                            (item.change30d || 0) > 0 ? "text-[#4ec9b0]" : "text-[#f14c4c]"
+                                                        )}>
+                                                            {(item.change30d || 0).toFixed(1)}%
+                                                        </TableCell>
+                                                    </TableRow>
+                                                )
+                                            })}
+                                        </TableBody>
+                                    </Table>
+                                </ScrollArea>
+                                {aiData.length > 500 && (
+                                    <div className="px-4 py-2 border-t border-[#3c3c3c] text-center">
+                                        <span className="text-[11px] text-[#6a6a6a]">
+                                            최근 500건만 표시 (전체: {aiData.length}건)
+                                        </span>
+                                    </div>
+                                )}
+                            </TabsContent>
+                        )}
+                    </Tabs>
                 </div>
             </div>
         )
+
     }
 
 
