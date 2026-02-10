@@ -31,11 +31,13 @@ export function AutomationSettingsPanel() {
         saveAutomationConfig,
         deleteAutomationConfig,
         loadingAutomation,
-        mlModels
+        aiModels,
+        fetchAiModels
     } = useStore();
 
     useEffect(() => {
         loadAutomationConfigs();
+        fetchAiModels();
     }, []);
 
     const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -256,10 +258,15 @@ export function AutomationSettingsPanel() {
                                         <SelectValue placeholder="그룹 선택" />
                                     </SelectTrigger>
                                     <SelectContent className="bg-[#252526] border-[#3c3c3c] text-[#cccccc]">
-                                        <SelectItem value="superinvestor">Superinvestor (거물)</SelectItem>
-                                        <SelectItem value="sp500">S&P 500</SelectItem>
-                                        <SelectItem value="nasdaq100">Nasdaq 100</SelectItem>
-                                        <SelectItem value="myholdings">내 보유 종목</SelectItem>
+                                        <SelectItem value="superinvestor">🔥 투자그루 Top Picks</SelectItem>
+                                        <SelectItem value="indices">🌏 주요 지수 (Indices)</SelectItem>
+                                        <SelectItem value="sp500">🇺🇸 S&P 500</SelectItem>
+                                        <SelectItem value="nasdaq100">🇺🇸 Nasdaq 100 (QQQ)</SelectItem>
+                                        <SelectItem value="usall">🇺🇸 나스닥+뉴욕 전체</SelectItem>
+                                        <SelectItem value="kospi200">🇰🇷 KOSPI 200</SelectItem>
+                                        <SelectItem value="kosdaq150">🇰🇷 KOSDAQ 150</SelectItem>
+                                        <SelectItem value="myholdings">💼 내 보유종목</SelectItem>
+                                        <SelectItem value="volumesurge">📊 거래량 급증</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -274,8 +281,10 @@ export function AutomationSettingsPanel() {
                                     </SelectTrigger>
                                     <SelectContent className="bg-[#252526] border-[#3c3c3c] text-[#cccccc]">
                                         <SelectItem value="default">기본 모델</SelectItem>
-                                        {mlModels.map(m => (
-                                            <SelectItem key={m.id} value={m.id}>{m.name || m.id}</SelectItem>
+                                        {aiModels.map(m => (
+                                            <SelectItem key={m.id} value={m.id}>
+                                                [{new Date(m.created_at).toLocaleDateString()}] {m.name || m.id} (정확도: {((m.accuracy || 0) * 100).toFixed(1)}%)
+                                            </SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>

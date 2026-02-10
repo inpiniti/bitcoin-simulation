@@ -78,12 +78,12 @@
 2.  **전처리 (Preprocessing)**:
     *   **Features**: 연속 등락일수, 1일/7일/30일 변화율, 보조지표 등.
     *   **Labels**: 다음날 2% 이상 상승 여부 (Binary Classification).
-3.  **학습 (Training)**:
-    *   데이터를 백엔드로 전송.
-    *   `XGBClassifier`로 학습 (Train/Test Split 적용).
-    *   학습된 모델을 JSON 형태로 직렬화하여 프론트엔드로 반환.
-4.  **저장 (Storage)**:
-    *   프론트엔드 `IndexedDB`에 학습된 모델 JSON 저장.
+#### 3. 데이터 학습 및 제한 (Training & Limits)
+*   **브라우저 메모리 최적화**: 2,600만 건 이상의 초대형 데이터 수집 시 브라우저의 `JSON.stringify` 문자열 길이 제한(RangeError)을 방지하기 위해 **최대 1,000,000건**으로 자동 샘플링(균등 간격)을 수행합니다.
+*   **전송 효율**: 샘플링된 데이터를 Supabase REST API를 통해 업로드하며, 서버(Hugging Face)는 해당 `dataset_id`를 사용하여 학습을 진행합니다.
+
+#### 4. 모델 저장 (Storage):
+    *   프론트엔드 `IndexedDB` 또는 Supabase `ml_models` 테이블에 학습된 모델 저장.
 5.  **예측 (Prediction)**:
     *   저장된 모델과 최신 데이터를 백엔드로 전송하여 내일 상승 확률 예측.
     *   결과를 게이지 차트와 확률(%)로 시각화.

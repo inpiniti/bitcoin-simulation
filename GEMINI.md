@@ -185,10 +185,10 @@ function FriendList({ friends }) {
 - **일관된 디자인**: 모든 UI 요소는 `shadcn/ui` 디자인 시스템과 `Tailwind CSS`를 기반으로 스타일링해야 합니다.
 - **접근성 (A11y)**: 시맨틱 HTML, 키보드 탐색 지원.
 
-## 7. React 기능 활용 및 최적화 준수
-- 본 문서에 정리된 **React Hook**, **React Components**, **React API** 내용을 적극적으로 참고하여 개발하세요.
-- 각 기술의 올바른 사용법을 숙지하고, **성능**(렌더링 최적화, 메모리 관리)과 **효율성**을 최우선으로 고려하여 코드를 작성해야 합니다.
-- 단순 구현을 넘어, React가 제공하는 최신 기능과 API를 적재적소에 활용하여 최적화된 결과물을 개발하도록 신경 써주세요.
+## 8. 대용량 데이터 처리 규칙 (Large Data Handling)
+- **JSON 직렬화 제한**: 브라우저의 `JSON.stringify`는 약 512MB~1GB 이상의 데이터를 처리할 때 `RangeError: Invalid string length`를 발생시킵니다.
+- **샘플링 필수**: 외부 API 전송 전, 데이터가 너무 크면 반드시 **샘플링**을 수행하여 크기를 줄여야 합니다. (XGBoost 학습 등 데이터 과학 작업 시 최대 100만 건 권장)
+- **비동기 처리**: 대용량 데이터 루프 연산 시 `Promise.all` 및 `setTimeout(0)` 등을 활용하여 메인 스레드 차단을 방지하세요.
 
 # 테스트 및 검증 규칙 (Testing Rules)
 

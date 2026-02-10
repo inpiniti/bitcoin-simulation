@@ -286,6 +286,30 @@ export function DeepLearningPanel() {
         setTrainProgress(0)
 
         try {
+            // 0. 데이터 샘플링 (브라우저 메모리 및 전송 제한 대응)
+            // 2,600만 건 등 초대형 데이터는 브라우저에서 JSON으로 변환할 수 없습니다 (Invalid string length)
+            const MAX_SAMPLES = 1000000; // 최대 100만 건으로 제한 (메모리 및 서버 부하 고려)
+            let finalFeatures = trainData.features;
+            let finalLabels = trainData.labels;
+
+            if (trainData.features.length > MAX_SAMPLES) {
+                console.log(`[XGB] Data too large (${trainData.features.length.toLocaleString()}). Sampling to ${MAX_SAMPLES.toLocaleString()} items...`);
+
+                const sampledFeatures = [];
+                const sampledLabels = [];
+                const step = Math.floor(trainData.features.length / MAX_SAMPLES);
+
+                // 데이터의 대표성을 위해 균등 간격으로 샘플링
+                for (let i = 0; i < trainData.features.length && sampledFeatures.length < MAX_SAMPLES; i += step) {
+                    sampledFeatures.push(trainData.features[i]);
+                    sampledLabels.push(trainData.labels[i]);
+                }
+
+                finalFeatures = sampledFeatures;
+                finalLabels = sampledLabels;
+                console.log(`[XGB] Sampling complete: ${finalFeatures.length.toLocaleString()} samples remaining.`);
+            }
+
             // 1. Supabase에 학습 데이터 업로드
             const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
             const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -306,8 +330,8 @@ export function DeepLearningPanel() {
                     "Prefer": "return=representation"
                 },
                 body: JSON.stringify({
-                    features: trainData.features,
-                    labels: trainData.labels
+                    features: finalFeatures,
+                    labels: finalLabels
                 })
             })
 
