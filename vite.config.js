@@ -793,11 +793,11 @@ export default defineConfig(({ mode }) => {
                         });
                     },
                 },
-                '/api/simple/kis': {
+                '/api/kis': {
                     target: 'https://openapi.koreainvestment.com:9443',
                     changeOrigin: true,
                     secure: false,
-                    rewrite: (path) => path.replace(/^\/api\/simple\/kis/, ''),
+                    rewrite: (path) => path.replace(/^\/api\/kis/, ''),
                 },
                 '/api/naver': {
                     target: 'https://m.stock.naver.com',

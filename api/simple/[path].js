@@ -9,7 +9,6 @@
  * /api/simple/cron → 크론 작업 (티커 그룹 로딩)
  * /api/simple/send → 이메일 발송
  * /api/simple/discussion → 종목 토론 통합 조회
- * /api/simple/kis → 한국투자증권 Proxy (경로 대응)
  */
 
 import * as cheerio from 'cheerio';
@@ -29,7 +28,7 @@ export default async function handler(req, res) {
     }
 
     // URL에서 서비스명 추출 (Vercel rewrite 및 직접 호출 대응)
-    const allowedServices = ['dataroma', 'forecast', 'gemini', 'hf', 'whale', 'cron', 'send', 'discussion', 'kis'];
+    const allowedServices = ['dataroma', 'forecast', 'gemini', 'hf', 'whale', 'cron', 'send', 'discussion'];
     const url = new URL(req.url, `http://${req.headers.host}`);
     const parts = url.pathname.toLowerCase().split('/').filter(Boolean);
 
@@ -60,8 +59,7 @@ export default async function handler(req, res) {
                 return await handleSend(req, res);
             case 'discussion':
                 return await handleDiscussion(req, res);
-            case 'kis':
-                return await handleKis(req, res);
+
             default:
                 return res.status(404).json({ error: `Unknown service: ${service}` });
         }
@@ -310,34 +308,4 @@ async function fetchToss(ticker) {
     } catch { return []; }
 }
 
-// ==================== KIS Proxy ====================
-async function handleKis(req, res) {
-    const fullUrl = req.url || '';
-    let targetPath = fullUrl.substring(fullUrl.indexOf('kis') + 3); // 'kis' 이후의 경로 추출
-    if (targetPath.startsWith('/')) targetPath = targetPath.substring(1);
 
-    // Vercel rewrite 상황에서 targetPath가 비어있을 수 있음
-    if (!targetPath && req.query.path) {
-        // req.query.path가 ['kis', 'oauth2', 'tokenP'] 처럼 배열로 오는 경우 대응
-        if (Array.isArray(req.query.path)) {
-            targetPath = req.query.path.slice(1).join('/');
-        }
-    }
-
-    const [pathOnly, search] = targetPath.split('?');
-    const targetUrl = `https://openapi.koreainvestment.com:9443/${pathOnly}${search ? '?' + search : ''}`;
-
-    const headers = {};
-    const skipHeaders = ['host', 'connection', 'content-length'];
-    Object.keys(req.headers).forEach(k => { if (!skipHeaders.includes(k.toLowerCase())) headers[k] = req.headers[k]; });
-    headers['content-type'] = headers['content-type'] || 'application/json; charset=utf-8';
-
-    const options = { method: req.method, headers };
-    if (['POST', 'PUT', 'PATCH'].includes(req.method)) {
-        options.body = typeof req.body === 'object' ? JSON.stringify(req.body) : req.body;
-    }
-
-    const response = await fetch(targetUrl, options);
-    const data = await response.json().catch(() => null);
-    return res.status(response.status).json(data || { error: 'Invalid Upstream Response' });
-}
