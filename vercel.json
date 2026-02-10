@@ -41,8 +41,8 @@
             "destination": "/api/simple/whale"
         },
         {
-            "source": "/api/cron",
-            "destination": "/api/simple/cron"
+            "source": "/api/cron/:path*",
+            "destination": "/api/cron/[path]"
         },
         {
             "source": "/api/send",
