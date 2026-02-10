@@ -20,7 +20,7 @@ jobs:
           fi
           
           # URL 끝에 슬래시 제거 후 /api/send 추가
-          TARGET_URL="${VERCEL_APP_URL%/}/api/send"
+          TARGET_URL="${VERCEL_APP_URL%/}/api/simple/send"
           
           echo "Triggering API: $TARGET_URL"
           

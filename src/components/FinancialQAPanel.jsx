@@ -141,7 +141,7 @@ export function FinancialQAPanel() {
             }
 
             // Gemini API 호출 (Vite Proxy 이용)
-            const response = await fetch("/api/gemini", {
+            const response = await fetch("/api/simple/gemini", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({

@@ -793,11 +793,11 @@ export default defineConfig(({ mode }) => {
                         });
                     },
                 },
-                '/api/kis': {
+                '/api/simple/kis': {
                     target: 'https://openapi.koreainvestment.com:9443',
                     changeOrigin: true,
                     secure: false,
-                    rewrite: (path) => path.replace(/^\/api\/kis/, ''),
+                    rewrite: (path) => path.replace(/^\/api\/simple\/kis/, ''),
                 },
                 '/api/naver': {
                     target: 'https://m.stock.naver.com',
@@ -843,22 +843,43 @@ export default defineConfig(({ mode }) => {
                         });
                     },
                 },
-                '/api/forecast': {
+                '/api/simple/forecast': {
                     target: 'https://younginpiniti-bitcoin-ai-backend.hf.space',
                     changeOrigin: true,
                     secure: false,
-                    rewrite: (path) => path.replace(/^\/api\/forecast/, '/v1/forecast'),
+                    rewrite: (path) => path.replace(/^\/api\/simple\/forecast/, '/v1/forecast'),
                     configure: (proxy, _options) => {
                         proxy.on('proxyReq', (proxyReq, req, _res) => {
                             proxyReq.setHeader('User-Agent', 'Motia/1.0');
                         });
                     },
                 },
-                '/api/whale': {
+                '/api/simple/dataroma': {
+                    target: 'https://www.dataroma.com',
+                    changeOrigin: true,
+                    secure: false,
+                    rewrite: (path) => path.replace(/^\/api\/simple\/dataroma/, '/m/g/portfolio.php?o=c'),
+                },
+                '/api/simple/discussion': {
+                    target: 'http://localhost:5173', // Placeholder or use actual logic
+                },
+                '/api/simple/gemini': {
+                    target: 'https://generativelanguage.googleapis.com',
+                    changeOrigin: true,
+                    secure: false,
+                    rewrite: (path) => path.replace(/^\/api\/simple\/gemini/, '/v1beta/models/gemini-3-flash-preview:generateContent'),
+                },
+                '/api/simple/hf': {
+                    target: 'https://router.huggingface.co',
+                    changeOrigin: true,
+                    secure: false,
+                    rewrite: (path) => path.replace(/^\/api\/simple\/hf/, '/hf-inference/models/ProsusAI/finbert'),
+                },
+                '/api/simple/whale': {
                     target: 'https://younginpiniti-bitcoin-ai-backend.hf.space',
                     changeOrigin: true,
                     secure: false,
-                    rewrite: (path) => path.replace(/^\/api\/whale/, '/v1/whale'),
+                    rewrite: (path) => path.replace(/^\/api\/simple\/whale/, '/v1/whale'),
                     configure: (proxy, _options) => {
                         proxy.on('proxyReq', (proxyReq, req, _res) => {
                             proxyReq.setHeader('User-Agent', 'Motia/1.0');

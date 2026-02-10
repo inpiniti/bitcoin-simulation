@@ -1,9 +1,7 @@
 // 한국투자증권 API 클라이언트
 // 개발 환경: Vite 프록시 사용
 // 프로덕션: Vercel 서버리스 함수 사용
-const KIS_BASE_URL = import.meta.env.DEV
-    ? '/api/kis'
-    : '/api/kis'
+const KIS_BASE_URL = '/api/simple/kis';
 
 export async function getAccessToken(appkey, appsecret) {
     try {

@@ -261,7 +261,7 @@ export async function fetchRecommendedTickers() {
     // Vercel dev를 쓰지 않는 한 로컬에서 api/dataroma.js는 동작하지 않음.
     // -> 따라서 에러 처리 필수.
 
-    const response = await fetch('/api/dataroma');
+    const response = await fetch('/api/simple/dataroma');
     if (!response.ok) {
         throw new Error(`Failed to fetch recommendations: ${response.statusText}`);
     }
@@ -300,7 +300,7 @@ export async function getSentimentScore(textList) {
 
         // 브라우저에서 직접 호출하지 않고, 내부 프록시(/api/hf)를 거쳐 호출합니다.
         // 이를 통해 API 토큰 노출을 방지하고 CORS 문제를 해결합니다.
-        const response = await fetch("/api/hf", {
+        const response = await fetch("/api/simple/hf", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -338,7 +338,7 @@ export async function fetchForecast(symbol, interval = 'day') {
         // Yahoo Finance 호환성을 위해 심볼 변환 (KOSPI .KS 처리 포함)
         const formattedSymbol = convertToYahooSymbol(symbol);
 
-        const response = await fetch('/api/forecast', {
+        const response = await fetch('/api/simple/forecast', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -372,7 +372,7 @@ export async function fetchForecast(symbol, interval = 'day') {
  */
 export async function fetchWhaleAnalysis(symbol, interval = 'day') {
     try {
-        const response = await fetch('/api/whale', {
+        const response = await fetch('/api/simple/whale', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -505,7 +505,7 @@ export async function warmupAIModel(model = "deepset/roberta-base-squad2") {
     const inputs = isQA ? { question: "warmup", context: "The AI is warming up." } : "warmup";
 
     try {
-        const response = await fetch("/api/hf", {
+        const response = await fetch("/api/simple/hf", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({

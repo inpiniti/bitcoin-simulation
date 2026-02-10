@@ -2,7 +2,7 @@
     "rewrites": [
         {
             "source": "/api/kis/:path*",
-            "destination": "/api/kis"
+            "destination": "/api/simple/kis/:path*"
         },
         {
             "source": "/api/yahoo/:path*",
@@ -19,6 +19,10 @@
         {
             "source": "/api/dataroma",
             "destination": "/api/simple/dataroma"
+        },
+        {
+            "source": "/api/discussion",
+            "destination": "/api/simple/discussion"
         },
         {
             "source": "/api/forecast",

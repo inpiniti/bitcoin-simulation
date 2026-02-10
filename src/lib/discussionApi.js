@@ -4,7 +4,7 @@
  * 로컬 개발 환경에서는 Vite 프록시를 사용합니다.
  */
 
-const API_BASE = '/api/discussion';
+const API_BASE = '/api/simple/discussion';
 
 /**
  * 통합 종목 토론 API를 호출하여 게시글 목록을 가져옵니다.
