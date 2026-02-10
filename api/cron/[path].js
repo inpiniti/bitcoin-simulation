@@ -227,26 +227,48 @@ async function handleStrategy(req, res, runId) {
 // 7. /api/cron/token
 // ---------------------------------------------------------
 async function handleToken(req, res, runId) {
+    if (!runId) throw new Error('[Step 7] runId is missing');
+
+    console.log(`[Step 7: Token] Fetching state for runId: ${runId}`);
     const run = await getRun(runId);
     const { setting } = run.data;
-    console.log(`[Step 7: Token] Issuing KIS token...`);
 
-    const response = await fetch(`${KIS_BASE_URL}/oauth2/tokenP`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            grant_type: 'client_credentials',
-            appkey: setting.kis_appkey,
-            appsecret: setting.kis_secret
-        })
-    });
+    if (!setting?.kis_appkey || !setting?.kis_secret) {
+        throw new Error('[Step 7] KIS AppKey or Secret is missing in settings');
+    }
 
-    const data = await response.json();
-    if (!data.access_token) throw new Error(`KIS Token 발급 실패: ${JSON.stringify(data)}`);
+    console.log(`[Step 7: Token] Issuing KIS token for: ${setting.name}`);
 
-    await updateRun(runId, 'token', { ...run.data, kisToken: data.access_token });
-    await triggerNext(req, 'balance', runId);
-    return res.status(200).json({ success: true });
+    try {
+        const response = await fetch(`${KIS_BASE_URL}/oauth2/tokenP`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                grant_type: 'client_credentials',
+                appkey: setting.kis_appkey,
+                appsecret: setting.kis_secret
+            })
+        });
+
+        const data = await response.json();
+
+        // 상세 디버깅을 위한 로그
+        if (!data.access_token) {
+            console.error(`[Step 7 Error] Token issuance failed. Response:`, JSON.stringify(data));
+            throw new Error(`KIS Token 발급 실패: ${data.msg1 || 'Unknown error'}`);
+        }
+
+        console.log(`[Step 7 Success] Token issued successfully.`);
+
+        await updateRun(runId, 'token', { ...run.data, kisToken: data.access_token });
+
+        // 다음 단계(balance) 트리거
+        await triggerNext(req, 'balance', runId);
+        return res.status(200).json({ success: true, step: 'token' });
+    } catch (e) {
+        console.error(`[Step 7 Fetch Error]:`, e.message);
+        throw e;
+    }
 }
 
 // ---------------------------------------------------------
