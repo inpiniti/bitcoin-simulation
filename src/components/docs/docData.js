@@ -16,6 +16,7 @@ import dialogsMd from '@/docs/components/dialogs.md?raw'
 import uiMd from '@/docs/components/ui.md?raw'
 
 import simUtilsMd from '@/docs/utils/simulation.md?raw'
+import automationMd from '@/docs/features/automation.md?raw'
 
 export const DOCS_DATA = {
     // ARCHITECTURE
@@ -265,5 +266,15 @@ export const DOCS_DATA = {
         path: 'src/utils/simulation.js',
         description: 'Backtesting helpers.',
         content: simUtilsMd
+    },
+
+    // FEATURES
+    'features/automation': {
+        id: 'features/automation',
+        title: 'Automation Settings',
+        type: 'feature',
+        path: 'src/components/automation/*',
+        description: 'Bot configuration and scheduling.',
+        content: automationMd
     }
 };

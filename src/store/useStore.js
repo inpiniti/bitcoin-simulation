@@ -164,6 +164,81 @@ export const useStore = create(
                     autoTradeSettings: { ...state.autoTradeSettings, ...settings }
                 })),
 
+                // Automation Config List (Supabase)
+                automationConfigList: [],
+                loadingAutomation: false,
+
+                loadAutomationConfigs: async () => {
+                    const supabase = getSupabaseClient();
+                    if (!supabase) return; // Supabase not configured
+
+                    set({ loadingAutomation: true });
+                    try {
+                        const { data, error } = await supabase
+                            .from('automation_settings')
+                            .select('*')
+                            .order('created_at', { ascending: false });
+
+                        if (error) throw error;
+                        set({ automationConfigList: data || [] });
+                    } catch (error) {
+                        console.error('Failed to load automation configs:', error);
+                        // 에러는 조용히 로그만 남기거나, 필요 시 상태 업데이트
+                    } finally {
+                        set({ loadingAutomation: false });
+                    }
+                },
+
+                saveAutomationConfig: async (config) => {
+                    const supabase = getSupabaseClient();
+                    if (!supabase) return { success: false, error: 'Supabase Not Configured' };
+
+                    set({ loadingAutomation: true });
+                    try {
+                        // id가 있으면 update, 없으면 insert
+                        const { data, error } = await supabase
+                            .from('automation_settings')
+                            .upsert(config)
+                            .select();
+
+                        if (error) throw error;
+
+                        // 목록 갱신을 위해 다시 로드 (간단한 방법)
+                        await get().loadAutomationConfigs();
+                        return { success: true, data };
+                    } catch (error) {
+                        console.error('Failed to save automation config:', error);
+                        return { success: false, error: error.message };
+                    } finally {
+                        set({ loadingAutomation: false });
+                    }
+                },
+
+                deleteAutomationConfig: async (id) => {
+                    const supabase = getSupabaseClient();
+                    if (!supabase) return { success: false, error: 'Supabase Not Configured' };
+
+                    set({ loadingAutomation: true });
+                    try {
+                        const { error } = await supabase
+                            .from('automation_settings')
+                            .delete()
+                            .eq('id', id);
+
+                        if (error) throw error;
+
+                        set(state => ({
+                            automationConfigList: state.automationConfigList.filter(item => item.id !== id)
+                        }));
+                        return { success: true };
+                    } catch (error) {
+                        console.error('Failed to delete automation config:', error);
+                        return { success: false, error: error.message };
+                    } finally {
+                        set({ loadingAutomation: false });
+                    }
+                },
+
                 addAutoTradeLog: (message) => set(state => ({
                     autoTradeStatus: {
                         ...state.autoTradeStatus,

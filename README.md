@@ -379,6 +379,37 @@ CREATE INDEX idx_trade_history_status ON trade_history(status);
 -- RLS 정책 (API Key 인증 시 모든 접근 허용)
 ALTER TABLE trade_history ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow all operations" ON trade_history FOR ALL USING (true);
+
+-- 자동 매매 설정 테이블 (Automation Settings)
+CREATE TABLE automation_settings (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(), -- 고유 ID
+    name VARCHAR(100) NOT NULL,               -- 설정 이름 (Alias)
+    execution_time VARCHAR(20) DEFAULT '09:00', -- 실행 시간 (Cron 또는 HH:mm)
+    is_active BOOLEAN DEFAULT true,           -- 활성화 여부
+    
+    -- 알림 설정
+    email VARCHAR(255),                       -- 알림 받을 이메일
+    
+    -- KIS 계좌 정보 (암호화 권장하지만 편의상 평문 저장 시 보안 유의)
+    kis_account VARCHAR(50),                  -- 계좌번호 (XXXXXXXX-XX)
+    kis_appkey TEXT,                          -- App Key
+    kis_secret TEXT,                          -- App Secret
+    
+    -- 매매 전략 설정
+    sell_condition DECIMAL(5, 2) DEFAULT 20.0, -- 매도 조건 (수익률 %)
+    buy_condition DECIMAL(5, 2) DEFAULT 60.0,  -- 매수 조건 (확률/점수 %)
+    
+    -- 타겟 설정
+    ai_model_key VARCHAR(100),                -- 사용할 AI 모델 ID
+    ticker_group_key VARCHAR(50) DEFAULT 'superinvestor', -- 대상 종목 그룹
+    
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- RLS 정책
+ALTER TABLE automation_settings ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all operations" ON automation_settings FOR ALL USING (true);
 ```
 
 ### 6. 이메일 알림 (Email Notification) - New
