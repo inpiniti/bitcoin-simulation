@@ -81,6 +81,7 @@ export const DOCS_DATA = {
             { id: 'fetchforecast', label: 'fetchForecast', type: 'method' },
             { id: 'fetchwhaleanalysis', label: 'fetchWhaleAnalysis', type: 'method' },
             { id: 'getsentimentscore', label: 'getSentimentScore', type: 'method' },
+            { id: 'sendemailapi', label: 'sendEmailApi', type: 'method' },
 
             // Data Processor
             { id: 'data-processor', label: 'Data Processor', type: 'section' },

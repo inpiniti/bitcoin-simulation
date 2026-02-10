@@ -91,3 +91,27 @@ const score = await getSentimentScore(textList)
 
 #### 반환값 (Return value)
 `Promise<number>` - -1(부정)에서 1(긍정) 사이의 점수.
+
+---
+
+### sendEmailApi
+Vercel Serverless Function을 호출하여 지정된 수신자에게 테스트 이메일을 발송합니다. GitHub Actions의 Cron Job에 의해 주기적으로 실행됩니다.
+
+#### 엔드포인트 (Endpoint)
+- **URL**: `/api/send`
+- **Method**: `POST` (또는 `GET`)
+
+#### 주요 로직
+1. Vercel 환경 변수에서 SMTP 설정을 로드합니다.
+2. 현재 시간(KST)을 포함한 이메일 본문을 생성합니다.
+3. `wjd0r@icloud.com` 주소로 메일을 발송합니다.
+
+#### 필수 설정
+- **Vercel Env**: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`
+- **GitHub Secret**: `VERCEL_APP_URL`
+
+#### 예제 (Example)
+```bash
+# GitHub Actions에서 호출 예시
+curl -X POST "https://your-app.vercel.app/api/send"
+```

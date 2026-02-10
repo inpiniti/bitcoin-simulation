@@ -184,353 +184,354 @@ export async function fetchKospi200Tickers() {
             // ... (원하는 만큼 추가하거나 메시지로 설명)
         ];
     }
+}
 
-    /**
-     * 나스닥 + 뉴욕 전체 종목 리스트를 가져옵니다. (6,000+ 종목)
-     * @returns {Promise<Array>} { ticker, name, count, exchange } 배열
-     */
-    export async function fetchUSAllTickers() {
-        try {
-            const response = await fetch('/api/index-stocks/usall');
-            if (!response.ok) throw new Error('Failed to fetch US All stocks list');
-            const stocks = await response.json();
-            return stocks;
-        } catch (error) {
-            console.error('US All stocks fetch failed:', error);
-            return [];
-        }
+/**
+ * 나스닥 + 뉴욕 전체 종목 리스트를 가져옵니다. (6,000+ 종목)
+ * @returns {Promise<Array>} { ticker, name, count, exchange } 배열
+ */
+export async function fetchUSAllTickers() {
+    try {
+        const response = await fetch('/api/index-stocks/usall');
+        if (!response.ok) throw new Error('Failed to fetch US All stocks list');
+        const stocks = await response.json();
+        return stocks;
+    } catch (error) {
+        console.error('US All stocks fetch failed:', error);
+        return [];
+    }
+}
+
+/**
+ * KOSDAQ 150 주요 종목 리스트 반환
+ * @returns {Promise<Array>} { ticker, name, count } 배열
+ */
+export async function fetchKosdaq150Tickers() {
+    // 주요 시가총액 상위 종목 (샘플)
+    const kosdaqList = [
+        { ticker: "247540", name: "에코프로비엠", count: 1 },
+        { ticker: "086520", name: "에코프로", count: 2 },
+        { ticker: "091990", name: "셀트리온헬스케어", count: 3 }, // 합병 이슈가 있지만 예전 데이터 조회용으로 유지 or HLB 등
+        { ticker: "028300", name: "HLB", count: 3 }, // 순위 조정
+        { ticker: "022100", name: "포스코DX", count: 4 }, // 코스피 이전 이슈 확인 필요하지만 일단 리스트업
+        { ticker: "066970", name: "엘앤에프", count: 5 }, // 코스피 이전 이슈
+        { ticker: "196170", name: "알테오젠", count: 6 },
+        { ticker: "035900", name: "JYP Ent.", count: 7 },
+        { ticker: "293490", name: "카카오게임즈", count: 8 },
+        { ticker: "036930", name: "주성엔지니어링", count: 9 }, // 예시
+        { ticker: "403870", name: "HPSP", count: 10 },
+        { ticker: "278280", name: "천보", count: 11 },
+        { ticker: "214150", name: "클래시스", count: 12 },
+        { ticker: "095610", name: "테스", count: 13 },
+        { ticker: "039030", name: "이오테크닉스", count: 14 },
+        { ticker: "145020", name: "휴젤", count: 15 },
+        { ticker: "041510", name: "에스엠", count: 16 },
+        { ticker: "025980", name: "아난티", count: 17 },
+        { ticker: "005290", name: "동진쎄미켐", count: 18 },
+        { ticker: "034230", name: "파라다이스", count: 19 },
+        { ticker: "237690", name: "에스티팜", count: 20 },
+        { ticker: "058470", name: "리노공업", count: 21 },
+        { ticker: "096530", name: "씨젠", count: 22 },
+        { ticker: "263750", name: "펄어비스", count: 23 },
+        { ticker: "357780", name: "솔브레인", count: 24 },
+        { ticker: "068760", name: "셀트리온제약", count: 25 },
+        { ticker: "213420", name: "덕산네오룩스", count: 26 },
+        { ticker: "112040", name: "위메이드", count: 27 },
+        { ticker: "290650", name: "엘앤씨바이오", count: 28 },
+        { ticker: "067160", name: "아프리카TV", count: 29 }, // SOOP으로 사명 변경되었으나 구 티커 유지
+        { ticker: "032190", name: "다우데이타", count: 30 },
+    ];
+    return Promise.resolve(kosdaqList);
+}
+
+/**
+ * Dataroma 크롤링 API를 통해 추천 종목 리스트 조회 (자산가 5인 이상)
+ * @returns {Promise<Array>} { ticker, name, count } 배열
+ */
+export async function fetchRecommendedTickers() {
+    // Vercel Serverless Function 호출
+    // 개발 환경(Vite Proxy)에서는 /api/dataroma 로 호출하면 vite.config.js 설정이 필요할 수 있음.
+    // 하지만 현재 vite.config.js에는 /api/yahoo만 설정되어 있음.
+    // 로컬 테스트를 위해 vite.config.js에 추가하거나, 배포 환경을 가정하고 호출.
+    // 여기서는 상대 경로로 호출.
+
+    // 주의: 로컬 Vite 개발 서버에서 /api/dataroma를 호출하려면 
+    // vite.config.js proxy 설정이 필요하지 않음 (로컬 파일/함수가 아니므로).
+    // 만약 로컬에서 테스트하려면 별도 서버가 떠있거나, Mock이 필요함.
+    // Vercel dev를 쓰지 않는 한 로컬에서 api/dataroma.js는 동작하지 않음.
+    // -> 따라서 에러 처리 필수.
+
+    const response = await fetch('/api/dataroma');
+    if (!response.ok) {
+        throw new Error(`Failed to fetch recommendations: ${response.statusText}`);
     }
 
-    /**
-     * KOSDAQ 150 주요 종목 리스트 반환
-     * @returns {Promise<Array>} { ticker, name, count } 배열
-     */
-    export async function fetchKosdaq150Tickers() {
-        // 주요 시가총액 상위 종목 (샘플)
-        const kosdaqList = [
-            { ticker: "247540", name: "에코프로비엠", count: 1 },
-            { ticker: "086520", name: "에코프로", count: 2 },
-            { ticker: "091990", name: "셀트리온헬스케어", count: 3 }, // 합병 이슈가 있지만 예전 데이터 조회용으로 유지 or HLB 등
-            { ticker: "028300", name: "HLB", count: 3 }, // 순위 조정
-            { ticker: "022100", name: "포스코DX", count: 4 }, // 코스피 이전 이슈 확인 필요하지만 일단 리스트업
-            { ticker: "066970", name: "엘앤에프", count: 5 }, // 코스피 이전 이슈
-            { ticker: "196170", name: "알테오젠", count: 6 },
-            { ticker: "035900", name: "JYP Ent.", count: 7 },
-            { ticker: "293490", name: "카카오게임즈", count: 8 },
-            { ticker: "036930", name: "주성엔지니어링", count: 9 }, // 예시
-            { ticker: "403870", name: "HPSP", count: 10 },
-            { ticker: "278280", name: "천보", count: 11 },
-            { ticker: "214150", name: "클래시스", count: 12 },
-            { ticker: "095610", name: "테스", count: 13 },
-            { ticker: "039030", name: "이오테크닉스", count: 14 },
-            { ticker: "145020", name: "휴젤", count: 15 },
-            { ticker: "041510", name: "에스엠", count: 16 },
-            { ticker: "025980", name: "아난티", count: 17 },
-            { ticker: "005290", name: "동진쎄미켐", count: 18 },
-            { ticker: "034230", name: "파라다이스", count: 19 },
-            { ticker: "237690", name: "에스티팜", count: 20 },
-            { ticker: "058470", name: "리노공업", count: 21 },
-            { ticker: "096530", name: "씨젠", count: 22 },
-            { ticker: "263750", name: "펄어비스", count: 23 },
-            { ticker: "357780", name: "솔브레인", count: 24 },
-            { ticker: "068760", name: "셀트리온제약", count: 25 },
-            { ticker: "213420", name: "덕산네오룩스", count: 26 },
-            { ticker: "112040", name: "위메이드", count: 27 },
-            { ticker: "290650", name: "엘앤씨바이오", count: 28 },
-            { ticker: "067160", name: "아프리카TV", count: 29 }, // SOOP으로 사명 변경되었으나 구 티커 유지
-            { ticker: "032190", name: "다우데이타", count: 30 },
-        ];
-        return Promise.resolve(kosdaqList);
+    const json = await response.json();
+    return json.stocks || [];
+}
+
+/**
+ * 야후 파이낸스에서 종목 관련 뉴스 헤드라인 수집
+ */
+export async function fetchStockNews(ticker) {
+    try {
+        const formattedTicker = ticker.replace('.', '-');
+        const url = `/api/yahoo/v1/finance/search?q=${formattedTicker}&quotesCount=1&newsCount=5`;
+        const response = await fetch(url);
+        if (!response.ok) return [];
+
+        const data = await response.json();
+        return (data.news || []).map(item => item.title);
+    } catch (err) {
+        console.error('Fetch News Error:', err);
+        return [];
     }
+}
 
-    /**
-     * Dataroma 크롤링 API를 통해 추천 종목 리스트 조회 (자산가 5인 이상)
-     * @returns {Promise<Array>} { ticker, name, count } 배열
-     */
-    export async function fetchRecommendedTickers() {
-        // Vercel Serverless Function 호출
-        // 개발 환경(Vite Proxy)에서는 /api/dataroma 로 호출하면 vite.config.js 설정이 필요할 수 있음.
-        // 하지만 현재 vite.config.js에는 /api/yahoo만 설정되어 있음.
-        // 로컬 테스트를 위해 vite.config.js에 추가하거나, 배포 환경을 가정하고 호출.
-        // 여기서는 상대 경로로 호출.
+/**
+ * Hugging Face FinBERT를 이용한 텍스트 감성 분석 (Proxy 이용)
+ * 점수: -1 (부정) ~ 1 (긍정)
+ */
+export async function getSentimentScore(textList) {
+    if (!textList || textList.length === 0) return 0;
 
-        // 주의: 로컬 Vite 개발 서버에서 /api/dataroma를 호출하려면 
-        // vite.config.js proxy 설정이 필요하지 않음 (로컬 파일/함수가 아니므로).
-        // 만약 로컬에서 테스트하려면 별도 서버가 떠있거나, Mock이 필요함.
-        // Vercel dev를 쓰지 않는 한 로컬에서 api/dataroma.js는 동작하지 않음.
-        // -> 따라서 에러 처리 필수.
+    try {
+        const text = textList.join(". ");
 
-        const response = await fetch('/api/dataroma');
+        // 브라우저에서 직접 호출하지 않고, 내부 프록시(/api/hf)를 거쳐 호출합니다.
+        // 이를 통해 API 토큰 노출을 방지하고 CORS 문제를 해결합니다.
+        const response = await fetch("/api/hf", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                inputs: text,
+                model: "ProsusAI/finbert"
+            }),
+        });
+
+        if (!response.ok) return 0;
+
+        const result = await response.json();
+
+        // FinBERT 결과 구조: [[{ label: 'positive', score: 0.9 }, ...]]
+        const scores = result[0];
+        if (!scores) return 0;
+
+        const pos = scores.find(s => s.label === 'positive')?.score || 0;
+        const neg = scores.find(s => s.label === 'negative')?.score || 0;
+
+        return pos - neg;
+    } catch (err) {
+        console.error('Sentiment Analysis Error:', err);
+        return 0;
+    }
+}
+
+/**
+ * AI 가격 예측 API 호출 (TimesFM-2.5 모델 기반)
+ * @param {string} symbol - 종목 코드 (예: AAPL)
+ * @param {string} interval - 예측 간격 ('day' 또는 'minute')
+ * @returns {Promise<Object|null>} 예측 결과 또는 null
+ */
+export async function fetchForecast(symbol, interval = 'day') {
+    try {
+        // Yahoo Finance 호환성을 위해 심볼 변환 (KOSPI .KS 처리 포함)
+        const formattedSymbol = convertToYahooSymbol(symbol);
+
+        const response = await fetch('/api/forecast', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'User-Agent': 'Motia/1.0',
+                'Accept': 'application/json',
+            },
+            body: JSON.stringify({ symbol: formattedSymbol, interval }),
+        });
+
         if (!response.ok) {
-            throw new Error(`Failed to fetch recommendations: ${response.statusText}`);
+            // Cold Start나 일시적 서버 오류일 경우 조용히 처리 (사용자 경험 보호)
+            console.warn(`[AI Forecast] 예측 서버 응답 없음 (${response.status}). 잠시 후 다시 시도하세요.`);
+            return null;
         }
+
+        const data = await response.json();
+        // console.log(`[API] Forecast loaded for ${symbol}:`, data.predictionCount, 'predictions');
+        return data;
+    } catch (err) {
+        // 네트워크 에러 등 (Failed to fetch)
+        console.warn(`[AI Forecast] API 연결 실패: ${err.message}. (서버가 절전 모드일 수 있음)`);
+        return null;
+    }
+}
+
+/**
+ * 세력 수급 분석 API 호출 (Whale Analysis)
+ * @param {string} symbol - 종목 코드 (예: AAPL)
+ * @param {string} interval - 데이터 간격 (기본: 'day')
+ * @returns {Promise<Object|null>} 분석 결과 또는 null
+ */
+export async function fetchWhaleAnalysis(symbol, interval = 'day') {
+    try {
+        const response = await fetch('/api/whale', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'User-Agent': 'Motia/1.0',
+                'Accept': 'application/json',
+            },
+            body: JSON.stringify({ symbol, interval }),
+        });
+
+        if (!response.ok) {
+            console.error('Whale API Error:', response.statusText);
+            return null;
+        }
+
+        const data = await response.json();
+        // console.log(`[API] Whale analysis loaded for ${symbol}`);
+        return data;
+    } catch (err) {
+        console.error('Whale API Error:', err);
+        return null;
+    }
+}
+/**
+ * 기업 개요 및 재무 정보 조회 (Hybrid: Double Scraper)
+ * Yahoo Finance API v10/v7 모두 차단 시, Profile과 Quote 페이지를 각각 스크래핑합니다.
+ * @param {string} ticker
+ */
+export async function fetchStockOverview(ticker) {
+    const formattedTicker = ticker.replace(/\./g, '-');
+
+    try {
+        // 병렬 호출 (둘 다 로컬 미들웨어 스크래퍼)
+        const [profileRes, quoteRes] = await Promise.all([
+            fetch(`/api/company/profile?ticker=${formattedTicker}`),
+            fetch(`/api/company/quote?ticker=${formattedTicker}`)
+        ]);
+
+        const profileData = profileRes.ok ? await profileRes.json() : null;
+        const quoteData = quoteRes.ok ? await quoteRes.json() : null; // { marketCap, trailingPE, ... }
+
+        // 스크래퍼 데이터는 이미 문자열이거나 null임. 포맷팅 불필요하나 구조 맞춤.
+        const fmt = (val) => ({ fmt: val || '-' });
+
+        return {
+            profile: profileData?.assetProfile || {},
+            financials: {
+                marketCap: fmt(quoteData?.marketCap),
+                currentPrice: fmt(quoteData?.regularMarketPrice),
+                targetMeanPrice: fmt('-'),
+                recommendationKey: '-', // 스크래핑 복잡도 높음
+                returnOnAssets: fmt(quoteData?.eps ? `EPS: ${quoteData.eps}` : '-'), // EPS를 임시로 보여줌
+                returnOnEquity: fmt('-'),
+            },
+            stats: {
+                enterpriseValue: fmt('-'),
+                trailingPE: fmt(quoteData?.trailingPE),
+                forwardPE: fmt('-'),
+                priceToBook: fmt('-'),
+                beta: fmt(quoteData?.beta),
+                profitMargins: fmt('-'),
+                operatingMargins: fmt('-')
+            },
+            recommendation: [],
+            earnings: { financialsChart: { yearly: [], quarterly: [] } }
+        };
+    } catch (e) {
+        console.error(`Overview fetch failed for ${ticker}:`, e);
+        return null;
+    }
+}
+
+/**
+ * Nasdaq API를 이용한 실적 데이터 조회
+ * @param {string} ticker 
+ */
+export async function fetchEarningsData(ticker) {
+    const symbol = ticker.toUpperCase().replace(/\./g, '-');
+    const url = `/api/nasdaq/company/${symbol}/earnings-surprise`;
+
+    try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`Nasdaq fetch failed for ${ticker}`);
 
         const json = await response.json();
-        return json.stocks || [];
+        const data = json.data;
+
+        if (!data || !data.earningsSurpriseTable || !data.earningsSurpriseTable.rows) {
+            return null;
+        }
+
+        // Nasdaq 데이터를 우리 앱 형식에 매핑
+        const history = data.earningsSurpriseTable.rows.map(row => ({
+            quarter: { fmt: row.dateReported || 'Unknown' },
+            actual: { raw: parseFloat(row.actualEPS) || 0, fmt: row.actualEPS },
+            estimate: { raw: parseFloat(row.consensusEPS) || 0, fmt: row.consensusEPS },
+            surprisePercent: {
+                raw: (parseFloat(row.surprisePcnt) || 0) / 100,
+                fmt: (row.surprisePcnt || '0') + '%'
+            }
+        }));
+
+        return {
+            history: history,
+            trend: [],
+            calendar: {
+                earningsDate: history.length > 0 ? [history[0].quarter] : []
+            }
+        };
+    } catch (e) {
+        console.error(`Earnings fetch failed for ${ticker} from Nasdaq:`, e);
+        return null;
     }
+}
+/**
+ * AI 모델의 상태를 확인하고 워밍업을 시도합니다.
+ * Hugging Face Inference API의 특성상 일정 시간 미사용 시 모델이 절전 모드로 전환되므로,
+ * 본격적인 요청 전 모델을 활성화시키기 위해 사용합니다.
+ * 
+ * @async
+ * @param {string} [model="deepset/roberta-base-squad2"] - 대상 모델 식별자
+ * @returns {Promise<{status: 'ready'|'loading'|'error', estimated_time?: number, message?: string}>} 서버 상태 객체
+ * 
+ * @example
+ * const result = await warmupAIModel("deepset/roberta-base-squad2");
+ * if (result.status === 'loading') console.log(`Wait for ${result.estimated_time}s`);
+ */
+export async function warmupAIModel(model = "deepset/roberta-base-squad2") {
+    // QA 모델 여부 확인 (구조화된 입력을 요구함)
+    const isQA = model.includes("squad") || model.includes("qa") || model.includes("roberta");
+    const inputs = isQA ? { question: "warmup", context: "The AI is warming up." } : "warmup";
 
-    /**
-     * 야후 파이낸스에서 종목 관련 뉴스 헤드라인 수집
-     */
-    export async function fetchStockNews(ticker) {
-        try {
-            const formattedTicker = ticker.replace('.', '-');
-            const url = `/api/yahoo/v1/finance/search?q=${formattedTicker}&quotesCount=1&newsCount=5`;
-            const response = await fetch(url);
-            if (!response.ok) return [];
+    try {
+        const response = await fetch("/api/hf", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                model,
+                inputs,
+                options: { wait_for_model: true }
+            }),
+        });
 
+        if (response.status === 503) {
             const data = await response.json();
-            return (data.news || []).map(item => item.title);
-        } catch (err) {
-            console.error('Fetch News Error:', err);
-            return [];
+            return { status: 'loading', ...data };
         }
-    }
 
-    /**
-     * Hugging Face FinBERT를 이용한 텍스트 감성 분석 (Proxy 이용)
-     * 점수: -1 (부정) ~ 1 (긍정)
-     */
-    export async function getSentimentScore(textList) {
-        if (!textList || textList.length === 0) return 0;
-
-        try {
-            const text = textList.join(". ");
-
-            // 브라우저에서 직접 호출하지 않고, 내부 프록시(/api/hf)를 거쳐 호출합니다.
-            // 이를 통해 API 토큰 노출을 방지하고 CORS 문제를 해결합니다.
-            const response = await fetch("/api/hf", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    inputs: text,
-                    model: "ProsusAI/finbert"
-                }),
-            });
-
-            if (!response.ok) return 0;
-
-            const result = await response.json();
-
-            // FinBERT 결과 구조: [[{ label: 'positive', score: 0.9 }, ...]]
-            const scores = result[0];
-            if (!scores) return 0;
-
-            const pos = scores.find(s => s.label === 'positive')?.score || 0;
-            const neg = scores.find(s => s.label === 'negative')?.score || 0;
-
-            return pos - neg;
-        } catch (err) {
-            console.error('Sentiment Analysis Error:', err);
-            return 0;
+        if (response.ok) {
+            return { status: 'ready' };
         }
+
+        // 400 에러 등이 발생해도 서버 자체는 살아있으므로 ready로 간주할지 고민해봐야 함.
+        // 여기선 모델 활성화 여부가 중요하므로, 에러 텍스트를 로그로 남김.
+        const errorText = await response.text();
+        console.warn(`AI Warmup Response (${response.status}):`, errorText);
+
+        return { status: 'ready', message: 'Model exists but returned error for warmup input' };
+    } catch (err) {
+        console.error('AI Warmup Network Error:', err);
+        return { status: 'error' };
     }
-
-    /**
-     * AI 가격 예측 API 호출 (TimesFM-2.5 모델 기반)
-     * @param {string} symbol - 종목 코드 (예: AAPL)
-     * @param {string} interval - 예측 간격 ('day' 또는 'minute')
-     * @returns {Promise<Object|null>} 예측 결과 또는 null
-     */
-    export async function fetchForecast(symbol, interval = 'day') {
-        try {
-            // Yahoo Finance 호환성을 위해 심볼 변환 (KOSPI .KS 처리 포함)
-            const formattedSymbol = convertToYahooSymbol(symbol);
-
-            const response = await fetch('/api/forecast', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'User-Agent': 'Motia/1.0',
-                    'Accept': 'application/json',
-                },
-                body: JSON.stringify({ symbol: formattedSymbol, interval }),
-            });
-
-            if (!response.ok) {
-                // Cold Start나 일시적 서버 오류일 경우 조용히 처리 (사용자 경험 보호)
-                console.warn(`[AI Forecast] 예측 서버 응답 없음 (${response.status}). 잠시 후 다시 시도하세요.`);
-                return null;
-            }
-
-            const data = await response.json();
-            // console.log(`[API] Forecast loaded for ${symbol}:`, data.predictionCount, 'predictions');
-            return data;
-        } catch (err) {
-            // 네트워크 에러 등 (Failed to fetch)
-            console.warn(`[AI Forecast] API 연결 실패: ${err.message}. (서버가 절전 모드일 수 있음)`);
-            return null;
-        }
-    }
-
-    /**
-     * 세력 수급 분석 API 호출 (Whale Analysis)
-     * @param {string} symbol - 종목 코드 (예: AAPL)
-     * @param {string} interval - 데이터 간격 (기본: 'day')
-     * @returns {Promise<Object|null>} 분석 결과 또는 null
-     */
-    export async function fetchWhaleAnalysis(symbol, interval = 'day') {
-        try {
-            const response = await fetch('/api/whale', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'User-Agent': 'Motia/1.0',
-                    'Accept': 'application/json',
-                },
-                body: JSON.stringify({ symbol, interval }),
-            });
-
-            if (!response.ok) {
-                console.error('Whale API Error:', response.statusText);
-                return null;
-            }
-
-            const data = await response.json();
-            // console.log(`[API] Whale analysis loaded for ${symbol}`);
-            return data;
-        } catch (err) {
-            console.error('Whale API Error:', err);
-            return null;
-        }
-    }
-    /**
-     * 기업 개요 및 재무 정보 조회 (Hybrid: Double Scraper)
-     * Yahoo Finance API v10/v7 모두 차단 시, Profile과 Quote 페이지를 각각 스크래핑합니다.
-     * @param {string} ticker
-     */
-    export async function fetchStockOverview(ticker) {
-        const formattedTicker = ticker.replace(/\./g, '-');
-
-        try {
-            // 병렬 호출 (둘 다 로컬 미들웨어 스크래퍼)
-            const [profileRes, quoteRes] = await Promise.all([
-                fetch(`/api/company/profile?ticker=${formattedTicker}`),
-                fetch(`/api/company/quote?ticker=${formattedTicker}`)
-            ]);
-
-            const profileData = profileRes.ok ? await profileRes.json() : null;
-            const quoteData = quoteRes.ok ? await quoteRes.json() : null; // { marketCap, trailingPE, ... }
-
-            // 스크래퍼 데이터는 이미 문자열이거나 null임. 포맷팅 불필요하나 구조 맞춤.
-            const fmt = (val) => ({ fmt: val || '-' });
-
-            return {
-                profile: profileData?.assetProfile || {},
-                financials: {
-                    marketCap: fmt(quoteData?.marketCap),
-                    currentPrice: fmt(quoteData?.regularMarketPrice),
-                    targetMeanPrice: fmt('-'),
-                    recommendationKey: '-', // 스크래핑 복잡도 높음
-                    returnOnAssets: fmt(quoteData?.eps ? `EPS: ${quoteData.eps}` : '-'), // EPS를 임시로 보여줌
-                    returnOnEquity: fmt('-'),
-                },
-                stats: {
-                    enterpriseValue: fmt('-'),
-                    trailingPE: fmt(quoteData?.trailingPE),
-                    forwardPE: fmt('-'),
-                    priceToBook: fmt('-'),
-                    beta: fmt(quoteData?.beta),
-                    profitMargins: fmt('-'),
-                    operatingMargins: fmt('-')
-                },
-                recommendation: [],
-                earnings: { financialsChart: { yearly: [], quarterly: [] } }
-            };
-        } catch (e) {
-            console.error(`Overview fetch failed for ${ticker}:`, e);
-            return null;
-        }
-    }
-
-    /**
-     * Nasdaq API를 이용한 실적 데이터 조회
-     * @param {string} ticker 
-     */
-    export async function fetchEarningsData(ticker) {
-        const symbol = ticker.toUpperCase().replace(/\./g, '-');
-        const url = `/api/nasdaq/company/${symbol}/earnings-surprise`;
-
-        try {
-            const response = await fetch(url);
-            if (!response.ok) throw new Error(`Nasdaq fetch failed for ${ticker}`);
-
-            const json = await response.json();
-            const data = json.data;
-
-            if (!data || !data.earningsSurpriseTable || !data.earningsSurpriseTable.rows) {
-                return null;
-            }
-
-            // Nasdaq 데이터를 우리 앱 형식에 매핑
-            const history = data.earningsSurpriseTable.rows.map(row => ({
-                quarter: { fmt: row.dateReported || 'Unknown' },
-                actual: { raw: parseFloat(row.actualEPS) || 0, fmt: row.actualEPS },
-                estimate: { raw: parseFloat(row.consensusEPS) || 0, fmt: row.consensusEPS },
-                surprisePercent: {
-                    raw: (parseFloat(row.surprisePcnt) || 0) / 100,
-                    fmt: (row.surprisePcnt || '0') + '%'
-                }
-            }));
-
-            return {
-                history: history,
-                trend: [],
-                calendar: {
-                    earningsDate: history.length > 0 ? [history[0].quarter] : []
-                }
-            };
-        } catch (e) {
-            console.error(`Earnings fetch failed for ${ticker} from Nasdaq:`, e);
-            return null;
-        }
-    }
-    /**
-     * AI 모델의 상태를 확인하고 워밍업을 시도합니다.
-     * Hugging Face Inference API의 특성상 일정 시간 미사용 시 모델이 절전 모드로 전환되므로,
-     * 본격적인 요청 전 모델을 활성화시키기 위해 사용합니다.
-     * 
-     * @async
-     * @param {string} [model="deepset/roberta-base-squad2"] - 대상 모델 식별자
-     * @returns {Promise<{status: 'ready'|'loading'|'error', estimated_time?: number, message?: string}>} 서버 상태 객체
-     * 
-     * @example
-     * const result = await warmupAIModel("deepset/roberta-base-squad2");
-     * if (result.status === 'loading') console.log(`Wait for ${result.estimated_time}s`);
-     */
-    export async function warmupAIModel(model = "deepset/roberta-base-squad2") {
-        // QA 모델 여부 확인 (구조화된 입력을 요구함)
-        const isQA = model.includes("squad") || model.includes("qa") || model.includes("roberta");
-        const inputs = isQA ? { question: "warmup", context: "The AI is warming up." } : "warmup";
-
-        try {
-            const response = await fetch("/api/hf", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    model,
-                    inputs,
-                    options: { wait_for_model: true }
-                }),
-            });
-
-            if (response.status === 503) {
-                const data = await response.json();
-                return { status: 'loading', ...data };
-            }
-
-            if (response.ok) {
-                return { status: 'ready' };
-            }
-
-            // 400 에러 등이 발생해도 서버 자체는 살아있으므로 ready로 간주할지 고민해봐야 함.
-            // 여기선 모델 활성화 여부가 중요하므로, 에러 텍스트를 로그로 남김.
-            const errorText = await response.text();
-            console.warn(`AI Warmup Response (${response.status}):`, errorText);
-
-            return { status: 'ready', message: 'Model exists but returned error for warmup input' };
-        } catch (err) {
-            console.error('AI Warmup Network Error:', err);
-            return { status: 'error' };
-        }
-    }
+}

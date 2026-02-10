@@ -380,3 +380,15 @@ CREATE INDEX idx_trade_history_status ON trade_history(status);
 ALTER TABLE trade_history ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow all operations" ON trade_history FOR ALL USING (true);
 ```
+
+### 6. 이메일 알림 (Email Notification) - New
+
+Github Actions의 Cron Job 기능을 활용하여 5분 간격으로 Vercel Serverless Function을 호출, 주기적인 이메일 알림을 발송합니다.
+
+- **API Endpoint**: `/api/send` (Vercel Serverless Function)
+- **주기**: 매 5분 (Github Actions Cron)
+- **발송 내용**: "vercel > simulation > 에서 {현재시간}에 전송한 테스트 메일입니다."
+- **설정 필요**:
+    - **Vercel**: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` 환경 변수 설정.
+    - **GitHub**: `VERCEL_APP_URL` (배포된 Vercel 도메인) Secret 설정.
+
