@@ -75,12 +75,17 @@ async function handleStart(req, res) {
     const currentTimeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
     for (const setting of settings) {
-        // 이미 오늘 실행했는지 여부는 DB에서 체크 (last_run_date 컬럼이 있다고 가정하거나 run_logs 조회)
-        // 여기서는 간단히 execution_time 체크만 우선 수행
+        // 이미 오늘 실행했는지 여부는 DB에서 체크
         if (setting.execution_time <= currentTimeStr) {
-            // 비동기로 다음 단계 호출 (Vercel 타임아웃 방지)
+            // 비동기로 다음 단계 호출 (Vercel 타임아웃 방지 위해 한 단계만 호출 보장)
             const nextUrl = getNextUrl(req, 'originData', { settingId: setting.id });
-            fetch(nextUrl).catch(e => console.error('Next hop failed:', e));
+            console.log(`[Cron] Triggering originData for setting: ${setting.id}`);
+
+            // await를 사용하여 요청이 실제로 전송되도록 보장 (fire and forget 방지)
+            await fetch(nextUrl, { headers: { 'Accept': 'application/json' } })
+                .then(r => r.json())
+                .catch(e => console.error('Next hop failed:', e.message));
+
             results.push({ settingId: setting.id, status: 'triggered' });
         }
     }
@@ -130,7 +135,7 @@ async function handleOriginData(req, res, settingId) {
     }
 
     // 다음 단계 호출
-    triggerNext(req, 'preprocessingData', run.id);
+    await triggerNext(req, 'preprocessingData', run.id);
     return res.status(200).json({ runId: run.id, step: 'originData' });
 }
 
@@ -153,7 +158,7 @@ async function handlePreprocessingData(req, res, runId) {
     }
 
     await updateRun(runId, 'preprocessingData', { ...run.data, preprocessed });
-    triggerNext(req, 'predict', runId);
+    await triggerNext(req, 'predict', runId);
     return res.status(200).json({ runId, step: 'preprocessingData' });
 }
 
@@ -188,7 +193,7 @@ async function handlePredict(req, res, runId) {
     }
 
     await updateRun(runId, 'predict', { ...run.data, predictionResults });
-    triggerNext(req, 'strategy', runId);
+    await triggerNext(req, 'strategy', runId);
     return res.status(200).json({ runId, step: 'predict' });
 }
 
@@ -205,7 +210,7 @@ async function handleStrategy(req, res, runId) {
     // 실제 필터링은 balance 단계 이후에 수행
 
     await updateRun(runId, 'strategy', { ...run.data, buyCandidates: buyList });
-    triggerNext(req, 'token', runId);
+    await triggerNext(req, 'token', runId);
     return res.status(200).json({ runId, step: 'strategy' });
 }
 
@@ -229,7 +234,7 @@ async function handleToken(req, res, runId) {
     if (!data.access_token) throw new Error('KIS Token발급 실패: ' + JSON.stringify(data));
 
     await updateRun(runId, 'token', { ...run.data, kisToken: data.access_token });
-    triggerNext(req, 'balance', runId);
+    await triggerNext(req, 'balance', runId);
     return res.status(200).json({ runId, step: 'token' });
 }
 
@@ -278,7 +283,7 @@ async function handleBalance(req, res, runId) {
     const finalBuyList = buyCandidates.filter(b => !holdings.find(h => h.pdno === b.ticker));
 
     await updateRun(runId, 'balance', { ...run.data, sellList, finalBuyList, cash });
-    triggerNext(req, 'sell', runId);
+    await triggerNext(req, 'sell', runId);
     return res.status(200).json({ runId, step: 'balance' });
 }
 
@@ -330,7 +335,7 @@ async function handleSell(req, res, runId) {
     }
 
     await updateRun(runId, 'sell', { ...run.data, sellResults });
-    triggerNext(req, 'buy', runId);
+    await triggerNext(req, 'buy', runId);
     return res.status(200).json({ runId, step: 'sell' });
 }
 
@@ -341,7 +346,7 @@ async function handleBuy(req, res, runId) {
     const { finalBuyList, cash, setting, kisToken } = run.data;
 
     if (finalBuyList.length === 0) {
-        triggerNext(req, 'report', runId);
+        await triggerNext(req, 'report', runId);
         return res.status(200).json({ runId, step: 'buy', message: 'No buy targets' });
     }
 
@@ -393,7 +398,7 @@ async function handleBuy(req, res, runId) {
     }
 
     await updateRun(runId, 'buy', { ...run.data, buyResults });
-    triggerNext(req, 'report', runId);
+    await triggerNext(req, 'report', runId);
     return res.status(200).json({ runId, step: 'buy' });
 }
 
@@ -443,23 +448,47 @@ async function handleReport(req, res, runId) {
 
 function getAbsoluteUrl(req, path) {
     const host = req.headers.host;
-    const protocol = host.includes('localhost') ? 'http' : 'https';
+    // Vercel 환경에서는 x-forwarded-proto를 우선 활용
+    const protocol = req.headers['x-forwarded-proto'] || (host.includes('localhost') ? 'http' : 'https');
     return `${protocol}://${host}${path}`;
 }
 
 function getNextUrl(req, nextPath, params = {}) {
-    const url = new URL(getAbsoluteUrl(req, `/api/cron/${nextPath}`));
-    Object.keys(params).forEach(k => url.searchParams.set(k, params[k]));
+    const baseUrl = getAbsoluteUrl(req, `/api/cron/${nextPath}`);
+    const url = new URL(baseUrl);
+    Object.keys(params).forEach(k => {
+        if (params[k] !== undefined) {
+            url.searchParams.set(k, params[k]);
+        }
+    });
     return url.toString();
 }
 
-function triggerNext(req, nextPath, runId) {
+/**
+ * 다음 단계를 트리거합니다.
+ * Vercel에서는 프로세스가 종료되기 전에 요청이 전송되어야 하므로 await를 사용합니다.
+ */
+async function triggerNext(req, nextPath, runId) {
     const url = getNextUrl(req, nextPath, { runId });
     console.log(`[Cron] Triggering next step: ${url}`);
-    fetch(url).catch(e => console.error(`Failed to trigger ${nextPath}:`, e.message));
+
+    try {
+        const res = await fetch(url, {
+            headers: {
+                'User-Agent': 'Bitcoin-Simulation-Cron',
+                'Accept': 'application/json'
+            }
+        });
+        const data = await res.json();
+        console.log(`[Cron] Next step (${nextPath}) triggered:`, data);
+    } catch (e) {
+        console.error(`[Cron] Failed to trigger ${nextPath}:`, e.message);
+        // 여기서 에러가 발생해도 전체를 멈추지 않으려면 로그만 남김
+    }
 }
 
 async function getRun(runId) {
+    if (!runId) throw new Error('runId is required to fetch run state');
     const { data, error } = await supabase.from('cron_runs').select('*').eq('id', runId).single();
     if (error) throw error;
     return data;
