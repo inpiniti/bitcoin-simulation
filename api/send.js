@@ -1,83 +1,86 @@
 import nodemailer from 'nodemailer';
+import crypto from 'crypto';
 
 /**
- * 이메일 발송 API (정상 작동 모드)
+ * 이메일 발송 API (최종 고도화 모드)
  */
 export default async function handler(req, res) {
-    console.log('--- Email Sending Process Started ---');
-
-    // 환경 변수 로드
     const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM } = process.env;
 
-    // 1. SMTP 설정 검증
     if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) {
-        console.error('Missing SMTP Environment Variables');
-        return res.status(500).json({ error: 'SMTP 설정이 누락되었습니다.' });
+        return res.status(500).json({ error: 'SMTP 설정 누락' });
     }
 
     try {
-        // 2. Nodemailer Transporter 생성
         const transporter = nodemailer.createTransport({
             host: SMTP_HOST,
             port: Number(SMTP_PORT) || 465,
-            secure: Number(SMTP_PORT) === 465, // 465는 true, 587은 false
-            auth: {
-                user: SMTP_USER,
-                pass: SMTP_PASS,
-            },
-            // 연결 시도 타임아웃 방지
-            connectionTimeout: 10000,
-            greetingTimeout: 10000,
+            secure: Number(SMTP_PORT) === 465,
+            auth: { user: SMTP_USER, pass: SMTP_PASS },
         });
 
-        const currentTime = new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
+        const now = new Date();
+        const currentTime = now.toLocaleString('ko-KR', {
+            timeZone: 'Asia/Seoul',
+            hour12: true,
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
 
-        // 3. 메일 옵션 설정
+        // 스팸 차단 방지를 위한 유니크 ID 생성 (초단위 + 랜덤)
+        const uniqueId = crypto.randomBytes(3).toString('hex').toUpperCase();
+        const requestId = `${now.getTime()}-${uniqueId}`;
+
         const mailOptions = {
             from: SMTP_FROM ? `"${SMTP_FROM}" <${SMTP_USER}>` : SMTP_USER,
             to: 'wjd0r@icloud.com',
-            subject: `[Vercel Simulation] ${currentTime} 테스트 메일`,
-            text: `vercel > simulation > 에서 ${currentTime}에 전송한 테스트 메일입니다.`,
+            // 제목에 유니크 ID를 추가하여 스레드 꼬임 및 스팸 차단 방지
+            subject: `[ALRT-#${uniqueId}] ${currentTime} 시뮬레이션 알림`,
+            text: `[ID: ${requestId}] vercel > simulation > 에서 ${currentTime}에 전송한 메일입니다.`,
             html: `
-                <div style="font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; padding: 30px; border: 1px solid #e0e0e0; border-radius: 12px; max-width: 600px; margin: 20px auto; background-color: #ffffff;">
-                    <div style="text-align: center; margin-bottom: 25px;">
-                        <h2 style="color: #0070f3; margin: 0;">Vercel Simulation Alert</h2>
-                        <p style="color: #666; font-size: 14px; margin-top: 5px;">Automated Status Notification</p>
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <meta name="format-detection" content="telephone=no, date=no, address=no, email=no">
+                    <style>
+                        /* 아이폰 숫자 자동 변조 방지 및 폰트 설정 */
+                        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+                        .number { font-variant-numeric: tabular-nums; color: #0070f3; font-weight: 700; }
+                    </style>
+                </head>
+                <body style="margin: 0; padding: 0; background-color: #f4f7f9;">
+                    <div style="padding: 20px;">
+                        <div style="background-color: #ffffff; border-radius: 16px; padding: 30px; border: 1px solid #e1e4e8; max-width: 500px; margin: 0 auto; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+                            <div style="display: flex; align-items: center; margin-bottom: 20px;">
+                                <div style="background-color: #0070f3; width: 4px; height: 24px; border-radius: 2px; margin-right: 12px;"></div>
+                                <h2 style="margin: 0; font-size: 20px; color: #1a1a1a; letter-spacing: -0.5px;">Vercel Status Update</h2>
+                            </div>
+                            
+                            <p style="font-size: 15px; color: #444; line-height: 1.6; margin-bottom: 25px;">
+                                vercel > simulation > 에서 전송한 메일입니다.
+                            </p>
+                            
+                            <div style="background-color: #f0f4f8; border-radius: 12px; padding: 20px; text-align: center;">
+                                <div style="font-size: 13px; color: #666; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px;">Update Time</div>
+                                <div class="number" style="font-size: 22px;">${currentTime}</div>
+                            </div>
+
+                            <div style="margin-top: 25px; font-size: 11px; color: #abb2bf; text-align: center; font-family: monospace;">
+                                TRACE-ID: <span style="color: #666;">${requestId}</span>
+                            </div>
+                        </div>
                     </div>
-                    <div style="padding: 20px; background-color: #f7f9fa; border-radius: 8px; line-height: 1.6;">
-                        <p style="margin: 0; color: #333; font-size: 16px;">
-                            vercel > simulation > 에서 전송한 메일입니다.
-                        </p>
-                        <p style="margin: 15px 0 0 0; color: #0070f3; font-weight: bold; font-size: 18px;">
-                            🕒 ${currentTime}
-                        </p>
-                    </div>
-                    <div style="margin-top: 25px; border-top: 1px solid #eee; padding-top: 15px; text-align: center;">
-                        <p style="font-size: 12px; color: #999; margin: 0;">
-                            본 메일은 시스템에 의해 자동으로 발송되었습니다.
-                        </p>
-                    </div>
-                </div>
+                </body>
+                </html>
             `,
         };
 
-        // 4. 메일 전송 실행
-        console.log('Attempting to send mail to wjd0r@icloud.com...');
-        const info = await transporter.sendMail(mailOptions);
-
-        console.log('Email sent successfully:', info.messageId);
-
-        return res.status(200).json({
-            success: true,
-            message: 'Email delivered!',
-            messageId: info.messageId
-        });
+        await transporter.sendMail(mailOptions);
+        return res.status(200).json({ success: true, requestId });
 
     } catch (error) {
-        console.error('EMAIL SENDING FAILED:', error);
-        return res.status(500).json({
-            error: '메일 전송 도중 에러가 발생했습니다.',
-            details: error.message
-        });
+        return res.status(500).json({ error: error.message });
     }
 }
