@@ -94,7 +94,7 @@ async function handleStart(req, res) {
         console.log(`[Start Trigger] '${setting.name}' 시작합니다...`);
 
         // 11단계를 타기 위해 originData 호출
-        await triggerNext(req, 'originData', null, setting.id);
+        triggerNext(req, 'originData', null, setting.id);
 
         // 실행 날짜 업데이트
         await supabase.from('automation_settings').update({ last_run_date: todayStr }).eq('id', setting.id);
@@ -142,7 +142,7 @@ async function handleOriginData(req, res, settingId) {
 
     console.log(`[OriginData Success] Tickers count: ${tickers.length} | RunId: ${run.id}`);
 
-    await triggerNext(req, 'preprocessingData', run.id);
+    triggerNext(req, 'preprocessingData', run.id);
     return res.status(200).json({ success: true, runId: run.id });
 }
 
@@ -166,7 +166,7 @@ async function handlePreprocessingData(req, res, runId) {
     }
 
     await updateRun(runId, 'preprocessingData', { ...run.data, preprocessed });
-    await triggerNext(req, 'predict', runId);
+    triggerNext(req, 'predict', runId);
     return res.status(200).json({ success: true, count: preprocessed.length });
 }
 
@@ -199,7 +199,7 @@ async function handlePredict(req, res, runId) {
     }
 
     await updateRun(runId, 'predict', { ...run.data, predictionResults });
-    await triggerNext(req, 'strategy', runId);
+    triggerNext(req, 'strategy', runId);
     return res.status(200).json({ success: true, count: predictionResults.length });
 }
 
@@ -219,7 +219,7 @@ async function handleStrategy(req, res, runId) {
     const sellThreshold = setting.sell_condition || 20.0; // 수익률 기준 등
 
     await updateRun(runId, 'strategy', { ...run.data, buyCandidates, sellThreshold });
-    await triggerNext(req, 'token', runId);
+    triggerNext(req, 'token', runId);
     return res.status(200).json({ success: true, buyCandidatesCount: buyCandidates.length });
 }
 
@@ -245,7 +245,7 @@ async function handleToken(req, res, runId) {
     if (!data.access_token) throw new Error(`KIS Token 발급 실패: ${JSON.stringify(data)}`);
 
     await updateRun(runId, 'token', { ...run.data, kisToken: data.access_token });
-    await triggerNext(req, 'balance', runId);
+    triggerNext(req, 'balance', runId);
     return res.status(200).json({ success: true });
 }
 
@@ -287,7 +287,7 @@ async function handleBalance(req, res, runId) {
     console.log(`[Balance Result] Cash: ${cash} | FinalBuy: ${finalBuyList.length} | Sell: ${sellList.length}`);
 
     await updateRun(runId, 'balance', { ...run.data, sellList, finalBuyList, cash });
-    await triggerNext(req, 'sell', runId);
+    triggerNext(req, 'sell', runId);
     return res.status(200).json({ success: true, cash });
 }
 
@@ -320,7 +320,7 @@ async function handleSell(req, res, runId) {
     }
 
     await updateRun(runId, 'sell', { ...run.data, sellResults });
-    await triggerNext(req, 'buy', runId);
+    triggerNext(req, 'buy', runId);
     return res.status(200).json({ success: true, count: sellResults.length });
 }
 
@@ -358,7 +358,7 @@ async function handleBuy(req, res, runId) {
     }
 
     await updateRun(runId, 'buy', { ...run.data, buyResults });
-    await triggerNext(req, 'report', runId);
+    triggerNext(req, 'report', runId);
     return res.status(200).json({ success: true, count: buyResults.length });
 }
 
@@ -405,28 +405,32 @@ async function handleReport(req, res, runId) {
 // Utilities
 // ---------------------------------------------------------
 
-async function triggerNext(req, nextPath, runId, settingId) {
+/**
+ * 다음 단계를 트리거합니다.
+ * 체인을 끊기 위해(Fire & Forget) 응답을 기다리지 않습니다.
+ * Vercel의 508 Infinite Loop 감지를 방지하기 위해 각 단계는 독립적으로 실행되어야 합니다.
+ */
+function triggerNext(req, nextPath, runId, settingId) {
     const host = req.headers.host;
     const protocol = req.headers['x-forwarded-proto'] || (host.includes('localhost') ? 'http' : 'https');
+
+    // 캐시 방지 및 루프 감지 우회를 위해 타임스탬프 추가
     const url = new URL(`${protocol}://${host}/api/cron/${nextPath}`);
     if (runId) url.searchParams.set('runId', runId);
     if (settingId) url.searchParams.set('settingId', settingId);
+    url.searchParams.set('t', Date.now().toString());
 
-    console.log(`[Triggering] >>> ${url.toString()}`);
+    const finalUrl = url.toString();
+    console.log(`[FireStep] >>> ${finalUrl}`);
 
-    // Vercel에서 비동기 호출 시 프로세스가 죽지 않도록 대기
-    try {
-        const response = await fetch(url.toString(), {
-            headers: { 'Accept': 'application/json' }
-        });
-        const text = await response.text();
-        console.log(`[Trigger Result] Step ${nextPath}: ${response.status}`);
-    } catch (e) {
-        console.error(`[Trigger Failed] Step ${nextPath}: ${e.message}`);
-    }
+    // 비동기로 호출 (await 하지 않음)
+    fetch(finalUrl, {
+        headers: { 'Accept': 'application/json' }
+    }).catch(e => console.error(`[Async Trigger Failed] ${nextPath}: ${e.message}`));
 }
 
 async function getRun(id) {
+    if (!id) throw new Error('runId is required');
     const { data, error } = await supabase.from('cron_runs').select('*').eq('id', id).single();
     if (error) throw error;
     return data;
