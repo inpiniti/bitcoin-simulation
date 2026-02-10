@@ -76,12 +76,15 @@ fetchStockHistory(ticker, days)
 
 #### 매개변수 (Parameters)
 - `ticker` (string): 종목 코드.
-- `days` (number): 조회할 과거 일수 (예: `365`).
+- `days` (number | string): 조회할 과거 일수 (예: `365`). 문자열 `'max'`를 전달하면 가용한 전체 역사(약 55년)를 일봉(1d) 해상도로 안정적으로 가져옵니다.
 
 #### 예제 (Example)
 ```javascript
-const history = await fetchStockHistory('TSLA', 30);
 // 최근 30일간의 테슬라 주가 데이터 반환
+const history = await fetchStockHistory('TSLA', 30);
+
+// 전체 역사 데이터 반환 (일봉 해상도 강제 유지)
+const maxHistory = await fetchStockHistory('BTC-USD', 'max');
 ```
 
 ### fetchStockMinuteData
@@ -161,6 +164,19 @@ KOSDAQ 150 지수 종목 리스트를 반환합니다.
 ```javascript
 fetchKosdaq150Tickers()
 ```
+
+### fetchUSAllTickers
+나스닥(NASDAQ) 및 뉴욕거래소(NYSE)에 상장된 6,000개 이상의 미국 시장 전체 종목 리스트를 반환합니다.
+
+#### 구문 (Syntax)
+```javascript
+const usStocks = await fetchUSAllTickers()
+```
+
+#### 반환값 (Return value)
+`Promise<Array<Object>>` - `{ ticker, name, count, exchange }` 구조의 배열.
+- `exchange`: 'NAS' (나스닥) 또는 'NYS' (뉴욕)
+
 
 ### fetchRecommendedTickers
 Dataroma 등의 소스를 크롤링하여 슈퍼 인베스터들이 보유한 추천 종목 리스트를 조회합니다.

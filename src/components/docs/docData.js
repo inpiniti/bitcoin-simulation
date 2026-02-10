@@ -76,6 +76,7 @@ export const DOCS_DATA = {
             { id: 'fetchearningsdata', label: 'fetchEarningsData', type: 'method' },
             { id: 'fetchkospi200tickers', label: 'fetchKospi200Tickers', type: 'method' },
             { id: 'fetchkosdaq150tickers', label: 'fetchKosdaq150Tickers', type: 'method' },
+            { id: 'fetchusalltickers', label: 'fetchUSAllTickers', type: 'method' },
             { id: 'fetchrecommendedtickers', label: 'fetchRecommendedTickers', type: 'method' },
             { id: 'fetchforecast', label: 'fetchForecast', type: 'method' },
             { id: 'fetchwhaleanalysis', label: 'fetchWhaleAnalysis', type: 'method' },

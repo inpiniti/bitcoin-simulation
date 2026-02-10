@@ -168,6 +168,7 @@ export function TickerSelectionPanel() {
                     <option value="indices">🌏 주요 지수 (Indices)</option>
                     <option value="sp500">🇺🇸 S&P 500</option>
                     <option value="qqq">🇺🇸 Nasdaq 100 (QQQ)</option>
+                    <option value="usall">🇺🇸 나스닥+뉴욕 전체</option>
                     <option value="kospi200">🇰🇷 KOSPI 200</option>
                     <option value="kosdaq150">🇰🇷 KOSDAQ 150</option>
                     <option value="myholdings" disabled={!kisAuth.isLoggedIn}>💼 내 보유종목</option>

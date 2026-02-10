@@ -730,6 +730,22 @@ export const useStore = create(
                         return;
                     }
 
+                    if (tickerGroup === 'usall') {
+                        setLoadingGroupStocks(true);
+                        try {
+                            const response = await fetch('/api/index-stocks/usall');
+                            if (!response.ok) throw new Error('Failed to fetch US All stocks');
+                            const stocks = await response.json();
+                            setGroupStocks(stocks);
+                        } catch (e) {
+                            console.error('US All stocks fetch error', e);
+                            setGroupStocks([]);
+                        } finally {
+                            setLoadingGroupStocks(false);
+                        }
+                        return;
+                    }
+
                     if (tickerGroup === 'indices') {
                         setGroupStocks([
                             { ticker: '^GSPC', name: 'S&P 500', exchange: 'SNP' },

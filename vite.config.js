@@ -381,13 +381,78 @@ export default defineConfig(({ mode }) => {
                         }
                     });
 
-                    // 지수 종목 리스트 (S&P 500, QQQ, KOSPI 200) 통합 미들웨어
+                    // 지수 종목 리스트 (S&P 500, QQQ, KOSPI 200, US All) 통합 미들웨어
                     server.middlewares.use('/api/index-stocks', async (req, res, next) => {
                         try {
                             const urlObj = new URL(req.originalUrl || req.url, `http://${req.headers.host}`);
                             const index = urlObj.pathname.split('/').pop();
                             const cheerio = await import('cheerio');
                             const fetch = (await import('node-fetch')).default || global.fetch;
+
+                            // usall: Nasdaq Trader 공개 FTP 파일에서 미국 전체 종목 조회
+                            // (api.nasdaq.com은 Cloudflare 봇 방어로 차단되므로 nasdaqtrader.com 사용)
+                            if (index === 'usall') {
+                                console.log('[Vite Dev] Fetching US All stocks from Nasdaq Trader FTP files...');
+
+                                const headers = {
+                                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                                };
+
+                                const [nasdaqRes, otherRes] = await Promise.all([
+                                    fetch('https://www.nasdaqtrader.com/dynamic/SymDir/nasdaqlisted.txt', { headers }),
+                                    fetch('https://www.nasdaqtrader.com/dynamic/SymDir/otherlisted.txt', { headers }),
+                                ]);
+
+                                const allStocks = [];
+
+                                // NASDAQ 종목 파싱 (파이프 구분)
+                                // 형식: Symbol|Security Name|Market Category|Test Issue|Financial Status|Round Lot Size|ETF|NextShares
+                                if (nasdaqRes.ok) {
+                                    const text = await nasdaqRes.text();
+                                    const lines = text.split('\n').slice(1); // 헤더 제거
+                                    lines.forEach(line => {
+                                        const cols = line.split('|');
+                                        if (cols.length < 7) return;
+                                        const ticker = cols[0].trim();
+                                        const name = cols[1].trim();
+                                        const testIssue = cols[3].trim();
+                                        const etf = cols[6].trim();
+                                        // 테스트 종목과 ETF 제외, 유효한 티커만
+                                        if (ticker && testIssue !== 'Y' && etf !== 'Y' && !ticker.includes('File Creation Time') && ticker.length <= 5) {
+                                            allStocks.push({ ticker, name, count: 'NASDAQ', exchange: 'NAS' });
+                                        }
+                                    });
+                                    console.log(`[usall] NASDAQ stocks: ${allStocks.length}`);
+                                }
+
+                                // NYSE/AMEX 종목 파싱
+                                // 형식: ACT Symbol|Security Name|Exchange|CQS Symbol|ETF|Round Lot Size|Test Issue|NASDAQ Symbol
+                                const nyseStartCount = allStocks.length;
+                                if (otherRes.ok) {
+                                    const text = await otherRes.text();
+                                    const lines = text.split('\n').slice(1); // 헤더 제거
+                                    lines.forEach(line => {
+                                        const cols = line.split('|');
+                                        if (cols.length < 7) return;
+                                        const ticker = cols[0].trim();
+                                        const name = cols[1].trim();
+                                        const exchangeCode = cols[2].trim(); // N=NYSE, A=AMEX, P=Arca, Z=BATS
+                                        const etf = cols[4].trim();
+                                        const testIssue = cols[6].trim();
+                                        // 테스트 종목과 ETF 제외, NYSE/AMEX만
+                                        if (ticker && testIssue !== 'Y' && etf !== 'Y' && !ticker.includes('File Creation Time') && ticker.length <= 5) {
+                                            const exchange = exchangeCode === 'N' ? 'NYS' : exchangeCode === 'A' ? 'AMS' : 'NYS';
+                                            allStocks.push({ ticker, name, count: exchangeCode === 'N' ? 'NYSE' : 'AMEX', exchange });
+                                        }
+                                    });
+                                    console.log(`[usall] NYSE/AMEX stocks: ${allStocks.length - nyseStartCount}`);
+                                }
+
+                                console.log(`[usall] Total US stocks: ${allStocks.length}`);
+                                res.setHeader('Content-Type', 'application/json');
+                                res.end(JSON.stringify(allStocks));
+                                return;
+                            }
 
                             let targetUrl = '';
                             let parser = null;

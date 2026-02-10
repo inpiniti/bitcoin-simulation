@@ -51,6 +51,7 @@ export function DeepLearningPanel() {
     // 학습 상태
     const [trainMode, setTrainMode] = useState("single") // "single" | "group"
     const [trainTicker, setTrainTicker] = useState("AAPL")
+    const [trainPeriod, setTrainPeriod] = useState("365") // "30" | "365" | "1825" | "max"
     const [trainData, setTrainData] = useState(null)
     const [training, setTraining] = useState(false)
     const [trainProgress, setTrainProgress] = useState(0)
@@ -190,7 +191,8 @@ export function DeepLearningPanel() {
 
             if (trainMode === 'single') {
                 setTrainProgress(30)
-                const candles = await fetchStockHistory(trainTicker, 365)
+                const days = trainPeriod === 'max' ? 'max' : parseInt(trainPeriod)
+                const candles = await fetchStockHistory(trainTicker, days)
                 setTrainProgress(70)
                 const { features, labels } = processStockDataForML(candles)
                 allFeatures = features
@@ -216,7 +218,8 @@ export function DeepLearningPanel() {
                     // 병렬 데이터 수집
                     const results = await Promise.all(batch.map(async (stock) => {
                         try {
-                            const candles = await fetchStockHistory(stock.ticker, 365)
+                            const days = trainPeriod === 'max' ? 'max' : parseInt(trainPeriod)
+                            const candles = await fetchStockHistory(stock.ticker, days)
                             if (!candles || candles.length === 0) return null
                             return processStockDataForML(candles)
                         } catch (err) {
@@ -255,6 +258,13 @@ export function DeepLearningPanel() {
 
 
             setTrainData({ features: allFeatures, labels: allLabels, count: allFeatures.length })
+
+            // 데이터 요약 로그 출력
+            console.log(`[DeepLearning] Data collection complete.`);
+            console.log(`- Mode: ${trainMode}`);
+            console.log(`- Target: ${trainMode === 'single' ? trainTicker : tickerGroup}`);
+            console.log(`- Samples: ${allFeatures.length}`);
+            console.log(`- Period: ${trainPeriod === 'max' ? 'Full History (Stablized Max)' : trainPeriod + ' days'}`);
 
             // 모델 이름 미리 생성 (사용자가 수정 가능)
             const identifier = trainMode === 'single' ? trainTicker : tickerGroup.toUpperCase()
@@ -598,6 +608,7 @@ export function DeepLearningPanel() {
                                                 <option value="superinvestor">Super Investors (DataRoma)</option>
                                                 <option value="sp500">S&P 500</option>
                                                 <option value="qqq">Nasdaq 100 (QQQ)</option>
+                                                <option value="usall">🇺🇸 나스닥 + 뉴욕 전체 (6,000+)</option>
                                                 <option value="kospi200">KOSPI 200</option>
                                                 <option value="kosdaq150">KOSDAQ 150</option>
                                                 <option value="myholdings">내 보유 종목</option>
@@ -608,6 +619,27 @@ export function DeepLearningPanel() {
                                             </div>
                                         </div>
                                     )}
+
+                                    {/* 학습 기간 선택 */}
+                                    <div className="space-y-2">
+                                        <label className="text-xs text-[#888888]">학습 데이터 기간</label>
+                                        <select
+                                            className="w-full bg-[#252526] border border-[#3c3c3c] rounded p-2 text-sm"
+                                            value={trainPeriod}
+                                            onChange={e => setTrainPeriod(e.target.value)}
+                                        >
+                                            <option value="30">1개월 (~30일)</option>
+                                            <option value="365">1년 (~365일)</option>
+                                            <option value="1825">5년 (~1,825일)</option>
+                                            <option value="max">MAX (전체 기간)</option>
+                                        </select>
+                                        <div className="text-xs text-[#888888]">
+                                            {trainPeriod === '30' && '최근 1개월 데이터로 학습합니다. 빠르지만 데이터가 적습니다.'}
+                                            {trainPeriod === '365' && '최근 1년 데이터로 학습합니다. (기본값)'}
+                                            {trainPeriod === '1825' && '최근 5년 데이터로 학습합니다. 더 많은 패턴을 학습할 수 있습니다.'}
+                                            {trainPeriod === 'max' && 'Yahoo Finance에서 제공하는 전체 기간 데이터로 학습합니다.'}
+                                        </div>
+                                    </div>
 
                                     <Button
                                         onClick={handleFetchAndProcess}
@@ -752,6 +784,7 @@ export function DeepLearningPanel() {
                                                 <option value="superinvestor">Super Investors (DataRoma)</option>
                                                 <option value="sp500">S&P 500</option>
                                                 <option value="qqq">Nasdaq 100 (QQQ)</option>
+                                                <option value="usall">🇺🇸 나스닥+뉴욕 전체</option>
                                                 <option value="kospi200">KOSPI 200</option>
                                                 <option value="kosdaq150">KOSDAQ 150</option>
                                                 <option value="myholdings">내 보유 종목</option>
