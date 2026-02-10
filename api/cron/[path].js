@@ -297,26 +297,33 @@ async function handleSell(req, res, runId) {
         try {
             // 현재가 조회 후 매도
             const price = await getKisCurrentPrice(kisToken, setting, item.ticker);
-            const orderRes = await fetch(`${KIS_BASE_URL}/uapi/overseas-stock/v1/trading/order`, {
-                method: 'POST',
-                headers: {
-                    'authorization': `Bearer ${kisToken}`,
-                    'appkey': setting.kis_appkey,
-                    'appsecret': setting.kis_secret,
-                    'tr_id': 'TTTT1006U' // 해외 매도
-                },
-                body: JSON.stringify({
-                    CANO: cano,
-                    ACNT_PRDT_CD: prdt,
-                    OVRS_EXCG_CD: 'NASD',
-                    PDNO: item.ticker,
-                    ORD_QTY: String(item.qty),
-                    OVRS_ORD_UNPR: String(price),
-                    ORD_SVR_DVSN_CD: '0',
-                    ORD_DVSN: '00'
-                })
-            });
-            sellResults.push({ ticker: item.ticker, status: 'ordered', res: await orderRes.json() });
+
+            if (setting.trade_enabled) {
+                const orderRes = await fetch(`${KIS_BASE_URL}/uapi/overseas-stock/v1/trading/order`, {
+                    method: 'POST',
+                    headers: {
+                        'authorization': `Bearer ${kisToken}`,
+                        'appkey': setting.kis_appkey,
+                        'appsecret': setting.kis_secret,
+                        'tr_id': 'TTTT1006U' // 해외 매도
+                    },
+                    body: JSON.stringify({
+                        CANO: cano,
+                        ACNT_PRDT_CD: prdt,
+                        OVRS_EXCG_CD: 'NASD',
+                        PDNO: item.ticker,
+                        ORD_QTY: String(item.qty),
+                        OVRS_ORD_UNPR: String(price),
+                        ORD_SVR_DVSN_CD: '0',
+                        ORD_DVSN: '00'
+                    })
+                });
+                sellResults.push({ ticker: item.ticker, status: 'ordered', res: await orderRes.json() });
+            } else {
+                // 실제 매매가 비활성화된 경우 시뮬레이션으로 처리
+                sellResults.push({ ticker: item.ticker, status: 'simulated', price, qty: item.qty });
+                console.log(`[Simulated] Sell ${item.ticker} ${item.qty} units at ${price}`);
+            }
         } catch (e) {
             sellResults.push({ ticker: item.ticker, status: 'error', error: e.message });
         }
@@ -351,26 +358,32 @@ async function handleBuy(req, res, runId) {
             const qty = Math.floor(buyAmountPerTicker / price);
 
             if (qty > 0) {
-                const orderRes = await fetch(`${KIS_BASE_URL}/uapi/overseas-stock/v1/trading/order`, {
-                    method: 'POST',
-                    headers: {
-                        'authorization': `Bearer ${kisToken}`,
-                        'appkey': setting.kis_appkey,
-                        'appsecret': setting.kis_secret,
-                        'tr_id': 'TTTT1002U' // 해외 매수
-                    },
-                    body: JSON.stringify({
-                        CANO: cano,
-                        ACNT_PRDT_CD: prdt,
-                        OVRS_EXCG_CD: 'NASD',
-                        PDNO: item.ticker,
-                        ORD_QTY: String(qty),
-                        OVRS_ORD_UNPR: String(price),
-                        ORD_SVR_DVSN_CD: '0',
-                        ORD_DVSN: '00'
-                    })
-                });
-                buyResults.push({ ticker: item.ticker, qty, price, res: await orderRes.json() });
+                if (setting.trade_enabled) {
+                    const orderRes = await fetch(`${KIS_BASE_URL}/uapi/overseas-stock/v1/trading/order`, {
+                        method: 'POST',
+                        headers: {
+                            'authorization': `Bearer ${kisToken}`,
+                            'appkey': setting.kis_appkey,
+                            'appsecret': setting.kis_secret,
+                            'tr_id': 'TTTT1002U' // 해외 매수
+                        },
+                        body: JSON.stringify({
+                            CANO: cano,
+                            ACNT_PRDT_CD: prdt,
+                            OVRS_EXCG_CD: 'NASD',
+                            PDNO: item.ticker,
+                            ORD_QTY: String(qty),
+                            OVRS_ORD_UNPR: String(price),
+                            ORD_SVR_DVSN_CD: '0',
+                            ORD_DVSN: '00'
+                        })
+                    });
+                    buyResults.push({ ticker: item.ticker, qty, price, res: await orderRes.json() });
+                } else {
+                    // 실제 매매가 비활성화된 경우 시뮬레이션으로 처리
+                    buyResults.push({ ticker: item.ticker, status: 'simulated', qty, price });
+                    console.log(`[Simulated] Buy ${item.ticker} ${qty} units at ${price}`);
+                }
             } else {
                 buyResults.push({ ticker: item.ticker, qty: 0, reason: 'Insufficient funds' });
             }
@@ -391,8 +404,9 @@ async function handleReport(req, res, runId) {
     const { sellResults, buyResults, setting } = run.data;
 
     const emailBody = `
-        <h2>자동매매 실행 리포트</h2>
+        <h2>자동매매 실행 리포트 ${setting.trade_enabled ? '' : '(모의 실행)'}</h2>
         <p>설정: ${setting.name}</p>
+        <p>실행 방식: ${setting.trade_enabled ? '<span style="color:red;font-weight:bold;">실제 매매</span>' : '<span style="color:blue;">모의 매매(테스트)</span>'}</p>
         <p>실행 시간: ${new Date(run.created_at).toLocaleString()}</p>
         
         <h3>매도 내역</h3>

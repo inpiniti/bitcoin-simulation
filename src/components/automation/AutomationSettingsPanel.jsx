@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Plus, Trash2, Edit, Save, RefreshCw, Eye, EyeOff, Bot } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Switch } from '@/components/ui/switch';
 
 /**
  * 자동 매매 봇 설정 패널 컴포넌트
@@ -56,7 +57,8 @@ export function AutomationSettingsPanel() {
         buy_condition: 60,
         ai_model_key: '',
         ticker_group_key: 'superinvestor',
-        is_active: true
+        is_active: true,
+        trade_enabled: false
     });
 
     const resetForm = () => {
@@ -71,7 +73,8 @@ export function AutomationSettingsPanel() {
             buy_condition: 60,
             ai_model_key: '',
             ticker_group_key: 'superinvestor',
-            is_active: true
+            is_active: true,
+            trade_enabled: false
         });
         setEditingId(null);
         setShowSecret(false);
@@ -91,7 +94,8 @@ export function AutomationSettingsPanel() {
                 buy_condition: config.buy_condition || 60,
                 ai_model_key: config.ai_model_key || '',
                 ticker_group_key: config.ticker_group_key || 'superinvestor',
-                is_active: config.is_active !== false
+                is_active: config.is_active !== false,
+                trade_enabled: !!config.trade_enabled
             });
         } else {
             resetForm();
@@ -161,7 +165,8 @@ export function AutomationSettingsPanel() {
                                     <TableHead className="text-[#858585]">대상 그룹</TableHead>
                                     <TableHead className="text-[#858585]">매수 조건</TableHead>
                                     <TableHead className="text-[#858585]">매도 조건</TableHead>
-                                    <TableHead className="text-[#858585]">상태</TableHead>
+                                    <TableHead className="text-[#858585]">스케줄</TableHead>
+                                    <TableHead className="text-[#858585]">실제매매</TableHead>
                                     <TableHead className="text-right text-[#858585]">관리</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -184,7 +189,12 @@ export function AutomationSettingsPanel() {
                                             <TableCell className="text-[#dcdcaa]">{config.sell_condition > 0 ? `수익 > ${config.sell_condition}%` : '-'}</TableCell>
                                             <TableCell>
                                                 <Badge className={config.is_active ? 'bg-[#007acc] hover:bg-[#0062a3]' : 'bg-[#3c3c3c] text-[#858585] hover:bg-[#4a4a4a]'}>
-                                                    {config.is_active ? 'Active' : 'Inactive'}
+                                                    {config.is_active ? 'ON' : 'OFF'}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell>
+                                                <Badge variant="outline" className={config.trade_enabled ? 'border-orange-500 text-orange-500 bg-orange-500/10' : 'border-[#3c3c3c] text-[#858585]'}>
+                                                    {config.trade_enabled ? '실제매매' : '모의매매'}
                                                 </Badge>
                                             </TableCell>
                                             <TableCell className="text-right">
@@ -235,6 +245,28 @@ export function AutomationSettingsPanel() {
                                     onChange={(e) => setFormData({ ...formData, execution_time: e.target.value })}
                                 />
                             </div>
+                        </div>
+
+                        <div className="flex items-center justify-between p-4 bg-[#1e1e1e] rounded-lg border border-[#3c3c3c]">
+                            <div className="space-y-0.5">
+                                <Label className="text-white text-base">스케줄 활성화</Label>
+                                <p className="text-[#858585] text-xs">정해진 시간에 자동으로 분석을 시작합니다.</p>
+                            </div>
+                            <Switch
+                                checked={formData.is_active}
+                                onCheckedChange={(val) => setFormData({ ...formData, is_active: val })}
+                            />
+                        </div>
+
+                        <div className="flex items-center justify-between p-4 bg-[#1e1e1e] rounded-lg border border-orange-900/30">
+                            <div className="space-y-0.5">
+                                <Label className="text-orange-500 text-base">실제 매매 활성화</Label>
+                                <p className="text-[#858585] text-xs">체크 해제 시 실제 주문은 나가지 않고 리포트만 발송됩니다.</p>
+                            </div>
+                            <Switch
+                                checked={formData.trade_enabled}
+                                onCheckedChange={(val) => setFormData({ ...formData, trade_enabled: val })}
+                            />
                         </div>
 
                         <div className="space-y-2">
