@@ -9,16 +9,40 @@
             "destination": "/api/yahoo"
         },
         {
-            "source": "/api/dataroma",
-            "destination": "/api/dataroma"
-        },
-        {
-            "source": "/api/hf",
-            "destination": "/api/hf"
+            "source": "/api/nasdaq/:path*",
+            "destination": "/api/nasdaq"
         },
         {
             "source": "/api/xgb/:path*",
             "destination": "/api/xgb"
+        },
+        {
+            "source": "/api/dataroma",
+            "destination": "/api/simple/dataroma"
+        },
+        {
+            "source": "/api/forecast",
+            "destination": "/api/simple/forecast"
+        },
+        {
+            "source": "/api/gemini",
+            "destination": "/api/simple/gemini"
+        },
+        {
+            "source": "/api/hf",
+            "destination": "/api/simple/hf"
+        },
+        {
+            "source": "/api/whale",
+            "destination": "/api/simple/whale"
+        },
+        {
+            "source": "/api/cron",
+            "destination": "/api/simple/cron"
+        },
+        {
+            "source": "/api/send",
+            "destination": "/api/simple/send"
         }
     ]
 }
