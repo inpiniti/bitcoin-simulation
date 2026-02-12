@@ -11,7 +11,8 @@ import {
 } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Plus, Trash2, Edit, Save, RefreshCw, Eye, EyeOff, Bot } from 'lucide-react';
+import { Plus, Trash2, Edit, Save, RefreshCw, Eye, EyeOff, Bot, Database } from 'lucide-react';
+import { DataSetInitDialog } from './DataSetInitDialog';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Switch } from '@/components/ui/switch';
@@ -44,6 +45,7 @@ export function AutomationSettingsPanel() {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [editingId, setEditingId] = useState(null);
     const [showSecret, setShowSecret] = useState(false);
+    const [isDataSetDialogOpen, setIsDataSetDialogOpen] = useState(false);
 
     // Form State
     const [formData, setFormData] = useState({
@@ -142,6 +144,10 @@ export function AutomationSettingsPanel() {
                     <Button variant="outline" size="sm" onClick={() => loadAutomationConfigs()} disabled={loadingAutomation} className="bg-[#252526] border-[#3c3c3c] text-[#cccccc] hover:bg-[#3c3c3c] hover:text-white">
                         <RefreshCw className={`w-4 h-4 mr-2 ${loadingAutomation ? 'animate-spin' : ''}`} />
                         새로고침
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => setIsDataSetDialogOpen(true)} className="bg-[#252526] border-[#3c3c3c] text-[#4ec9b0] hover:bg-[#3c3c3c] hover:text-white">
+                        <Database className="w-4 h-4 mr-2" />
+                        미리 데이터 생성
                     </Button>
                     <Button onClick={() => handleOpenDialog()} className="bg-[#007acc] hover:bg-[#0062a3] text-white border-none">
                         <Plus className="w-4 h-4 mr-2" />
@@ -401,6 +407,8 @@ export function AutomationSettingsPanel() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            <DataSetInitDialog open={isDataSetDialogOpen} onOpenChange={setIsDataSetDialogOpen} />
         </div>
     );
 }
