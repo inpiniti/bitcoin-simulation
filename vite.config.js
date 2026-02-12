@@ -87,6 +87,55 @@ export default defineConfig(({ mode }) => {
                         }
                     });
 
+                    // DataSet & TradingView API 미들웨어 (로컬 개발용)
+                    const datasetServices = ['insertdataset', 'selectdataset', 'updatedataset', 'tradingview'];
+                    for (const svc of datasetServices) {
+                        server.middlewares.use(`/api/simple/${svc}`, async (req, res, next) => {
+                            try {
+                                const urlObj = new URL(req.originalUrl || req.url, `http://${req.headers.host}`);
+                                console.log(`[Simple/${svc} Middleware] ${req.method} ${urlObj.pathname}`);
+
+                                if (!global.fetch) {
+                                    try {
+                                        const nodeFetch = await import('node-fetch');
+                                        global.fetch = nodeFetch.default;
+                                    } catch (e) { /* ignore */ }
+                                }
+
+                                // Vercel Serverless Function 환경 흉내
+                                req.query = Object.fromEntries(urlObj.searchParams.entries());
+                                req.query.path = svc;
+
+                                res.status = (code) => { res.statusCode = code; return res; };
+                                res.json = (data) => {
+                                    res.setHeader('Content-Type', 'application/json');
+                                    res.end(JSON.stringify(data));
+                                    return res;
+                                };
+
+                                if (req.method === 'POST') {
+                                    const buffers = [];
+                                    for await (const chunk of req) { buffers.push(chunk); }
+                                    const bodyStr = Buffer.concat(buffers).toString();
+                                    try { req.body = JSON.parse(bodyStr); } catch { req.body = {}; }
+                                } else {
+                                    req.body = {};
+                                }
+
+                                Object.assign(process.env, env);
+
+                                const handlerModule = await import('./api/simple/[path].js');
+                                await handlerModule.default(req, res);
+                            } catch (e) {
+                                console.error(`[Simple/${svc} Middleware Error]`, e);
+                                if (!res.headersSent) {
+                                    res.statusCode = 500;
+                                    res.end(JSON.stringify({ error: e.message }));
+                                }
+                            }
+                        });
+                    }
+
                     // 종목 토론 API 미들웨어
                     server.middlewares.use('/api/discussion', async (req, res, next) => {
                         try {

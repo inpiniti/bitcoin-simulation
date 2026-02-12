@@ -410,7 +410,58 @@ CREATE TABLE automation_settings (
 -- RLS 정책
 ALTER TABLE automation_settings ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow all operations" ON automation_settings FOR ALL USING (true);
+
+-- 주식 데이터셋 테이블 (DataSet 기반 수집 최적화용)
+CREATE TABLE stock_dataset (
+    id BIGSERIAL PRIMARY KEY,
+    ticker VARCHAR(20) NOT NULL UNIQUE,           -- 종목코드 (예: AAPL)
+    candles JSONB DEFAULT '[]'::jsonb,            -- 100일치 캔들 데이터 [{date, open, high, low, close, volume}]
+    data_count INTEGER DEFAULT 0,                  -- 저장된 캔들 수
+    last_updated TIMESTAMPTZ DEFAULT NOW(),        -- 마지막 업데이트 시간
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 인덱스
+CREATE INDEX idx_stock_dataset_ticker ON stock_dataset(ticker);
+
+-- RLS 정책
+ALTER TABLE stock_dataset ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all operations" ON stock_dataset FOR ALL USING (true);
 ```
+
+### 5-1. DataSet 기반 11단계 파이프라인 최적화
+
+#### 문제점 (기존)
+- **4단계(preprocessingData)**: 티커마다 Yahoo API 개별 호출 → 수백 종목 시 수십 분 소요
+- **5단계(predict)**: 티커마다 XGBoost API 개별 호출 → 수백 건의 HTTP 요청
+
+#### 해결 방안
+1. **DataSet 사전 등록**: `insertDataSet` API로 100일치 과거 데이터를 Supabase에 미리 저장
+2. **TradingView 일괄 조회**: `tradingview` API로 모든 종목의 오늘 데이터를 1회 API 호출로 수집
+3. **배치 예측**: 모든 features를 배열로 묶어 1회 API 호출로 예측 결과 획득
+4. **자동 업데이트**: GitHub Actions Cron → 장 종료 1시간 후 `updateDataSet` 호출
+
+#### API 엔드포인트
+| API | 메서드 | 설명 |
+|-----|--------|------|
+| `/api/simple/insertdataset` | POST | 티커별 100일치 과거 데이터를 Yahoo에서 수집하여 Supabase에 저장 (이미 있으면 스킵) |
+| `/api/simple/selectdataset` | GET/POST | Supabase에서 DataSet 조회 (DB 역할) |
+| `/api/simple/updatedataset` | POST | TradingView에서 오늘 데이터 수신 후 모든 등록 티커 업데이트 |
+| `/api/simple/tradingview` | POST | TradingView Screener API로 모든 종목 OHLCV+지표 일괄 조회 |
+
+#### 개선된 데이터 흐름
+```
+[기존] 4단계: for(ticker) { Yahoo 개별 조회 → 특징 추출 } → 세월...
+[개선] 4단계: Supabase selectDataSet + TradingView 오늘 데이터(1회) → 병합 → 특징 추출
+
+[기존] 5단계: for(ticker) { XGBoost 개별 예측 } → 세월...
+[개선] 5단계: XGBoost 배치 예측 (모든 features 배열 1회 전송)
+```
+
+#### GitHub Actions Cron
+- **워크플로우**: `.github/workflows/cron_update_dataset.yml`
+- **실행 시점**: 평일 UTC 21:00 / 22:00 (미국 장 종료 1시간 후, 서머타임 모두 커버)
+- **동작**: `POST /api/simple/updatedataset` → TradingView → Supabase 업데이트
 
 ### 6. 이메일 알림 (Email Notification) - New
 

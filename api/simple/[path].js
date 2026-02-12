@@ -14,6 +14,12 @@
 import * as cheerio from 'cheerio';
 import nodemailer from 'nodemailer';
 import crypto from 'crypto';
+import { createClient } from '@supabase/supabase-js';
+
+// Supabase 클라이언트 초기화
+const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+const supabase = (supabaseUrl && supabaseKey) ? createClient(supabaseUrl, supabaseKey) : null;
 
 export default async function handler(req, res) {
     // CORS 설정
@@ -28,7 +34,7 @@ export default async function handler(req, res) {
     }
 
     // URL에서 서비스명 추출 (Vercel rewrite 및 직접 호출 대응)
-    const allowedServices = ['dataroma', 'forecast', 'gemini', 'hf', 'whale', 'cron', 'send', 'discussion'];
+    const allowedServices = ['dataroma', 'forecast', 'gemini', 'hf', 'whale', 'cron', 'send', 'discussion', 'insertdataset', 'selectdataset', 'updatedataset', 'tradingview'];
     const url = new URL(req.url, `http://${req.headers.host}`);
     const parts = url.pathname.toLowerCase().split('/').filter(Boolean);
 
@@ -59,6 +65,14 @@ export default async function handler(req, res) {
                 return await handleSend(req, res);
             case 'discussion':
                 return await handleDiscussion(req, res);
+            case 'insertdataset':
+                return await handleInsertDataSet(req, res);
+            case 'selectdataset':
+                return await handleSelectDataSet(req, res);
+            case 'updatedataset':
+                return await handleUpdateDataSet(req, res);
+            case 'tradingview':
+                return await handleTradingView(req, res);
 
             default:
                 return res.status(404).json({ error: `Unknown service: ${service}` });
@@ -306,6 +320,367 @@ async function fetchToss(ticker) {
             source: 'Toss', id: c.id, user: c.author?.nickname || 'Anonymous', text: c.message, date: c.updatedAt
         }));
     } catch { return []; }
+}
+
+// ==================== TradingView Screener (일괄 조회) ====================
+/**
+ * TradingView Screener API를 통해 모든 종목의 OHLCV + 지표 데이터를 한 번에 조회합니다.
+ * @param {Object} req - POST { tickers?: string[], columns?: string[] }
+ * @returns {{ data: Array<{ ticker, exchange, close, open, ... }> }}
+ */
+async function handleTradingView(req, res) {
+    if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
+
+    const { tickers = [], columns } = req.body || {};
+
+    // 기본 조회 컬럼 (OHLCV + 주요 지표)
+    const defaultColumns = [
+        'close', 'open', 'high', 'low', 'volume',
+        'change', 'change_abs',
+        'RSI', 'RSI[1]',
+        'BB.upper', 'BB.lower', 'BB.basis',
+        'SMA20', 'SMA50',
+        'EMA20',
+        'ADX', 'MACD.macd', 'MACD.signal',
+        'Stoch.K', 'Stoch.D',
+        'average_volume_10d_calc',
+        'market_cap_basic',
+        'description',
+        'exchange',
+        'type'
+    ];
+
+    const selectedColumns = columns || defaultColumns;
+
+    const payload = {
+        filter: tickers.length > 0 ? [] : [{ left: 'market_cap_basic', operation: 'nempty' }],
+        options: { lang: 'en' },
+        markets: ['america'],
+        symbols: tickers.length > 0 ? {
+            tickers: [
+                ...tickers.map(t => `NASDAQ:${t}`),
+                ...tickers.map(t => `NYSE:${t}`),
+                ...tickers.map(t => `AMEX:${t}`)
+            ]
+        } : undefined,
+        columns: selectedColumns,
+        sort: { sortBy: 'market_cap_basic', sortOrder: 'desc' },
+        range: [0, tickers.length > 0 ? tickers.length * 3 : 500]
+    };
+
+    try {
+        const apiResponse = await fetch('https://scanner.tradingview.com/america/scan', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (!apiResponse.ok) {
+            const errText = await apiResponse.text();
+            throw new Error(`TradingView API error: ${apiResponse.status} - ${errText}`);
+        }
+
+        const result = await apiResponse.json();
+
+        // 결과를 ticker 기준으로 정리 (중복 제거: 같은 티커가 여러 거래소에 있을 수 있음)
+        const tickerMap = new Map();
+        for (const item of (result.data || [])) {
+            const [exchange, ticker] = item.s.split(':');
+            if (!tickerMap.has(ticker)) {
+                const row = { ticker, exchange };
+                selectedColumns.forEach((col, i) => {
+                    row[col] = item.d[i];
+                });
+                tickerMap.set(ticker, row);
+            }
+        }
+
+        const data = Array.from(tickerMap.values());
+
+        res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=600');
+        return res.status(200).json({
+            totalCount: result.totalCount || 0,
+            count: data.length,
+            columns: selectedColumns,
+            data
+        });
+    } catch (e) {
+        console.error('[TradingView Error]', e);
+        return res.status(500).json({ error: e.message });
+    }
+}
+
+// ==================== InsertDataSet (DataSet 초기 등록) ====================
+/**
+ * 티커별 100일치 과거 데이터를 Yahoo Finance에서 수집하여 Supabase stock_dataset에 저장합니다.
+ * 이미 등록된 티커는 스킵합니다.
+ * @param {Object} req - POST { tickers: string[] }
+ */
+async function handleInsertDataSet(req, res) {
+    if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
+    if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
+
+    const { tickers } = req.body || {};
+    if (!tickers || !Array.isArray(tickers) || tickers.length === 0) {
+        return res.status(400).json({ error: 'tickers 배열이 필요합니다.' });
+    }
+
+    const results = [];
+
+    for (const ticker of tickers) {
+        try {
+            // 이미 등록되어 있는지 확인
+            const { data: existing } = await supabase
+                .from('stock_dataset')
+                .select('ticker')
+                .eq('ticker', ticker.toUpperCase())
+                .limit(1);
+
+            if (existing && existing.length > 0) {
+                results.push({ ticker, status: 'skipped', message: '이미 등록되어 있습니다.' });
+                continue;
+            }
+
+            // Yahoo Finance에서 100일치 데이터 수집
+            const yahooUrl = `https://query2.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=100d`;
+            const yahooRes = await fetch(yahooUrl, {
+                headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
+            });
+
+            if (!yahooRes.ok) {
+                results.push({ ticker, status: 'error', message: `Yahoo 데이터 조회 실패: ${yahooRes.status}` });
+                continue;
+            }
+
+            const yahooData = await yahooRes.json();
+            const chartResult = yahooData.chart?.result?.[0];
+            if (!chartResult) {
+                results.push({ ticker, status: 'error', message: 'Yahoo 데이터 파싱 실패' });
+                continue;
+            }
+
+            const timestamps = chartResult.timestamp || [];
+            const quote = chartResult.indicators?.quote?.[0] || {};
+
+            // 캔들 데이터 구성
+            const candles = timestamps.map((t, i) => ({
+                date: new Date(t * 1000).toISOString().split('T')[0],
+                open: quote.open?.[i],
+                high: quote.high?.[i],
+                low: quote.low?.[i],
+                close: quote.close?.[i],
+                volume: quote.volume?.[i]
+            })).filter(c => c.close != null); // null 데이터 제거
+
+            // Supabase에 저장
+            const { error: insertError } = await supabase
+                .from('stock_dataset')
+                .insert({
+                    ticker: ticker.toUpperCase(),
+                    candles: candles,
+                    last_updated: new Date().toISOString(),
+                    data_count: candles.length
+                });
+
+            if (insertError) {
+                results.push({ ticker, status: 'error', message: insertError.message });
+            } else {
+                results.push({ ticker, status: 'inserted', count: candles.length });
+            }
+        } catch (e) {
+            results.push({ ticker, status: 'error', message: e.message });
+        }
+    }
+
+    return res.status(200).json({
+        success: true,
+        total: tickers.length,
+        inserted: results.filter(r => r.status === 'inserted').length,
+        skipped: results.filter(r => r.status === 'skipped').length,
+        errors: results.filter(r => r.status === 'error').length,
+        results
+    });
+}
+
+// ==================== SelectDataSet (DataSet 조회) ====================
+/**
+ * Supabase stock_dataset에서 데이터를 조회합니다.
+ * @param {Object} req - GET ?tickers=AAPL,TSLA 또는 POST { tickers: string[] }
+ */
+async function handleSelectDataSet(req, res) {
+    if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
+
+    let tickers = [];
+
+    if (req.method === 'GET') {
+        const url = new URL(req.url, `http://${req.headers.host}`);
+        const tickerParam = url.searchParams.get('tickers') || req.query?.tickers;
+        if (tickerParam) {
+            tickers = tickerParam.split(',').map(t => t.trim().toUpperCase());
+        }
+    } else if (req.method === 'POST') {
+        tickers = (req.body?.tickers || []).map(t => t.toUpperCase());
+    }
+
+    try {
+        let query = supabase.from('stock_dataset').select('*');
+
+        if (tickers.length > 0) {
+            query = query.in('ticker', tickers);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+
+        return res.status(200).json({
+            success: true,
+            count: data.length,
+            data
+        });
+    } catch (e) {
+        return res.status(500).json({ error: e.message });
+    }
+}
+
+// ==================== UpdateDataSet (오늘 데이터 업데이트) ====================
+/**
+ * TradingView에서 오늘의 시장 데이터를 일괄 조회한 뒤,
+ * Supabase stock_dataset의 모든 등록 티커에 대해 오늘자 캔들을 추가합니다.
+ * Git Action에서 장 종료 1시간 뒤에 호출하도록 설계되었습니다.
+ */
+async function handleUpdateDataSet(req, res) {
+    if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
+
+    try {
+        // 1. Supabase에서 등록된 모든 티커 조회
+        const { data: datasets, error: selectError } = await supabase
+            .from('stock_dataset')
+            .select('id, ticker, candles, data_count');
+
+        if (selectError) throw selectError;
+        if (!datasets || datasets.length === 0) {
+            return res.status(200).json({ success: true, message: '등록된 DataSet이 없습니다.', updated: 0 });
+        }
+
+        const allTickers = datasets.map(d => d.ticker);
+        console.log(`[UpdateDataSet] 총 ${allTickers.length}개 티커 업데이트 시작...`);
+
+        // 2. TradingView에서 모든 종목 한방에 조회
+        const tvPayload = {
+            symbols: {
+                tickers: [
+                    ...allTickers.map(t => `NASDAQ:${t}`),
+                    ...allTickers.map(t => `NYSE:${t}`),
+                    ...allTickers.map(t => `AMEX:${t}`)
+                ]
+            },
+            columns: ['close', 'open', 'high', 'low', 'volume', 'change'],
+            options: { lang: 'en' },
+            range: [0, allTickers.length * 3]
+        };
+
+        const tvResponse = await fetch('https://scanner.tradingview.com/america/scan', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            },
+            body: JSON.stringify(tvPayload)
+        });
+
+        if (!tvResponse.ok) {
+            throw new Error(`TradingView 조회 실패: ${tvResponse.status}`);
+        }
+
+        const tvResult = await tvResponse.json();
+
+        // 티커별 오늘 데이터 매핑 (중복 제거)
+        const todayDataMap = new Map();
+        for (const item of (tvResult.data || [])) {
+            const [exchange, ticker] = item.s.split(':');
+            if (!todayDataMap.has(ticker)) {
+                todayDataMap.set(ticker, {
+                    close: item.d[0],
+                    open: item.d[1],
+                    high: item.d[2],
+                    low: item.d[3],
+                    volume: item.d[4],
+                    change: item.d[5]
+                });
+            }
+        }
+
+        console.log(`[UpdateDataSet] TradingView에서 ${todayDataMap.size}개 종목 데이터 수신`);
+
+        // 3. 각 DataSet에 오늘 데이터 추가 및 오래된 데이터 제거 (100일 유지)
+        const todayStr = new Date().toISOString().split('T')[0];
+        let updated = 0;
+        let skipped = 0;
+
+        for (const dataset of datasets) {
+            const todayData = todayDataMap.get(dataset.ticker);
+            if (!todayData || todayData.close == null) {
+                skipped++;
+                continue;
+            }
+
+            let candles = dataset.candles || [];
+
+            // 오늘 날짜 데이터가 이미 있으면 업데이트, 없으면 추가
+            const existingIdx = candles.findIndex(c => c.date === todayStr);
+            const newCandle = {
+                date: todayStr,
+                open: todayData.open,
+                high: todayData.high,
+                low: todayData.low,
+                close: todayData.close,
+                volume: todayData.volume
+            };
+
+            if (existingIdx >= 0) {
+                candles[existingIdx] = newCandle;
+            } else {
+                candles.push(newCandle);
+            }
+
+            // 날짜순 정렬 후 최근 100개만 유지
+            candles.sort((a, b) => a.date.localeCompare(b.date));
+            if (candles.length > 100) {
+                candles = candles.slice(-100);
+            }
+
+            const { error: updateError } = await supabase
+                .from('stock_dataset')
+                .update({
+                    candles,
+                    last_updated: new Date().toISOString(),
+                    data_count: candles.length
+                })
+                .eq('id', dataset.id);
+
+            if (!updateError) {
+                updated++;
+            } else {
+                console.warn(`[UpdateDataSet] ${dataset.ticker} 업데이트 실패:`, updateError.message);
+            }
+        }
+
+        console.log(`[UpdateDataSet] 완료 - 업데이트: ${updated}, 스킵: ${skipped}`);
+
+        return res.status(200).json({
+            success: true,
+            total: datasets.length,
+            updated,
+            skipped,
+            todayDate: todayStr
+        });
+    } catch (e) {
+        console.error('[UpdateDataSet Error]', e);
+        return res.status(500).json({ error: e.message });
+    }
 }
 
 

@@ -5,10 +5,10 @@
  * 1. Git Action 트리거
  * 2. start: 설정 조회 및 필터링
  * 3. originData: 티커 수집 및 초기화
- * 4. preprocessingData: 과거 데이터 수집 및 특징 추출
- * 5. predict: AI 예측 API 호출
+ * 4. preprocessingData: DataSet 조회 + TradingView 오늘 데이터 병합 + 특징 추출
+ * 5. predict: AI 예측 API 배치 호출
  * 6. strategy: 매수/매도 후보 확정
- * 7. tocken: KIS 토큰 발급
+ * 7. token: KIS 토큰 발급
  * 8. balance: 현재 잔고 확인 및 필터링
  * 9. sell: 실제 매도 주문
  * 10. buy: 자금 배분 및 실제 매수 주문
@@ -206,22 +206,125 @@ async function handleOriginData(req, res, settingId) {
 
 // ---------------------------------------------------------
 // 4. /api/cron/preprocessingData
+//    DataSet 기반 수집: selectDataSet → 티커 필터 → TradingView 오늘 데이터 → 병합
 // ---------------------------------------------------------
 async function handlePreprocessingData(req, res, runId) {
     const run = await getRun(runId);
     const { tickers } = run.data;
-    console.log(`[Step 4: Preprocessing] Processing ${tickers.length} tickers...`);
+    console.log(`[Step 4: Preprocessing] DataSet 기반 처리 시작 - ${tickers.length}개 티커`);
 
-    const preprocessed = [];
-    for (const ticker of tickers) {
-        try {
-            const candles = await fetchYahooHistory(ticker);
-            const features = extractFeatures(candles);
-            preprocessed.push({ ticker, features });
-        } catch (e) {
-            console.warn(`[Preprocessing Skip] ${ticker}: ${e.message}`);
+    // 1. Supabase에서 DataSet 일괄 조회 (DB 역할)
+    const { data: datasets, error: dsError } = await supabase
+        .from('stock_dataset')
+        .select('ticker, candles')
+        .in('ticker', tickers.map(t => t.toUpperCase()));
+
+    if (dsError) {
+        console.warn('[Step 4] DataSet 조회 실패, Yahoo 폴백 사용:', dsError.message);
+    }
+
+    // DataSet 맵 구성
+    const datasetMap = new Map();
+    if (datasets) {
+        for (const ds of datasets) {
+            datasetMap.set(ds.ticker, ds.candles || []);
         }
     }
+    console.log(`[Step 4] DataSet에서 ${datasetMap.size}개 티커 로드 완료`);
+
+    // 2. TradingView에서 오늘 데이터 한방에 조회
+    let todayDataMap = new Map();
+    try {
+        const tvPayload = {
+            symbols: {
+                tickers: [
+                    ...tickers.map(t => `NASDAQ:${t}`),
+                    ...tickers.map(t => `NYSE:${t}`),
+                    ...tickers.map(t => `AMEX:${t}`)
+                ]
+            },
+            columns: ['close', 'open', 'high', 'low', 'volume', 'change'],
+            options: { lang: 'en' },
+            range: [0, tickers.length * 3]
+        };
+
+        const tvResponse = await fetch('https://scanner.tradingview.com/america/scan', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            },
+            body: JSON.stringify(tvPayload)
+        });
+
+        if (tvResponse.ok) {
+            const tvResult = await tvResponse.json();
+            for (const item of (tvResult.data || [])) {
+                const [exchange, ticker] = item.s.split(':');
+                if (!todayDataMap.has(ticker)) {
+                    todayDataMap.set(ticker, {
+                        close: item.d[0],
+                        open: item.d[1],
+                        high: item.d[2],
+                        low: item.d[3],
+                        volume: item.d[4]
+                    });
+                }
+            }
+            console.log(`[Step 4] TradingView에서 ${todayDataMap.size}개 오늘 데이터 수신`);
+        } else {
+            console.warn(`[Step 4] TradingView 조회 실패: ${tvResponse.status}`);
+        }
+    } catch (e) {
+        console.warn('[Step 4] TradingView 조회 에러:', e.message);
+    }
+
+    // 3. 각 티커별 DataSet + 오늘 데이터 병합 후 특징 추출
+    const todayStr = new Date().toISOString().split('T')[0];
+    const preprocessed = [];
+
+    for (const ticker of tickers) {
+        try {
+            let candles = datasetMap.get(ticker.toUpperCase()) || [];
+
+            // DataSet이 없으면 Yahoo 폴백 (개별 조회)
+            if (candles.length === 0) {
+                console.log(`[Step 4] ${ticker}: DataSet 없음, Yahoo 폴백`);
+                try {
+                    candles = await fetchYahooHistory(ticker);
+                } catch (e) {
+                    console.warn(`[Step 4 Skip] ${ticker}: Yahoo 폴백 실패 - ${e.message}`);
+                    continue;
+                }
+            }
+
+            // 오늘 데이터 병합
+            const todayData = todayDataMap.get(ticker.toUpperCase());
+            if (todayData && todayData.close != null) {
+                const existingIdx = candles.findIndex(c => c.date === todayStr);
+                const newCandle = {
+                    date: todayStr,
+                    open: todayData.open,
+                    high: todayData.high,
+                    low: todayData.low,
+                    close: todayData.close,
+                    volume: todayData.volume
+                };
+                if (existingIdx >= 0) {
+                    candles[existingIdx] = newCandle;
+                } else {
+                    candles.push(newCandle);
+                }
+            }
+
+            const features = extractFeatures(candles);
+            preprocessed.push({ ticker, features, candleCount: candles.length });
+        } catch (e) {
+            console.warn(`[Step 4 Skip] ${ticker}: ${e.message}`);
+        }
+    }
+
+    console.log(`[Step 4 완료] ${preprocessed.length}/${tickers.length}개 티커 처리 완료`);
 
     await updateRun(runId, 'preprocessingData', { ...run.data, preprocessed });
     await triggerNext(req, 'predict', runId);
@@ -229,16 +332,66 @@ async function handlePreprocessingData(req, res, runId) {
 }
 
 // ---------------------------------------------------------
-// 5. /api/cron/predict
+// 5. /api/cron/predict (배치 예측)
+//    개별 호출 대신 모든 티커의 features를 배열로 한방에 전송
 // ---------------------------------------------------------
 async function handlePredict(req, res, runId) {
     const run = await getRun(runId);
     const { preprocessed, setting } = run.data;
-    console.log(`[Step 5: Predict] Requesting predictions for ${preprocessed.length} items...`);
+    console.log(`[Step 5: Predict] 배치 예측 요청 - ${preprocessed.length}개 항목`);
 
-    const predictionResults = [];
     const modelId = setting.ai_model_key || 'default';
+    let predictionResults = [];
 
+    // 배치 예측 시도 (모든 features를 한번에 전송)
+    try {
+        const allFeatures = preprocessed.map(item => item.features);
+        const allTickers = preprocessed.map(item => item.ticker);
+
+        const predRes = await fetch(getAbsoluteUrl(req, '/api/xgb/predict'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                modelId,
+                features: allFeatures,
+                tickers: allTickers  // 티커 목록도 함께 전송 (서버 로깅용)
+            })
+        });
+
+        if (predRes.ok) {
+            const data = await predRes.json();
+            const predictions = data.predictions || [];
+
+            // 배치 결과 매핑
+            for (let i = 0; i < preprocessed.length; i++) {
+                predictionResults.push({
+                    ticker: preprocessed[i].ticker,
+                    probability: predictions[i]?.probability || 0
+                });
+            }
+            console.log(`[Step 5] 배치 예측 성공: ${predictionResults.length}개 결과`);
+        } else {
+            console.warn(`[Step 5] 배치 예측 실패 (${predRes.status}), 개별 폴백 시도...`);
+            // 배치 실패 시 개별 폴백
+            predictionResults = await fallbackIndividualPredict(req, preprocessed, modelId);
+        }
+    } catch (e) {
+        console.warn(`[Step 5] 배치 예측 에러: ${e.message}, 개별 폴백 시도...`);
+        predictionResults = await fallbackIndividualPredict(req, preprocessed, modelId);
+    }
+
+    console.log(`[Step 5 완료] ${predictionResults.length}개 예측 결과`);
+
+    await updateRun(runId, 'predict', { ...run.data, predictionResults });
+    await triggerNext(req, 'strategy', runId);
+    return res.status(200).json({ success: true, count: predictionResults.length });
+}
+
+/**
+ * 배치 예측 실패 시 개별 호출 폴백
+ */
+async function fallbackIndividualPredict(req, preprocessed, modelId) {
+    const results = [];
     for (const item of preprocessed) {
         try {
             const predRes = await fetch(getAbsoluteUrl(req, '/api/xgb/predict'), {
@@ -247,18 +400,15 @@ async function handlePredict(req, res, runId) {
                 body: JSON.stringify({ modelId, features: [item.features] })
             });
             const data = await predRes.json();
-            predictionResults.push({
+            results.push({
                 ticker: item.ticker,
                 probability: data.predictions?.[0]?.probability || 0
             });
         } catch (e) {
-            console.error(`[Predict Error] ${item.ticker}: ${e.message}`);
+            console.error(`[Predict Fallback Error] ${item.ticker}: ${e.message}`);
         }
     }
-
-    await updateRun(runId, 'predict', { ...run.data, predictionResults });
-    await triggerNext(req, 'strategy', runId);
-    return res.status(200).json({ success: true, count: predictionResults.length });
+    return results;
 }
 
 // ---------------------------------------------------------
