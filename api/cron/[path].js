@@ -117,14 +117,72 @@ async function handleOriginData(req, res, settingId) {
     const { data: setting, error: sError } = await supabase.from('automation_settings').select('*').eq('id', settingId).single();
     if (sError) throw sError;
 
+    console.log(`[Step 3: OriginData] Fetching tickers for setting: ${settingId} (Key: ${setting.ticker_group_key})`);
+
     let tickers = [];
-    if (setting.ticker_group_key === 'superinvestor') {
-        const res = await fetch(getAbsoluteUrl(req, '/api/simple/dataroma'));
-        const { stocks } = await res.json();
-        tickers = stocks.map(s => s.ticker);
-    } else {
-        // 기본 티커 셋
-        tickers = ['AAPL', 'TSLA', 'NVDA', 'MSFT', 'AMZN', 'GOOGL', 'META'];
+    const groupKey = setting.ticker_group_key || 'superinvestor'; // Default to superinvestor if null
+
+    console.log(`[Step 3: OriginData] Processing group key: ${groupKey}`);
+
+    try {
+        if (groupKey === 'superinvestor') {
+            const res = await fetch(getAbsoluteUrl(req, '/api/simple/dataroma'));
+            const { stocks } = await res.json();
+            tickers = stocks.map(s => s.ticker);
+        }
+        else if (['usall', 'nasdaq', 'nyse'].includes(groupKey)) {
+            // 전체 시장 (또는 거래소별) 조회
+            // /api/index-stocks/usall 은 vite.config.js 미들웨어에서 처리됨 (나스닥+NYSE 전체)
+            const endpoint = 'usall';
+
+            console.log(`[OriginData] Fetching market wide tickers from /api/index-stocks/${endpoint}...`);
+            const res = await fetch(getAbsoluteUrl(req, `/api/index-stocks/${endpoint}`));
+            if (!res.ok) throw new Error(`Stock list fetch failed: ${res.status}`);
+
+            const stocks = await res.json();
+            // usall은 { ticker, name, exchange ... } 배열 반환 중 유효한 티커만 추출
+
+            if (groupKey === 'nasdaq') {
+                tickers = stocks.filter(s => s.exchange === 'NAS').map(s => s.ticker);
+            } else if (groupKey === 'nyse') {
+                tickers = stocks.filter(s => ['NYS', 'AMS', 'NYSE', 'AMEX'].includes(s.exchange)).map(s => s.ticker);
+            } else {
+                tickers = stocks.map(s => s.ticker);
+            }
+        }
+        else if (groupKey === 'sp500') {
+            const res = await fetch(getAbsoluteUrl(req, '/api/index-stocks/sp500'));
+            if (!res.ok) throw new Error(`SP500 fetch failed: ${res.status}`);
+            const stocks = await res.json();
+            tickers = stocks.map(s => s.ticker);
+        }
+        else if (groupKey === 'nasdaq100') { // Front-end value for QQQ is often nasdaq100 or qqq
+            const res = await fetch(getAbsoluteUrl(req, '/api/index-stocks/qqq'));
+            if (!res.ok) throw new Error(`QQQ fetch failed: ${res.status}`);
+            const stocks = await res.json();
+            tickers = stocks.map(s => s.ticker);
+        }
+        else if (groupKey === 'kospi200') {
+            const res = await fetch(getAbsoluteUrl(req, '/api/index-stocks/kospi200'));
+            if (!res.ok) throw new Error(`KOSPI200 fetch failed: ${res.status}`);
+            const stocks = await res.json();
+            tickers = stocks.map(s => s.ticker);
+        }
+        // TODO: 'myholdings', 'volumesurge' 등 추가 핸들러 필요 시 확장
+        else {
+            console.warn(`[OriginData] Unknown ticker group key: ${groupKey}. No tickers fetched.`);
+            tickers = [];
+        }
+
+        console.log(`[OriginData] Fetched ${tickers.length} tickers for group: ${groupKey}`);
+
+    } catch (e) {
+        console.error(`[OriginData Error] Failed to fetch tickers for ${groupKey}:`, e);
+        tickers = [];
+    }
+
+    if (tickers.length === 0) {
+        console.warn('[OriginData] Warning: No tickers found. Pipeline might stop.');
     }
 
     // 새로운 실행(Run) 인스턴스 생성
