@@ -333,21 +333,9 @@ async function handleTradingView(req, res) {
 
     const { tickers = [], columns } = req.body || {};
 
-    // 기본 조회 컬럼 (OHLCV + 주요 지표)
+    // 기본 조회 컬럼 (OHLCV 위주)
     const defaultColumns = [
-        'close', 'open', 'high', 'low', 'volume',
-        'change', 'change_abs',
-        'RSI', 'RSI[1]',
-        'BB.upper', 'BB.lower', 'BB.basis',
-        'SMA20', 'SMA50',
-        'EMA20',
-        'ADX', 'MACD.macd', 'MACD.signal',
-        'Stoch.K', 'Stoch.D',
-        'average_volume_10d_calc',
-        'market_cap_basic',
-        'description',
-        'exchange',
-        'type'
+        'close', 'open', 'high', 'low', 'volume', 'exchange'
     ];
 
     const selectedColumns = columns || defaultColumns;
@@ -387,13 +375,22 @@ async function handleTradingView(req, res) {
 
         // 결과를 ticker 기준으로 정리 (중복 제거: 같은 티커가 여러 거래소에 있을 수 있음)
         const tickerMap = new Map();
+        const todayStr = new Date().toISOString().split('T')[0];
+
         for (const item of (result.data || [])) {
             const [exchange, ticker] = item.s.split(':');
             if (!tickerMap.has(ticker)) {
-                const row = { ticker, exchange };
+                // 야후 포맷과 유사하게 정리
+                const row = {
+                    ticker,
+                    exchange,
+                    date: todayStr // 오늘 날짜 명시
+                };
+
                 selectedColumns.forEach((col, i) => {
                     row[col] = item.d[i];
                 });
+
                 tickerMap.set(ticker, row);
             }
         }
@@ -577,7 +574,7 @@ async function handleUpdateDataSet(req, res) {
                     ...allTickers.map(t => `AMEX:${t}`)
                 ]
             },
-            columns: ['close', 'open', 'high', 'low', 'volume', 'change'],
+            columns: ['close', 'open', 'high', 'low', 'volume'],
             options: { lang: 'en' },
             range: [0, allTickers.length * 3]
         };
@@ -607,8 +604,7 @@ async function handleUpdateDataSet(req, res) {
                     open: item.d[1],
                     high: item.d[2],
                     low: item.d[3],
-                    volume: item.d[4],
-                    change: item.d[5]
+                    volume: item.d[4]
                 });
             }
         }
