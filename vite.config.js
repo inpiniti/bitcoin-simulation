@@ -909,8 +909,10 @@ export default defineConfig(({ mode }) => {
                             for await (const chunk of req) buffers.push(chunk);
                             const body = JSON.parse(Buffer.concat(buffers).toString());
 
-                            const apiKey = env.VITE_GEMINI_API_KEY;
-                            if (!apiKey) {
+                            // 콤마 구분으로 여러 키 지원
+                            const rawKey = env.VITE_GEMINI_API_KEY || '';
+                            const apiKeys = rawKey.split(',').map(k => k.trim()).filter(Boolean);
+                            if (apiKeys.length === 0) {
                                 res.statusCode = 500;
                                 res.end(JSON.stringify({ error: 'Gemini API Key missing' }));
                                 return;
@@ -920,52 +922,62 @@ export default defineConfig(({ mode }) => {
                             const contents = body.contents || [];
                             const genConfig = { maxOutputTokens: 2048, temperature: 0.7 };
 
-                            // 사용 가능한 모델을 순서대로 시도 (2026-03 기준 최신)
                             const models = [
-                                'gemini-flash-lite-latest',   // → gemini-3.1-flash-lite-preview (무료 최적)
-                                'gemini-flash-latest',        // → gemini-3-flash-preview
+                                'gemini-flash-lite-latest',
+                                'gemini-flash-latest',
                                 'gemini-3.1-flash-lite-preview',
                                 'gemini-3-flash-preview',
                                 'gemini-3.1-pro-preview',
                             ];
 
+                            // 랜덤 키부터 시작 (키 로테이션)
+                            const startIdx = Math.floor(Math.random() * apiKeys.length);
+                            const orderedKeys = [
+                                ...apiKeys.slice(startIdx),
+                                ...apiKeys.slice(0, startIdx),
+                            ];
+
                             let streamed = false;
-                            for (const model of models) {
-                                const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`;
-                                const apiResponse = await fetch(url, {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ contents, generationConfig: genConfig }),
-                                });
+                            outer: for (const apiKey of orderedKeys) {
+                                for (const model of models) {
+                                    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`;
+                                    const apiResponse = await fetch(url, {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ contents, generationConfig: genConfig }),
+                                    });
 
-                                if (!apiResponse.ok) {
-                                    console.log(`[Gemini] ${model} → ${apiResponse.status}, trying next...`);
-                                    continue;
-                                }
-
-                                console.log(`[Gemini] Streaming with model: ${model}`);
-                                res.statusCode = 200;
-                                res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-
-                                let buf = '';
-                                for await (const chunk of apiResponse.body) {
-                                    buf += chunk.toString();
-                                    const lines = buf.split('\n');
-                                    buf = lines.pop() || '';
-                                    for (const line of lines) {
-                                        if (!line.startsWith('data: ')) continue;
-                                        const raw = line.slice(6).trim();
-                                        if (!raw || raw === '[DONE]') continue;
-                                        try {
-                                            const json = JSON.parse(raw);
-                                            const text = json.candidates?.[0]?.content?.parts?.[0]?.text || '';
-                                            if (text) res.write(text);
-                                        } catch { /* skip malformed */ }
+                                    if (!apiResponse.ok) {
+                                        const status = apiResponse.status;
+                                        console.log(`[Gemini] key[...${apiKey.slice(-6)}] ${model} → ${status}`);
+                                        if (status === 429 || status === 403) break; // 다음 키로
+                                        continue; // 다음 모델로
                                     }
+
+                                    console.log(`[Gemini] OK key[...${apiKey.slice(-6)}] model: ${model}`);
+                                    res.statusCode = 200;
+                                    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+
+                                    let buf = '';
+                                    for await (const chunk of apiResponse.body) {
+                                        buf += chunk.toString();
+                                        const lines = buf.split('\n');
+                                        buf = lines.pop() || '';
+                                        for (const line of lines) {
+                                            if (!line.startsWith('data: ')) continue;
+                                            const raw = line.slice(6).trim();
+                                            if (!raw || raw === '[DONE]') continue;
+                                            try {
+                                                const json = JSON.parse(raw);
+                                                const text = json.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                                                if (text) res.write(text);
+                                            } catch { /* skip malformed */ }
+                                        }
+                                    }
+                                    res.end();
+                                    streamed = true;
+                                    break outer;
                                 }
-                                res.end();
-                                streamed = true;
-                                break;
                             }
 
                             if (!streamed) {
