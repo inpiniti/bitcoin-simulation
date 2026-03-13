@@ -893,6 +893,93 @@ export default defineConfig(({ mode }) => {
                             res.end(JSON.stringify({ error: 'Failed to spawn process: ' + e.message }));
                         }
                     });
+
+                    // Gemini AI 스트리밍 미들웨어 (Direct SSE + 모델 폴백)
+                    // configureServer 미들웨어는 proxy보다 먼저 실행됩니다.
+                    server.middlewares.use('/api/simple/gemini', async (req, res) => {
+                        res.setHeader('Access-Control-Allow-Origin', '*');
+                        res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
+                        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+                        if (req.method === 'OPTIONS') { res.statusCode = 200; res.end(); return; }
+                        if (req.method !== 'POST') { res.statusCode = 405; res.end(); return; }
+
+                        try {
+                            const buffers = [];
+                            for await (const chunk of req) buffers.push(chunk);
+                            const body = JSON.parse(Buffer.concat(buffers).toString());
+
+                            const apiKey = env.VITE_GEMINI_API_KEY;
+                            if (!apiKey) {
+                                res.statusCode = 500;
+                                res.end(JSON.stringify({ error: 'Gemini API Key missing' }));
+                                return;
+                            }
+
+                            const fetch = (await import('node-fetch')).default || global.fetch;
+                            const contents = body.contents || [];
+                            const genConfig = { maxOutputTokens: 2048, temperature: 0.7 };
+
+                            // 사용 가능한 모델을 순서대로 시도 (2026-03 기준 최신)
+                            const models = [
+                                'gemini-flash-lite-latest',   // → gemini-3.1-flash-lite-preview (무료 최적)
+                                'gemini-flash-latest',        // → gemini-3-flash-preview
+                                'gemini-3.1-flash-lite-preview',
+                                'gemini-3-flash-preview',
+                                'gemini-3.1-pro-preview',
+                            ];
+
+                            let streamed = false;
+                            for (const model of models) {
+                                const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`;
+                                const apiResponse = await fetch(url, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ contents, generationConfig: genConfig }),
+                                });
+
+                                if (!apiResponse.ok) {
+                                    console.log(`[Gemini] ${model} → ${apiResponse.status}, trying next...`);
+                                    continue;
+                                }
+
+                                console.log(`[Gemini] Streaming with model: ${model}`);
+                                res.statusCode = 200;
+                                res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+
+                                let buf = '';
+                                for await (const chunk of apiResponse.body) {
+                                    buf += chunk.toString();
+                                    const lines = buf.split('\n');
+                                    buf = lines.pop() || '';
+                                    for (const line of lines) {
+                                        if (!line.startsWith('data: ')) continue;
+                                        const raw = line.slice(6).trim();
+                                        if (!raw || raw === '[DONE]') continue;
+                                        try {
+                                            const json = JSON.parse(raw);
+                                            const text = json.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                                            if (text) res.write(text);
+                                        } catch { /* skip malformed */ }
+                                    }
+                                }
+                                res.end();
+                                streamed = true;
+                                break;
+                            }
+
+                            if (!streamed) {
+                                res.statusCode = 503;
+                                res.end('Gemini API 할당량 초과 또는 사용 가능한 모델 없음. 잠시 후 다시 시도해주세요.');
+                            }
+                        } catch (e) {
+                            console.error('[Gemini Stream Error]', e);
+                            if (!res.headersSent) {
+                                res.statusCode = 500;
+                                res.end(e.message);
+                            }
+                        }
+                    });
                 }
             }
         ],
@@ -987,12 +1074,7 @@ export default defineConfig(({ mode }) => {
                 '/api/simple/discussion': {
                     target: 'http://localhost:5173', // Placeholder or use actual logic
                 },
-                '/api/simple/gemini': {
-                    target: 'https://generativelanguage.googleapis.com',
-                    changeOrigin: true,
-                    secure: false,
-                    rewrite: (path) => path.replace(/^\/api\/simple\/gemini/, '/v1beta/models/gemini-3-flash-preview:generateContent'),
-                },
+                // '/api/simple/gemini' → configureServer 미들웨어에서 스트리밍 처리 (Vercel AI SDK)
                 '/api/simple/hf': {
                     target: 'https://router.huggingface.co',
                     changeOrigin: true,

@@ -148,27 +148,66 @@ async function handleForecast(req, res) {
     return res.status(200).json(await apiResponse.json());
 }
 
-// ==================== Gemini AI ====================
+// ==================== Gemini AI (Direct SSE Streaming + 모델 폴백) ====================
 async function handleGemini(req, res) {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
     const apiKey = process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
     if (!apiKey) return res.status(500).json({ error: 'Gemini API Key missing' });
 
-    const body = req.body;
-    const model = body.model || "gemini-3-flash-preview";
-    const targetUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    const contents = req.body?.contents || [];
+    const genConfig = { maxOutputTokens: 2048, temperature: 0.7 };
 
-    const apiResponse = await fetch(targetUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            contents: body.contents,
-            generationConfig: body.generationConfig || { temperature: 0.7, topK: 40, topP: 0.95, maxOutputTokens: 1024 }
-        })
-    });
+    const models = [
+        'gemini-flash-lite-latest',
+        'gemini-flash-latest',
+        'gemini-3.1-flash-lite-preview',
+        'gemini-3-flash-preview',
+        'gemini-3.1-pro-preview',
+    ];
 
-    if (!apiResponse.ok) return res.status(apiResponse.status).send(await apiResponse.text());
-    return res.status(200).json(await apiResponse.json());
+    let streamed = false;
+    for (const model of models) {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`;
+        const apiResponse = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ contents, generationConfig: genConfig }),
+        });
+
+        if (!apiResponse.ok) {
+            console.log(`[Gemini] ${model} → ${apiResponse.status}, trying next...`);
+            continue;
+        }
+
+        console.log(`[Gemini] Streaming with model: ${model}`);
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+
+        let buf = '';
+        for await (const chunk of apiResponse.body) {
+            buf += chunk.toString();
+            const lines = buf.split('\n');
+            buf = lines.pop() || '';
+            for (const line of lines) {
+                if (!line.startsWith('data: ')) continue;
+                const raw = line.slice(6).trim();
+                if (!raw || raw === '[DONE]') continue;
+                try {
+                    const json = JSON.parse(raw);
+                    const text = json.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                    if (text) res.write(text);
+                } catch { /* skip malformed */ }
+            }
+        }
+        res.end();
+        streamed = true;
+        break;
+    }
+
+    if (!streamed) {
+        res.statusCode = 503;
+        res.end('Gemini API 할당량 초과 또는 사용 가능한 모델 없음.');
+    }
 }
 
 // ==================== Hugging Face ====================
