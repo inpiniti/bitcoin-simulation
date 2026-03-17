@@ -16,8 +16,84 @@ import { KISAccountDialog } from "@/components/KISAccountDialog"
 import { KISOrderDialog } from "@/components/KISOrderDialog"
 import { GlobalAlertDialog } from "@/components/GlobalAlertDialog"
 import { AutoTradingDialog } from "@/components/AutoTradingDialog"
-import { Search, Clock } from "lucide-react"
+import { Search, Clock, Zap } from "lucide-react"
 import { getMinutesUntilClose } from "@/lib/marketTime"
+
+const BACKEND_URL = "https://younginpiniti-bitcoin-ai-backend.hf.space"
+const PING_INTERVAL_MS = 60_000 // 1분마다 상태 확인
+
+function ServerStatus() {
+    const [status, setStatus] = useState("checking") // "checking" | "online" | "offline" | "waking"
+
+    const checkStatus = async () => {
+        try {
+            const res = await fetch(`${BACKEND_URL}/`, { signal: AbortSignal.timeout(8000) })
+            setStatus(res.ok ? "online" : "offline")
+        } catch {
+            setStatus("offline")
+        }
+    }
+
+    const wakeServer = async () => {
+        setStatus("waking")
+        try {
+            await fetch(`${BACKEND_URL}/`, { signal: AbortSignal.timeout(30_000) })
+        } catch { /* ignore */ }
+        // 잠시 후 재확인
+        setTimeout(checkStatus, 3000)
+    }
+
+    useEffect(() => {
+        checkStatus()
+        const id = setInterval(checkStatus, PING_INTERVAL_MS)
+        return () => clearInterval(id)
+    }, [])
+
+    if (status === "checking") {
+        return (
+            <div className="flex items-center gap-1 text-[10px] text-[#666] bg-[#252526] px-1.5 py-0.5 rounded border border-[#3e3e42]">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#555] animate-pulse" />
+                <span>Server...</span>
+            </div>
+        )
+    }
+
+    if (status === "waking") {
+        return (
+            <div className="flex items-center gap-1 text-[10px] text-[#dac422] bg-[#3a3a2a] px-1.5 py-0.5 rounded border border-[#5a5a3a]">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#dac422] animate-pulse" />
+                <span>Waking...</span>
+            </div>
+        )
+    }
+
+    if (status === "online") {
+        return (
+            <div className="flex items-center gap-1 text-[10px] text-[#4ec9b0] bg-[#252526] px-1.5 py-0.5 rounded border border-[#3e3e42]">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#4ec9b0]" />
+                <span>Server ON</span>
+            </div>
+        )
+    }
+
+    // offline
+    return (
+        <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 text-[10px] text-[#f44747] bg-[#252526] px-1.5 py-0.5 rounded border border-[#3e3e42]">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#f44747]" />
+                <span>Server OFF</span>
+            </div>
+            <button
+                onClick={wakeServer}
+                className="flex items-center gap-0.5 text-[10px] text-[#dac422] bg-[#3a3a2a] px-1.5 py-0.5 rounded border border-[#5a5a3a] hover:bg-[#4a4a3a] transition-colors"
+                title="서버 깨우기"
+            >
+                <Zap className="w-2.5 h-2.5" />
+                <span>Wake</span>
+            </button>
+        </div>
+    )
+}
 
 function AutoTradeTimer({ executionTimeMinutes, isEnabled }) {
     const { reloginKIS } = useStore();
@@ -237,6 +313,8 @@ export function TitleBar() {
                         Min
                     </button>
                 </div>
+
+                <ServerStatus />
             </div>
 
             {/* Center: Stock Ticker Input */}
