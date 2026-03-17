@@ -56,6 +56,7 @@ export function AutomationSettingsPanel() {
         kis_appkey: '',
         kis_secret: '',
         sell_condition: 20,
+        sell_profit_condition: 20,
         buy_condition: 60,
         ai_model_key: '',
         ticker_group_key: 'superinvestor',
@@ -72,6 +73,7 @@ export function AutomationSettingsPanel() {
             kis_appkey: '',
             kis_secret: '',
             sell_condition: 20,
+            sell_profit_condition: 20,
             buy_condition: 60,
             ai_model_key: '',
             ticker_group_key: 'superinvestor',
@@ -92,7 +94,8 @@ export function AutomationSettingsPanel() {
                 kis_account: config.kis_account || '',
                 kis_appkey: config.kis_appkey || '',
                 kis_secret: config.kis_secret || '',
-                sell_condition: config.sell_condition || 20,
+                sell_condition: config.sell_condition ?? 20,
+                sell_profit_condition: config.sell_profit_condition ?? 20,
                 buy_condition: config.buy_condition || 60,
                 ai_model_key: config.ai_model_key || '',
                 ticker_group_key: config.ticker_group_key || 'superinvestor',
@@ -192,7 +195,12 @@ export function AutomationSettingsPanel() {
                                             </TableCell>
                                             <TableCell className="text-[#ce9178]">{config.ticker_group_key}</TableCell>
                                             <TableCell className="text-[#dcdcaa]">{config.buy_condition > 0 ? `확률 > ${config.buy_condition}%` : '-'}</TableCell>
-                                            <TableCell className="text-[#dcdcaa]">{config.sell_condition > 0 ? `수익 > ${config.sell_condition}%` : '-'}</TableCell>
+                                            <TableCell className="text-[#dcdcaa]">
+                                                <div className="flex flex-col gap-0.5 text-xs">
+                                                    <span>확률 ≤ {config.sell_condition ?? 20}%</span>
+                                                    <span>수익 ≥ {config.sell_profit_condition ?? 20}%</span>
+                                                </div>
+                                            </TableCell>
                                             <TableCell>
                                                 <Badge className={config.is_active ? 'bg-[#007acc] hover:bg-[#0062a3]' : 'bg-[#3c3c3c] text-[#858585] hover:bg-[#4a4a4a]'}>
                                                     {config.is_active ? 'ON' : 'OFF'}
@@ -329,29 +337,51 @@ export function AutomationSettingsPanel() {
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4 p-4 bg-[#1e1e1e] rounded-lg border border-[#3c3c3c]">
-                            <div className="space-y-2">
-                                <Label className="text-[#cccccc]">매수 조건 (확률 %)</Label>
-                                <div className="flex items-center gap-2">
-                                    <Input
-                                        className="bg-[#3c3c3c] border-[#555555] text-white"
-                                        type="number"
-                                        value={formData.buy_condition}
-                                        onChange={(e) => setFormData({ ...formData, buy_condition: Number(e.target.value) })}
-                                    />
-                                    <span className="text-sm text-[#858585]">% 이상</span>
+                        <div className="space-y-3 p-4 bg-[#1e1e1e] rounded-lg border border-[#3c3c3c]">
+                            <Label className="text-white text-base font-semibold">매매 조건</Label>
+                            <div className="grid grid-cols-2 gap-4">
+                                {/* 매수 조건 */}
+                                <div className="space-y-2">
+                                    <Label className="text-[#4ec9b0] text-sm">📈 매수 — 확률</Label>
+                                    <div className="flex items-center gap-2">
+                                        <Input
+                                            className="bg-[#3c3c3c] border-[#555555] text-white"
+                                            type="number"
+                                            value={formData.buy_condition}
+                                            onChange={(e) => setFormData({ ...formData, buy_condition: Number(e.target.value) })}
+                                        />
+                                        <span className="text-sm text-[#858585] whitespace-nowrap">% 이상</span>
+                                    </div>
                                 </div>
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="text-[#cccccc]">매도 조건 (수익률 %)</Label>
-                                <div className="flex items-center gap-2">
-                                    <Input
-                                        className="bg-[#3c3c3c] border-[#555555] text-white"
-                                        type="number"
-                                        value={formData.sell_condition}
-                                        onChange={(e) => setFormData({ ...formData, sell_condition: Number(e.target.value) })}
-                                    />
-                                    <span className="text-sm text-[#858585]">% 도달 시</span>
+
+                                {/* 매도 조건 — 확률 */}
+                                <div className="space-y-2">
+                                    <Label className="text-[#f14c4c] text-sm">📉 매도 — 확률 (OR)</Label>
+                                    <div className="flex items-center gap-2">
+                                        <Input
+                                            className="bg-[#3c3c3c] border-[#555555] text-white"
+                                            type="number"
+                                            value={formData.sell_condition}
+                                            onChange={(e) => setFormData({ ...formData, sell_condition: Number(e.target.value) })}
+                                        />
+                                        <span className="text-sm text-[#858585] whitespace-nowrap">% 이하</span>
+                                    </div>
+                                    <p className="text-xs text-[#666]">모델이 상승 확률을 이 값 이하로 보면 매도</p>
+                                </div>
+
+                                {/* 매도 조건 — 수익률 */}
+                                <div className="space-y-2 col-span-2">
+                                    <Label className="text-[#dac422] text-sm">💰 매도 — 익절 수익률 (OR)</Label>
+                                    <div className="flex items-center gap-2 max-w-[50%]">
+                                        <Input
+                                            className="bg-[#3c3c3c] border-[#555555] text-white"
+                                            type="number"
+                                            value={formData.sell_profit_condition}
+                                            onChange={(e) => setFormData({ ...formData, sell_profit_condition: Number(e.target.value) })}
+                                        />
+                                        <span className="text-sm text-[#858585] whitespace-nowrap">% 이상 수익 시 익절</span>
+                                    </div>
+                                    <p className="text-xs text-[#666]">확률과 무관하게 수익률이 이 값 이상이면 매도</p>
                                 </div>
                             </div>
                         </div>
