@@ -2,7 +2,7 @@
     "crons": [
         {
             "path": "/api/cron/auto-trade-dl",
-            "schedule": "0 19,20 * * 1-5"
+            "schedule": "0 19 * * 1-5"
         }
     ],
     "rewrites": [
