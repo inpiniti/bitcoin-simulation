@@ -58,6 +58,7 @@ export function AutomationSettingsPanel() {
         sell_condition: 20,
         sell_profit_condition: 20,
         buy_condition: 60,
+        prevent_loss_sell: false,
         ai_model_key: '',
         ticker_group_key: 'superinvestor',
         is_active: true,
@@ -75,6 +76,7 @@ export function AutomationSettingsPanel() {
             sell_condition: 20,
             sell_profit_condition: 20,
             buy_condition: 60,
+            prevent_loss_sell: false,
             ai_model_key: '',
             ticker_group_key: 'superinvestor',
             is_active: true,
@@ -97,6 +99,7 @@ export function AutomationSettingsPanel() {
                 sell_condition: config.sell_condition ?? 20,
                 sell_profit_condition: config.sell_profit_condition ?? 20,
                 buy_condition: config.buy_condition || 60,
+                prevent_loss_sell: !!config.prevent_loss_sell,
                 ai_model_key: config.ai_model_key || '',
                 ticker_group_key: config.ticker_group_key || 'superinvestor',
                 is_active: config.is_active !== false,
@@ -199,6 +202,7 @@ export function AutomationSettingsPanel() {
                                                 <div className="flex flex-col gap-0.5 text-xs">
                                                     <span>확률 ≤ {config.sell_condition ?? 20}%</span>
                                                     <span>수익 ≥ {config.sell_profit_condition ?? 20}%</span>
+                                                    {config.prevent_loss_sell && <span className="text-[#569cd6]">🛡️ 손실매도방지</span>}
                                                 </div>
                                             </TableCell>
                                             <TableCell>
@@ -383,6 +387,17 @@ export function AutomationSettingsPanel() {
                                     </div>
                                     <p className="text-xs text-[#666]">확률과 무관하게 수익률이 이 값 이상이면 매도</p>
                                 </div>
+                            </div>
+
+                            <div className="flex items-center justify-between pt-2 border-t border-[#3c3c3c]">
+                                <div className="space-y-0.5">
+                                    <Label className="text-[#569cd6] text-sm">🛡️ 손실 중 매도 방지</Label>
+                                    <p className="text-xs text-[#666]">현재가가 평균단가보다 낮으면 매도 신호가 와도 매도하지 않습니다.</p>
+                                </div>
+                                <Switch
+                                    checked={formData.prevent_loss_sell}
+                                    onCheckedChange={(val) => setFormData({ ...formData, prevent_loss_sell: val })}
+                                />
                             </div>
                         </div>
 
