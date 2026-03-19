@@ -215,6 +215,19 @@ export function FinancialQAPanel() {
         }
     }, [messages])
 
+    const isMarketRelatedQuestion = (text) => {
+        const keywords = [
+            '예측', '분석', '매수', '매도', 'rsi', '볼린저', '차트', '지표', '시그널',
+            '수익률', '백테스트', '현재가', '추세', '가격', '확률', '신호', '타이밍',
+            '기술적', '이동평균', '거래량', '낙폭', '과매수', '과매도', 'mdd',
+            'xgboost', '딥러닝', 'ai예측', '모델',
+            'predict', 'forecast', 'signal', 'indicator', 'technical',
+            'buy', 'sell', 'trend', 'bollinger', 'drawdown', 'volume',
+        ]
+        const lower = text.toLowerCase()
+        return keywords.some(k => lower.includes(k))
+    }
+
     const handleSend = async (text = input) => {
         if (!text.trim() || loading) return
 
@@ -225,15 +238,24 @@ export function FinancialQAPanel() {
 
         try {
             const hasMarketData = hist1d.length > 0
-            const prompt = `You are a professional financial advisor and quantitative analyst.
+            const needsMarketContext = hasMarketData && isMarketRelatedQuestion(text)
+
+            const prompt = needsMarketContext
+                ? `You are a professional financial advisor and quantitative analyst.
 The user is asking about the stock ticker: ${ticker}
 If the question is in Korean, answer in Korean.
 Use Markdown formatting (bolding, bullet points, or numbered lists) for readability.
-Keep the answer concise and informative.
-Answer based on both your training knowledge AND the real-time market data provided below.
-${hasMarketData ? 'When relevant, reference the actual data (price, indicators, AI predictions) in your answer.' : ''}
+Keep the answer concise and data-driven. Reference the actual numbers from the data below.
 
-${hasMarketData ? `REAL-TIME MARKET DATA (use this for data-driven analysis):\n${marketContext}` : '(No chart data loaded yet — answer from training knowledge only)'}
+REAL-TIME MARKET DATA:
+${marketContext}
+
+USER QUESTION: ${text}`
+                : `You are a professional financial advisor with broad knowledge of global companies and markets.
+If the question is in Korean, answer in Korean.
+Use Markdown formatting for readability. Keep the answer concise and informative.
+The user may be asking about the stock ticker: ${ticker}, but answer the question directly based on your knowledge.
+Do NOT force market data or prediction results into the answer unless specifically relevant.
 
 USER QUESTION: ${text}`
 
@@ -414,7 +436,7 @@ USER QUESTION: ${text}`
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
-                            placeholder="기업·차트·AI예측에 대해 물어보세요 (한글/영어 지원)"
+                            placeholder="무엇이든 물어보세요 — 예측/차트 질문은 데이터 기반, 일반 질문은 AI 직접 답변"
                             className="bg-[#1e1e1e] border-[#3c3c3c] text-[#cccccc] focus:ring-[#007acc]"
                             disabled={loading}
                         />
@@ -428,7 +450,7 @@ USER QUESTION: ${text}`
                         </Button>
                     </div>
                     <p className="text-[10px] text-[#666666] text-center">
-                        * 현재 로드된 차트 데이터, 기술지표, AI 예측 결과를 Gemini에 전달하여 분석합니다.
+                        * 예측·차트·지표 관련 질문은 로드된 데이터 기반으로, 그 외 일반 질문은 Gemini가 직접 답변합니다.
                     </p>
                 </div>
             </div>
