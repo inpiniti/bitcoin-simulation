@@ -382,7 +382,7 @@ export function AutomationSettingsPanel() {
                                                         </TableCell>
                                                     </TableRow>
                                                     {expandedLogId === log.id && (
-                                                        <TableRow className="border-[#3c3c3c] bg-[#1a1a1a]">
+                                                        <TableRow className="border-[#3c3c3c] bg-[#1a1a1a] hover:bg-[#1a1a1a]">
                                                             <TableCell colSpan={10} className="p-0">
                                                                 <div className="p-3 font-mono text-xs text-[#9cdcfe] space-y-0.5 max-h-64 overflow-y-auto">
                                                                     {log.error && (
