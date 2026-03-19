@@ -29,15 +29,20 @@ export default async function handler(req, res) {
 
     try {
         // ── code → token 교환 ──────────────────────────────
+        const tokenParams = {
+            grant_type: 'authorization_code',
+            client_id: restApiKey,
+            redirect_uri: redirectUri,
+            code,
+        };
+        // Client Secret 설정된 경우에만 추가
+        const clientSecret = process.env.KAKAO_CLIENT_SECRET;
+        if (clientSecret) tokenParams.client_secret = clientSecret;
+
         const tokenRes = await fetch('https://kauth.kakao.com/oauth/token', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({
-                grant_type: 'authorization_code',
-                client_id: restApiKey,
-                redirect_uri: redirectUri,
-                code,
-            }),
+            body: new URLSearchParams(tokenParams),
         });
 
         const tokenData = await tokenRes.json();
