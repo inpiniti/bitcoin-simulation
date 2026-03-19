@@ -12,7 +12,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Trash2, Edit, Save, RefreshCw, Eye, EyeOff, Bot, Database, ChevronDown, ChevronRight, ClipboardList } from 'lucide-react';
+import { Plus, Trash2, Edit, Save, RefreshCw, Eye, EyeOff, Bot, Database, ChevronDown, ChevronRight, ClipboardList, MessageCircle, CheckCircle2, XCircle } from 'lucide-react';
 import { DataSetInitDialog } from './DataSetInitDialog';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -52,6 +52,37 @@ export function AutomationSettingsPanel() {
     const [showSecret, setShowSecret] = useState(false);
     const [isDataSetDialogOpen, setIsDataSetDialogOpen] = useState(false);
     const [expandedLogId, setExpandedLogId] = useState(null);
+    const [kakaoConnected, setKakaoConnected] = useState(false);
+
+    // 카카오 OAuth 팝업 핸들러
+    const handleKakaoConnect = () => {
+        if (!editingId) return;
+        const restApiKey = import.meta.env.VITE_KAKAO_REST_API_KEY;
+        if (!restApiKey) return alert('VITE_KAKAO_REST_API_KEY 환경변수가 설정되지 않았습니다.');
+        const redirectUri = encodeURIComponent(`${window.location.origin}/api/kakao-callback`);
+        const url = `https://kauth.kakao.com/oauth/authorize?client_id=${restApiKey}&redirect_uri=${redirectUri}&response_type=code&scope=talk_message&state=${editingId}`;
+
+        const popup = window.open(url, 'kakao_oauth', 'width=500,height=650,scrollbars=yes');
+
+        // 팝업에서 postMessage 수신
+        const onMessage = (e) => {
+            if (e.data === 'kakao_connected') {
+                setKakaoConnected(true);
+                loadAutomationConfigs();
+                window.removeEventListener('message', onMessage);
+            }
+        };
+        window.addEventListener('message', onMessage);
+
+        // 팝업 닫힘 감지 (fallback)
+        const timer = setInterval(() => {
+            if (popup?.closed) {
+                clearInterval(timer);
+                window.removeEventListener('message', onMessage);
+                loadAutomationConfigs();
+            }
+        }, 500);
+    };
 
     // 미장 기준 실행 시간 옵션 (ET 기준, America/New_York 타임존으로 DST 자동 처리)
     const MARKET_TIME_OPTIONS = [
@@ -106,6 +137,7 @@ export function AutomationSettingsPanel() {
     const handleOpenDialog = (config = null) => {
         if (config) {
             setEditingId(config.id);
+            setKakaoConnected(!!config.kakao_access_token);
             setFormData({
                 name: config.name || '',
                 execution_time: config.execution_time || 'market_close_1h',
@@ -452,6 +484,44 @@ export function AutomationSettingsPanel() {
                                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                             />
                         </div>
+
+                        {/* 카카오톡 연동 */}
+                        <div className="flex items-center justify-between p-4 bg-[#1e1e1e] rounded-lg border border-[#3c3c3c]">
+                            <div className="space-y-0.5">
+                                <Label className="text-white text-base flex items-center gap-2">
+                                    <MessageCircle className="w-4 h-4 text-[#FAE100]" />
+                                    카카오톡 매매 리포트
+                                </Label>
+                                <p className="text-[#858585] text-xs">
+                                    매매 실행 후 본인 카카오톡으로 결과를 전송합니다.
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                {kakaoConnected ? (
+                                    <span className="flex items-center gap-1 text-[#4ec9b0] text-xs">
+                                        <CheckCircle2 className="w-4 h-4" /> 연동됨
+                                    </span>
+                                ) : (
+                                    <span className="flex items-center gap-1 text-[#858585] text-xs">
+                                        <XCircle className="w-4 h-4" /> 미연동
+                                    </span>
+                                )}
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    disabled={!editingId}
+                                    onClick={handleKakaoConnect}
+                                    className="bg-[#FAE100] hover:bg-[#f0d800] text-black border-none text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
+                                >
+                                    {kakaoConnected ? '재연동' : '카카오 연동'}
+                                </Button>
+                            </div>
+                        </div>
+                        {!editingId && (
+                            <p className="text-xs text-[#858585] -mt-2 ml-1">
+                                💡 카카오 연동은 저장 후 수정 시 가능합니다.
+                            </p>
+                        )}
 
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
