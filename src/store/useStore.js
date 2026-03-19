@@ -246,6 +246,29 @@ export const useStore = create(
                     }
                 })),
 
+                // auto_trade_dl_logs (Supabase)
+                autoTradeDlLogs: [],
+                loadingAutoTradeDlLogs: false,
+
+                fetchAutoTradeDlLogs: async () => {
+                    const supabase = getSupabaseClient();
+                    if (!supabase) return;
+                    set({ loadingAutoTradeDlLogs: true });
+                    try {
+                        const { data, error } = await supabase
+                            .from('auto_trade_dl_logs')
+                            .select('*')
+                            .order('created_at', { ascending: false })
+                            .limit(50);
+                        if (error) throw error;
+                        set({ autoTradeDlLogs: data || [] });
+                    } catch (e) {
+                        console.error('fetchAutoTradeDlLogs error:', e);
+                    } finally {
+                        set({ loadingAutoTradeDlLogs: false });
+                    }
+                },
+
                 setLastRunDate: (dateStr) => set(state => ({
                     autoTradeStatus: { ...state.autoTradeStatus, lastRunDate: dateStr }
                 })),

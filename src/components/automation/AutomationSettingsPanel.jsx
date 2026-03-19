@@ -11,7 +11,8 @@ import {
 } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Plus, Trash2, Edit, Save, RefreshCw, Eye, EyeOff, Bot, Database } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Plus, Trash2, Edit, Save, RefreshCw, Eye, EyeOff, Bot, Database, ChevronDown, ChevronRight, ClipboardList } from 'lucide-react';
 import { DataSetInitDialog } from './DataSetInitDialog';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -34,18 +35,23 @@ export function AutomationSettingsPanel() {
         deleteAutomationConfig,
         loadingAutomation,
         aiModels,
-        fetchAiModels
+        fetchAiModels,
+        autoTradeDlLogs,
+        loadingAutoTradeDlLogs,
+        fetchAutoTradeDlLogs,
     } = useStore();
 
     useEffect(() => {
         loadAutomationConfigs();
         fetchAiModels();
+        fetchAutoTradeDlLogs();
     }, []);
 
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [editingId, setEditingId] = useState(null);
     const [showSecret, setShowSecret] = useState(false);
     const [isDataSetDialogOpen, setIsDataSetDialogOpen] = useState(false);
+    const [expandedLogId, setExpandedLogId] = useState(null);
 
     // Form State
     const [formData, setFormData] = useState({
@@ -136,7 +142,7 @@ export function AutomationSettingsPanel() {
 
     return (
         <div className="h-full flex flex-col p-4 bg-[#1e1e1e] text-[#cccccc]">
-            <div className="flex justify-between items-center mb-6">
+            <div className="flex justify-between items-center mb-4">
                 <div>
                     <h2 className="text-2xl font-bold flex items-center gap-2 text-white">
                         <Bot className="w-6 h-6 text-[#007acc]" />
@@ -146,93 +152,217 @@ export function AutomationSettingsPanel() {
                         Git Action 봇이 실행할 매매 시나리오를 관리합니다. (Supabase 저장)
                     </p>
                 </div>
-                <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={() => loadAutomationConfigs()} disabled={loadingAutomation} className="bg-[#252526] border-[#3c3c3c] text-[#cccccc] hover:bg-[#3c3c3c] hover:text-white">
-                        <RefreshCw className={`w-4 h-4 mr-2 ${loadingAutomation ? 'animate-spin' : ''}`} />
-                        새로고침
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => setIsDataSetDialogOpen(true)} className="bg-[#252526] border-[#3c3c3c] text-[#4ec9b0] hover:bg-[#3c3c3c] hover:text-white">
-                        <Database className="w-4 h-4 mr-2" />
-                        미리 데이터 생성
-                    </Button>
-                    <Button onClick={() => handleOpenDialog()} className="bg-[#007acc] hover:bg-[#0062a3] text-white border-none">
-                        <Plus className="w-4 h-4 mr-2" />
-                        새 설정 추가
-                    </Button>
-                </div>
             </div>
 
-            <Card className="flex-1 flex flex-col bg-[#252526] border-[#3c3c3c]">
-                <CardHeader>
-                    <CardTitle className="text-white">시나리오 목록</CardTitle>
-                    <CardDescription className="text-[#858585]">등록된 자동 매매 설정 리스트입니다.</CardDescription>
-                </CardHeader>
-                <CardContent className="flex-1 p-0 overflow-hidden">
-                    <ScrollArea className="h-full">
-                        <Table>
-                            <TableHeader>
-                                <TableRow className="border-[#3c3c3c] hover:bg-transparent">
-                                    <TableHead className="text-[#858585]">이름</TableHead>
-                                    <TableHead className="text-[#858585]">실행 시간</TableHead>
-                                    <TableHead className="text-[#858585]">대상 그룹</TableHead>
-                                    <TableHead className="text-[#858585]">매수 조건</TableHead>
-                                    <TableHead className="text-[#858585]">매도 조건</TableHead>
-                                    <TableHead className="text-[#858585]">스케줄</TableHead>
-                                    <TableHead className="text-[#858585]">실제매매</TableHead>
-                                    <TableHead className="text-right text-[#858585]">관리</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {automationConfigList.length === 0 ? (
-                                    <TableRow className="border-[#3c3c3c]">
-                                        <TableCell colSpan={7} className="text-center py-8 text-[#858585]">
-                                            등록된 설정이 없습니다. '새 설정 추가' 버튼을 눌러보세요.
-                                        </TableCell>
-                                    </TableRow>
-                                ) : (
-                                    automationConfigList.map((config) => (
-                                        <TableRow key={config.id} className="border-[#3c3c3c] hover:bg-[#2a2a2a]">
-                                            <TableCell className="font-medium text-[#d4d4d4]">{config.name}</TableCell>
-                                            <TableCell>
-                                                <Badge variant="outline" className="border-[#4ec9b0] text-[#4ec9b0] bg-[#4ec9b0]/10">{config.execution_time}</Badge>
-                                            </TableCell>
-                                            <TableCell className="text-[#ce9178]">{config.ticker_group_key}</TableCell>
-                                            <TableCell className="text-[#dcdcaa]">{config.buy_condition > 0 ? `확률 > ${config.buy_condition}%` : '-'}</TableCell>
-                                            <TableCell className="text-[#dcdcaa]">
-                                                <div className="flex flex-col gap-0.5 text-xs">
-                                                    <span>확률 ≤ {config.sell_condition ?? 20}%</span>
-                                                    <span>수익 ≥ {config.sell_profit_condition ?? 20}%</span>
-                                                    {config.prevent_loss_sell && <span className="text-[#569cd6]">🛡️ 손실매도방지</span>}
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Badge className={config.is_active ? 'bg-[#007acc] hover:bg-[#0062a3]' : 'bg-[#3c3c3c] text-[#858585] hover:bg-[#4a4a4a]'}>
-                                                    {config.is_active ? 'ON' : 'OFF'}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Badge variant="outline" className={config.trade_enabled ? 'border-orange-500 text-orange-500 bg-orange-500/10' : 'border-[#3c3c3c] text-[#858585]'}>
-                                                    {config.trade_enabled ? '실제매매' : '모의매매'}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell className="text-right">
-                                                <div className="flex justify-end gap-2">
-                                                    <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(config)} className="hover:bg-[#3c3c3c]">
-                                                        <Edit className="w-4 h-4 text-[#569cd6]" />
-                                                    </Button>
-                                                    <Button variant="ghost" size="icon" onClick={() => handleDelete(config.id)} className="hover:bg-[#3c3c3c]">
-                                                        <Trash2 className="w-4 h-4 text-[#f14c4c]" />
-                                                    </Button>
-                                                </div>
-                                            </TableCell>
+            <Tabs defaultValue="settings" className="flex-1 flex flex-col min-h-0">
+                <TabsList className="bg-[#252526] border border-[#3c3c3c] mb-4 w-fit">
+                    <TabsTrigger value="settings" className="data-[state=active]:bg-[#007acc] data-[state=active]:text-white text-[#858585]">
+                        <Bot className="w-4 h-4 mr-2" />
+                        설정 관리
+                    </TabsTrigger>
+                    <TabsTrigger value="logs" className="data-[state=active]:bg-[#007acc] data-[state=active]:text-white text-[#858585]">
+                        <ClipboardList className="w-4 h-4 mr-2" />
+                        실행 로그
+                    </TabsTrigger>
+                </TabsList>
+
+                {/* ── 설정 탭 ── */}
+                <TabsContent value="settings" className="flex-1 flex flex-col min-h-0 mt-0">
+                    <div className="flex justify-end gap-2 mb-3">
+                        <Button variant="outline" size="sm" onClick={() => loadAutomationConfigs()} disabled={loadingAutomation} className="bg-[#252526] border-[#3c3c3c] text-[#cccccc] hover:bg-[#3c3c3c] hover:text-white">
+                            <RefreshCw className={`w-4 h-4 mr-2 ${loadingAutomation ? 'animate-spin' : ''}`} />
+                            새로고침
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => setIsDataSetDialogOpen(true)} className="bg-[#252526] border-[#3c3c3c] text-[#4ec9b0] hover:bg-[#3c3c3c] hover:text-white">
+                            <Database className="w-4 h-4 mr-2" />
+                            미리 데이터 생성
+                        </Button>
+                        <Button onClick={() => handleOpenDialog()} className="bg-[#007acc] hover:bg-[#0062a3] text-white border-none">
+                            <Plus className="w-4 h-4 mr-2" />
+                            새 설정 추가
+                        </Button>
+                    </div>
+
+                    <Card className="flex-1 flex flex-col bg-[#252526] border-[#3c3c3c] min-h-0">
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-white">시나리오 목록</CardTitle>
+                            <CardDescription className="text-[#858585]">등록된 자동 매매 설정 리스트입니다.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="flex-1 p-0 overflow-hidden">
+                            <ScrollArea className="h-full">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow className="border-[#3c3c3c] hover:bg-transparent">
+                                            <TableHead className="text-[#858585]">이름</TableHead>
+                                            <TableHead className="text-[#858585]">실행 시간</TableHead>
+                                            <TableHead className="text-[#858585]">대상 그룹</TableHead>
+                                            <TableHead className="text-[#858585]">매수 조건</TableHead>
+                                            <TableHead className="text-[#858585]">매도 조건</TableHead>
+                                            <TableHead className="text-[#858585]">스케줄</TableHead>
+                                            <TableHead className="text-[#858585]">실제매매</TableHead>
+                                            <TableHead className="text-right text-[#858585]">관리</TableHead>
                                         </TableRow>
-                                    ))
-                                )}
-                            </TableBody>
-                        </Table>
-                    </ScrollArea>
-                </CardContent>
-            </Card>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {automationConfigList.length === 0 ? (
+                                            <TableRow className="border-[#3c3c3c]">
+                                                <TableCell colSpan={7} className="text-center py-8 text-[#858585]">
+                                                    등록된 설정이 없습니다. '새 설정 추가' 버튼을 눌러보세요.
+                                                </TableCell>
+                                            </TableRow>
+                                        ) : (
+                                            automationConfigList.map((config) => (
+                                                <TableRow key={config.id} className="border-[#3c3c3c] hover:bg-[#2a2a2a]">
+                                                    <TableCell className="font-medium text-[#d4d4d4]">{config.name}</TableCell>
+                                                    <TableCell>
+                                                        <Badge variant="outline" className="border-[#4ec9b0] text-[#4ec9b0] bg-[#4ec9b0]/10">{config.execution_time}</Badge>
+                                                    </TableCell>
+                                                    <TableCell className="text-[#ce9178]">{config.ticker_group_key}</TableCell>
+                                                    <TableCell className="text-[#dcdcaa]">{config.buy_condition > 0 ? `확률 > ${config.buy_condition}%` : '-'}</TableCell>
+                                                    <TableCell className="text-[#dcdcaa]">
+                                                        <div className="flex flex-col gap-0.5 text-xs">
+                                                            <span>확률 ≤ {config.sell_condition ?? 20}%</span>
+                                                            <span>수익 ≥ {config.sell_profit_condition ?? 20}%</span>
+                                                            {config.prevent_loss_sell && <span className="text-[#569cd6]">🛡️ 손실매도방지</span>}
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Badge className={config.is_active ? 'bg-[#007acc] hover:bg-[#0062a3]' : 'bg-[#3c3c3c] text-[#858585] hover:bg-[#4a4a4a]'}>
+                                                            {config.is_active ? 'ON' : 'OFF'}
+                                                        </Badge>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Badge variant="outline" className={config.trade_enabled ? 'border-orange-500 text-orange-500 bg-orange-500/10' : 'border-[#3c3c3c] text-[#858585]'}>
+                                                            {config.trade_enabled ? '실제매매' : '모의매매'}
+                                                        </Badge>
+                                                    </TableCell>
+                                                    <TableCell className="text-right">
+                                                        <div className="flex justify-end gap-2">
+                                                            <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(config)} className="hover:bg-[#3c3c3c]">
+                                                                <Edit className="w-4 h-4 text-[#569cd6]" />
+                                                            </Button>
+                                                            <Button variant="ghost" size="icon" onClick={() => handleDelete(config.id)} className="hover:bg-[#3c3c3c]">
+                                                                <Trash2 className="w-4 h-4 text-[#f14c4c]" />
+                                                            </Button>
+                                                        </div>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </ScrollArea>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                {/* ── 실행 로그 탭 ── */}
+                <TabsContent value="logs" className="flex-1 flex flex-col min-h-0 mt-0">
+                    <div className="flex justify-end mb-3">
+                        <Button variant="outline" size="sm" onClick={() => fetchAutoTradeDlLogs()} disabled={loadingAutoTradeDlLogs} className="bg-[#252526] border-[#3c3c3c] text-[#cccccc] hover:bg-[#3c3c3c] hover:text-white">
+                            <RefreshCw className={`w-4 h-4 mr-2 ${loadingAutoTradeDlLogs ? 'animate-spin' : ''}`} />
+                            새로고침
+                        </Button>
+                    </div>
+
+                    <Card className="flex-1 flex flex-col bg-[#252526] border-[#3c3c3c] min-h-0">
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-white">실행 로그</CardTitle>
+                            <CardDescription className="text-[#858585]">최근 50건의 자동매매 실행 기록입니다. 행을 클릭하면 상세 로그를 확인할 수 있습니다.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="flex-1 p-0 overflow-hidden">
+                            <ScrollArea className="h-full">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow className="border-[#3c3c3c] hover:bg-transparent">
+                                            <TableHead className="text-[#858585] w-8"></TableHead>
+                                            <TableHead className="text-[#858585]">실행일시</TableHead>
+                                            <TableHead className="text-[#858585]">구분</TableHead>
+                                            <TableHead className="text-[#858585]">그룹</TableHead>
+                                            <TableHead className="text-[#858585]">보유</TableHead>
+                                            <TableHead className="text-[#858585]">매수신호</TableHead>
+                                            <TableHead className="text-[#858585]">매도신호</TableHead>
+                                            <TableHead className="text-[#858585]">매수주문</TableHead>
+                                            <TableHead className="text-[#858585]">매도주문</TableHead>
+                                            <TableHead className="text-[#858585]">상태</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {autoTradeDlLogs.length === 0 ? (
+                                            <TableRow className="border-[#3c3c3c]">
+                                                <TableCell colSpan={10} className="text-center py-8 text-[#858585]">
+                                                    {loadingAutoTradeDlLogs ? '로딩 중...' : '실행 로그가 없습니다.'}
+                                                </TableCell>
+                                            </TableRow>
+                                        ) : (
+                                            autoTradeDlLogs.map((log) => (
+                                                <React.Fragment key={log.id}>
+                                                    <TableRow
+                                                        className="border-[#3c3c3c] hover:bg-[#2a2a2a] cursor-pointer"
+                                                        onClick={() => setExpandedLogId(expandedLogId === log.id ? null : log.id)}
+                                                    >
+                                                        <TableCell className="text-[#858585]">
+                                                            {expandedLogId === log.id
+                                                                ? <ChevronDown className="w-4 h-4" />
+                                                                : <ChevronRight className="w-4 h-4" />}
+                                                        </TableCell>
+                                                        <TableCell className="text-[#d4d4d4] text-xs whitespace-nowrap">
+                                                            {new Date(log.created_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Badge variant="outline" className={log.is_test ? 'border-[#569cd6] text-[#569cd6]' : 'border-orange-500 text-orange-500'}>
+                                                                {log.is_test ? '테스트' : '실매매'}
+                                                            </Badge>
+                                                        </TableCell>
+                                                        <TableCell className="text-[#ce9178] text-xs">{log.target_group ?? '-'}</TableCell>
+                                                        <TableCell className="text-[#858585] text-center">{log.holdings_count ?? '-'}</TableCell>
+                                                        <TableCell className="text-center">
+                                                            <Badge className={log.buy_signals > 0 ? 'bg-[#4ec9b0]/20 text-[#4ec9b0] border-[#4ec9b0]' : 'bg-transparent text-[#555] border-[#3c3c3c]'} variant="outline">
+                                                                {log.buy_signals ?? 0}
+                                                            </Badge>
+                                                        </TableCell>
+                                                        <TableCell className="text-center">
+                                                            <Badge className={log.sell_signals > 0 ? 'bg-[#f14c4c]/20 text-[#f14c4c] border-[#f14c4c]' : 'bg-transparent text-[#555] border-[#3c3c3c]'} variant="outline">
+                                                                {log.sell_signals ?? 0}
+                                                            </Badge>
+                                                        </TableCell>
+                                                        <TableCell className="text-center text-[#4ec9b0] text-sm font-bold">{log.buy_orders ?? 0}</TableCell>
+                                                        <TableCell className="text-center text-[#f14c4c] text-sm font-bold">{log.sell_orders ?? 0}</TableCell>
+                                                        <TableCell>
+                                                            {log.error
+                                                                ? <Badge className="bg-[#f14c4c]/20 text-[#f14c4c] border-[#f14c4c]" variant="outline">오류</Badge>
+                                                                : <Badge className="bg-[#4ec9b0]/20 text-[#4ec9b0] border-[#4ec9b0]" variant="outline">완료</Badge>}
+                                                        </TableCell>
+                                                    </TableRow>
+                                                    {expandedLogId === log.id && (
+                                                        <TableRow className="border-[#3c3c3c] bg-[#1a1a1a]">
+                                                            <TableCell colSpan={10} className="p-0">
+                                                                <div className="p-3 font-mono text-xs text-[#9cdcfe] space-y-0.5 max-h-64 overflow-y-auto">
+                                                                    {log.error && (
+                                                                        <div className="text-[#f14c4c] mb-2">⚠️ 오류: {log.error}</div>
+                                                                    )}
+                                                                    {(log.logs ?? []).map((line, i) => (
+                                                                        <div key={i} className={
+                                                                            line.includes('BUY') ? 'text-[#4ec9b0]' :
+                                                                            line.includes('SELL') ? 'text-[#f14c4c]' :
+                                                                            line.includes('오류') || line.includes('실패') ? 'text-[#f14c4c]' :
+                                                                            'text-[#858585]'
+                                                                        }>{line}</div>
+                                                                    ))}
+                                                                </div>
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    )}
+                                                </React.Fragment>
+                                            ))
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </ScrollArea>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+            </Tabs>
 
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-[#252526] border-[#3c3c3c] text-[#cccccc]">
