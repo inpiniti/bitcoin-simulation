@@ -102,13 +102,53 @@
   color: #cccccc;
   background: transparent;
 }
+/* caption: 가운데 정렬, 양쪽 nav 버튼 */
 .rdp-market .rdp-month_caption {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: var(--rdp-nav-height);
+  position: relative;
+}
+.rdp-market .rdp-caption_label {
   color: #e1e1e1;
   font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  flex: 1;
+}
+.rdp-market .rdp-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: absolute;
+  inset: 0;
+  padding: 0 4px;
+  pointer-events: none;
+}
+.rdp-market .rdp-button_previous,
+.rdp-market .rdp-button_next {
+  pointer-events: all;
+  color: #9d9d9d;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+}
+.rdp-market .rdp-button_previous:hover,
+.rdp-market .rdp-button_next:hover {
+  background: #2d2d2d;
+  color: #e1e1e1;
 }
 .rdp-market .rdp-weekday {
   color: #666;
   font-size: 11px;
+  text-align: center;
 }
 .rdp-market .rdp-day_button {
   color: #cccccc;
@@ -129,15 +169,6 @@
 .rdp-market .rdp-disabled .rdp-day_button {
   text-decoration: line-through;
   color: #555;
-}
-.rdp-market button[class*="nav"] {
-  color: #9d9d9d;
-  background: transparent;
-  border: none;
-}
-.rdp-market button[class*="nav"]:hover {
-  background: #2d2d2d;
-  border-radius: 4px;
 }
 /* 공휴일 modifier */
 .rdp-market .rdp-holiday .rdp-day_button {

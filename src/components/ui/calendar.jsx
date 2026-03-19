@@ -9,6 +9,13 @@ function Calendar({ className, ...props }) {
     return (
         <DayPicker
             className={cn("rdp-market", className)}
+            navLayout="around"
+            formatters={{
+                formatCaption: (date) =>
+                    `${date.getFullYear()}년 ${date.getMonth() + 1}월`,
+                formatWeekdayName: (date) =>
+                    ['일', '월', '화', '수', '목', '금', '토'][date.getDay()],
+            }}
             components={{
                 Chevron: ({ orientation }) =>
                     orientation === "left"

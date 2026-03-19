@@ -11,7 +11,8 @@
       "Bash(rm \"c:/Users/USER/git/bitcoin-simulation/api/cron/[path].js\" \"c:/Users/USER/git/bitcoin-simulation/api/cron/auto-trade-dl.js\")",
       "Bash(rmdir \"c:/Users/USER/git/bitcoin-simulation/api/cron\")",
       "Bash(grep -E \"\\\\.css$\")",
-      "Bash(node -e \"const {DayPicker} = require\\(''c:/Users/USER/git/bitcoin-simulation/node_modules/react-day-picker/dist/cjs/index.js''\\); console.log\\(Object.keys\\(DayPicker\\)\\)\")"
+      "Bash(node -e \"const {DayPicker} = require\\(''c:/Users/USER/git/bitcoin-simulation/node_modules/react-day-picker/dist/cjs/index.js''\\); console.log\\(Object.keys\\(DayPicker\\)\\)\")",
+      "Bash(node -e \"const pkg = require\\(''c:/Users/USER/git/bitcoin-simulation/node_modules/react-day-picker/package.json''\\); console.log\\(pkg.exports ? Object.keys\\(pkg.exports\\) : ''no exports''\\)\")"
     ]
   }
 }
