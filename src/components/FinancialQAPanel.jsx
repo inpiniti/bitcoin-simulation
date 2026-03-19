@@ -216,16 +216,23 @@ export function FinancialQAPanel() {
     }, [messages])
 
     const isMarketRelatedQuestion = (text) => {
-        const keywords = [
-            '예측', '분석', '매수', '매도', 'rsi', '볼린저', '차트', '지표', '시그널',
-            '수익률', '백테스트', '현재가', '추세', '가격', '확률', '신호', '타이밍',
-            '기술적', '이동평균', '거래량', '낙폭', '과매수', '과매도', 'mdd',
-            'xgboost', '딥러닝', 'ai예측', '모델',
+        // 복합 키워드 (정확한 문자열 매칭)
+        const exactPhrases = [
+            'ai 예측', 'ai예측', 'xgboost', '딥러닝 모델', 'ai 모델', '예측 모델',
+            '매수 타이밍', '매도 타이밍', '이동평균', '볼린저 밴드', '볼린저밴드',
+        ]
+        // 단독 키워드 (짧아서 오매칭 위험 낮은 것만)
+        const singleKeywords = [
+            '예측', '매수', '매도', 'rsi', '볼린저', '차트', '지표', '시그널',
+            '수익률', '백테스트', '현재가', '기술적', '거래량', '낙폭',
+            '과매수', '과매도', 'mdd', 'xgboost', '딥러닝',
             'predict', 'forecast', 'signal', 'indicator', 'technical',
-            'buy', 'sell', 'trend', 'bollinger', 'drawdown', 'volume',
+            'bollinger', 'drawdown',
         ]
         const lower = text.toLowerCase()
-        return keywords.some(k => lower.includes(k))
+        if (exactPhrases.some(p => lower.includes(p))) return true
+        if (singleKeywords.some(k => lower.includes(k))) return true
+        return false
     }
 
     const handleSend = async (text = input) => {
@@ -251,11 +258,14 @@ REAL-TIME MARKET DATA:
 ${marketContext}
 
 USER QUESTION: ${text}`
-                : `You are a professional financial advisor with broad knowledge of global companies and markets.
+                : `You are a knowledgeable AI assistant with expertise in finance, business, and global companies.
 If the question is in Korean, answer in Korean.
 Use Markdown formatting for readability. Keep the answer concise and informative.
-The user may be asking about the stock ticker: ${ticker}, but answer the question directly based on your knowledge.
-Do NOT force market data or prediction results into the answer unless specifically relevant.
+
+IMPORTANT RULES:
+- Answer ONLY based on your training knowledge. Do NOT mention any real-time market data, chart data, RSI, moving averages, AI predictions, or technical indicators.
+- Do NOT say you cannot answer due to lack of market data. Just answer the question directly.
+- The current ticker context is ${ticker}, use it only if relevant to the question.
 
 USER QUESTION: ${text}`
 
