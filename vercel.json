@@ -59,6 +59,10 @@
         {
             "source": "/api/tradingview",
             "destination": "/api/simple/tradingview"
+        },
+        {
+            "source": "/api/reschedule",
+            "destination": "/api/simple/reschedule"
         }
     ]
 }

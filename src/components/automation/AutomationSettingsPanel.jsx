@@ -53,10 +53,21 @@ export function AutomationSettingsPanel() {
     const [isDataSetDialogOpen, setIsDataSetDialogOpen] = useState(false);
     const [expandedLogId, setExpandedLogId] = useState(null);
 
+    // 미장 기준 실행 시간 옵션 (ET 기준, America/New_York 타임존으로 DST 자동 처리)
+    const MARKET_TIME_OPTIONS = [
+        { value: 'market_open',      label: '🔔 장 시작 (09:30 ET)',         desc: '개장 직후' },
+        { value: 'market_open_30m',  label: '⏱ 장 시작 30분 후 (10:00 ET)', desc: '초기 변동성 안정 후' },
+        { value: 'market_open_1h',   label: '⏱ 장 시작 1시간 후 (10:30 ET)', desc: '추천: 트렌드 확인 후 매수' },
+        { value: 'market_close_2h',  label: '⏳ 장 마감 2시간 전 (14:00 ET)', desc: '여유있게 분석' },
+        { value: 'market_close_1h',  label: '⏳ 장 마감 1시간 전 (15:00 ET)', desc: '추천: 당일 매도/매수 기본값' },
+        { value: 'market_close_30m', label: '⚡ 장 마감 30분 전 (15:30 ET)',  desc: '마지막 기회' },
+        { value: 'market_close',     label: '🔕 장 마감 시 (16:00 ET)',       desc: '장 종료 직후' },
+    ];
+
     // Form State
     const [formData, setFormData] = useState({
         name: '',
-        execution_time: '09:00',
+        execution_time: 'market_close_1h',
         email: 'wjd0r@icloud.com',
         kis_account: '',
         kis_appkey: '',
@@ -74,7 +85,7 @@ export function AutomationSettingsPanel() {
     const resetForm = () => {
         setFormData({
             name: '',
-            execution_time: '09:00',
+            execution_time: 'market_close_1h',
             email: 'wjd0r@icloud.com',
             kis_account: '',
             kis_appkey: '',
@@ -97,7 +108,7 @@ export function AutomationSettingsPanel() {
             setEditingId(config.id);
             setFormData({
                 name: config.name || '',
-                execution_time: config.execution_time || '09:00',
+                execution_time: config.execution_time || 'market_close_1h',
                 email: config.email || 'wjd0r@icloud.com',
                 kis_account: config.kis_account || '',
                 kis_appkey: config.kis_appkey || '',
@@ -129,6 +140,8 @@ export function AutomationSettingsPanel() {
         if (result.success) {
             setIsDialogOpen(false);
             resetForm();
+            // 백엔드 스케줄 즉시 반영 (비동기, 실패해도 무시)
+            fetch('/api/reschedule', { method: 'POST' }).catch(() => {});
         } else {
             alert('저장 실패: ' + result.error);
         }
@@ -215,7 +228,9 @@ export function AutomationSettingsPanel() {
                                                 <TableRow key={config.id} className="border-[#3c3c3c] hover:bg-[#2a2a2a]">
                                                     <TableCell className="font-medium text-[#d4d4d4]">{config.name}</TableCell>
                                                     <TableCell>
-                                                        <Badge variant="outline" className="border-[#4ec9b0] text-[#4ec9b0] bg-[#4ec9b0]/10">{config.execution_time}</Badge>
+                                                        <Badge variant="outline" className="border-[#4ec9b0] text-[#4ec9b0] bg-[#4ec9b0]/10">
+                                                            {MARKET_TIME_OPTIONS.find(o => o.value === config.execution_time)?.label ?? config.execution_time}
+                                                        </Badge>
                                                     </TableCell>
                                                     <TableCell className="text-[#ce9178]">{config.ticker_group_key}</TableCell>
                                                     <TableCell className="text-[#dcdcaa]">{config.buy_condition > 0 ? `확률 > ${config.buy_condition}%` : '-'}</TableCell>
@@ -385,13 +400,24 @@ export function AutomationSettingsPanel() {
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label className="text-[#cccccc]">실행 시간 (Cron/Time)</Label>
-                                <Input
-                                    className="bg-[#3c3c3c] border-[#555555] text-white placeholder:text-[#666666]"
-                                    placeholder="09:00"
+                                <Label className="text-[#cccccc]">실행 시간 (미장 기준 ET · DST 자동)</Label>
+                                <Select
                                     value={formData.execution_time}
-                                    onChange={(e) => setFormData({ ...formData, execution_time: e.target.value })}
-                                />
+                                    onValueChange={(val) => setFormData({ ...formData, execution_time: val })}
+                                >
+                                    <SelectTrigger className="bg-[#3c3c3c] border-[#555555] text-white">
+                                        <SelectValue placeholder="실행 시간 선택" />
+                                    </SelectTrigger>
+                                    <SelectContent className="bg-[#252526] border-[#3c3c3c] text-[#cccccc]">
+                                        {MARKET_TIME_OPTIONS.map(opt => (
+                                            <SelectItem key={opt.value} value={opt.value}>
+                                                <span>{opt.label}</span>
+                                                <span className="ml-2 text-xs text-[#858585]">{opt.desc}</span>
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <p className="text-xs text-[#858585]">썸머타임(EDT)/겨울(EST) 모두 자동 처리됩니다.</p>
                             </div>
                         </div>
 

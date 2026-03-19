@@ -34,7 +34,7 @@ export default async function handler(req, res) {
     }
 
     // URL에서 서비스명 추출 (Vercel rewrite 및 직접 호출 대응)
-    const allowedServices = ['dataroma', 'forecast', 'gemini', 'hf', 'whale', 'cron', 'send', 'discussion', 'insertdataset', 'selectdataset', 'updatedataset', 'tradingview'];
+    const allowedServices = ['dataroma', 'forecast', 'gemini', 'hf', 'whale', 'cron', 'send', 'discussion', 'insertdataset', 'selectdataset', 'updatedataset', 'tradingview', 'reschedule'];
     const url = new URL(req.url, `http://${req.headers.host}`);
     const parts = url.pathname.toLowerCase().split('/').filter(Boolean);
 
@@ -73,6 +73,8 @@ export default async function handler(req, res) {
                 return await handleUpdateDataSet(req, res);
             case 'tradingview':
                 return await handleTradingView(req, res);
+            case 'reschedule':
+                return await handleReschedule(req, res);
 
             default:
                 return res.status(404).json({ error: `Unknown service: ${service}` });
@@ -446,6 +448,29 @@ async function handleTradingView(req, res) {
     } catch (e) {
         console.error('[TradingView Error]', e);
         return res.status(500).json({ error: e.message });
+    }
+}
+
+// ==================== Reschedule (백엔드 스케줄 재설정) ====================
+async function handleReschedule(req, res) {
+    if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
+
+    const backendUrl = process.env.BACKEND_URL || 'https://younginpiniti-bitcoin-ai-backend.hf.space';
+    const targetUrl = `${backendUrl}/auto-trade/reschedule`;
+
+    try {
+        const response = await fetch(targetUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Cron-Secret': process.env.CRON_SECRET || '',
+            },
+        });
+        const result = await response.json().catch(() => ({}));
+        return res.status(response.ok ? 200 : response.status).json(result);
+    } catch (error) {
+        console.error('[Reschedule] 백엔드 호출 실패:', error.message);
+        return res.status(500).json({ error: error.message });
     }
 }
 

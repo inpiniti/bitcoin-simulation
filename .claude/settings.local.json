@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "Bash(npm install:*)",
-      "Bash(cat /c/Users/USER/git/bitcoin-simulation/src/cron/*.js)"
+      "Bash(cat /c/Users/USER/git/bitcoin-simulation/src/cron/*.js)",
+      "Bash(npm list:*)",
+      "Bash(repomix --version)",
+      "Bash(repomix --output /c/Users/USER/.claude/repomix-frontend.txt --ignore \"node_modules,dist,.git,public\" /c/Users/USER/git/bitcoin-simulation)",
+      "Bash(repomix --output /c/Users/USER/.claude/repomix-backend.txt --ignore \"node_modules,dist,.git,__pycache__,*.pyc,temp\" /c/Users/USER/git/bitcoin-ai-backend)"
     ]
   }
 }
