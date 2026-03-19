@@ -41,22 +41,6 @@
             "destination": "/api/simple/whale"
         },
         {
-            "source": "/api/send",
-            "destination": "/api/simple/send"
-        },
-        {
-            "source": "/api/insertdataset",
-            "destination": "/api/simple/insertdataset"
-        },
-        {
-            "source": "/api/selectdataset",
-            "destination": "/api/simple/selectdataset"
-        },
-        {
-            "source": "/api/updatedataset",
-            "destination": "/api/simple/updatedataset"
-        },
-        {
             "source": "/api/tradingview",
             "destination": "/api/simple/tradingview"
         },

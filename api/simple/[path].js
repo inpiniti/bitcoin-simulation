@@ -12,7 +12,6 @@
  */
 
 import * as cheerio from 'cheerio';
-import nodemailer from 'nodemailer';
 import crypto from 'crypto';
 import { createClient } from '@supabase/supabase-js';
 
@@ -34,7 +33,7 @@ export default async function handler(req, res) {
     }
 
     // URL에서 서비스명 추출 (Vercel rewrite 및 직접 호출 대응)
-    const allowedServices = ['dataroma', 'forecast', 'gemini', 'hf', 'whale', 'cron', 'send', 'discussion', 'insertdataset', 'selectdataset', 'updatedataset', 'tradingview', 'reschedule'];
+    const allowedServices = ['dataroma', 'forecast', 'gemini', 'hf', 'whale', 'cron', 'discussion', 'insertdataset', 'selectdataset', 'tradingview', 'reschedule'];
     const url = new URL(req.url, `http://${req.headers.host}`);
     const parts = url.pathname.toLowerCase().split('/').filter(Boolean);
 
@@ -61,16 +60,12 @@ export default async function handler(req, res) {
                 return await handleWhale(req, res);
             case 'cron':
                 return await handleCron(req, res);
-            case 'send':
-                return await handleSend(req, res);
             case 'discussion':
                 return await handleDiscussion(req, res);
             case 'insertdataset':
                 return await handleInsertDataSet(req, res);
             case 'selectdataset':
                 return await handleSelectDataSet(req, res);
-            case 'updatedataset':
-                return await handleUpdateDataSet(req, res);
             case 'tradingview':
                 return await handleTradingView(req, res);
             case 'reschedule':
@@ -269,32 +264,6 @@ async function handleCron(req, res) {
         ]
     };
     return res.status(200).json(groupTickers[group] || []);
-}
-
-// ==================== Send (Email) ====================
-async function handleSend(req, res) {
-    const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM } = process.env;
-    if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) return res.status(500).json({ error: 'SMTP 설정 누락' });
-
-    try {
-        const transporter = nodemailer.createTransport({
-            host: SMTP_HOST,
-            port: Number(SMTP_PORT) || 465,
-            secure: Number(SMTP_PORT) === 465,
-            auth: { user: SMTP_USER, pass: SMTP_PASS },
-        });
-
-        const info = await transporter.sendMail({
-            from: SMTP_FROM || SMTP_USER,
-            to: req.body?.to || SMTP_USER,
-            subject: req.body?.subject || `Bitcoin Simulation Test Mail`,
-            html: req.body?.html || `<p>Tesla Simulation at ${new Date().toLocaleString()}</p>`,
-        });
-
-        return res.status(200).json({ success: true, messageId: info.messageId });
-    } catch (error) {
-        return res.status(500).json({ error: error.message });
-    }
 }
 
 // ==================== Discussion (통합 종목 토론) ====================
@@ -602,143 +571,6 @@ async function handleSelectDataSet(req, res) {
             data
         });
     } catch (e) {
-        return res.status(500).json({ error: e.message });
-    }
-}
-
-// ==================== UpdateDataSet (오늘 데이터 업데이트) ====================
-/**
- * TradingView에서 오늘의 시장 데이터를 일괄 조회한 뒤,
- * Supabase stock_dataset의 모든 등록 티커에 대해 오늘자 캔들을 추가합니다.
- * Git Action에서 장 종료 1시간 뒤에 호출하도록 설계되었습니다.
- */
-async function handleUpdateDataSet(req, res) {
-    if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
-
-    try {
-        // 1. Supabase에서 등록된 모든 티커 조회
-        const { data: datasets, error: selectError } = await supabase
-            .from('stock_dataset')
-            .select('id, ticker, candles, data_count');
-
-        if (selectError) throw selectError;
-        if (!datasets || datasets.length === 0) {
-            return res.status(200).json({ success: true, message: '등록된 DataSet이 없습니다.', updated: 0 });
-        }
-
-        const allTickers = datasets.map(d => d.ticker);
-        console.log(`[UpdateDataSet] 총 ${allTickers.length}개 티커 업데이트 시작...`);
-
-        // 2. TradingView에서 모든 종목 한방에 조회
-        const tvPayload = {
-            symbols: {
-                tickers: [
-                    ...allTickers.map(t => `NASDAQ:${t}`),
-                    ...allTickers.map(t => `NYSE:${t}`),
-                    ...allTickers.map(t => `AMEX:${t}`)
-                ]
-            },
-            columns: ['close', 'open', 'high', 'low', 'volume'],
-            options: { lang: 'en' },
-            range: [0, allTickers.length * 3]
-        };
-
-        const tvResponse = await fetch('https://scanner.tradingview.com/america/scan', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            },
-            body: JSON.stringify(tvPayload)
-        });
-
-        if (!tvResponse.ok) {
-            throw new Error(`TradingView 조회 실패: ${tvResponse.status}`);
-        }
-
-        const tvResult = await tvResponse.json();
-
-        // 티커별 오늘 데이터 매핑 (중복 제거)
-        const todayDataMap = new Map();
-        for (const item of (tvResult.data || [])) {
-            const [exchange, ticker] = item.s.split(':');
-            if (!todayDataMap.has(ticker)) {
-                todayDataMap.set(ticker, {
-                    close: item.d[0],
-                    open: item.d[1],
-                    high: item.d[2],
-                    low: item.d[3],
-                    volume: item.d[4]
-                });
-            }
-        }
-
-        console.log(`[UpdateDataSet] TradingView에서 ${todayDataMap.size}개 종목 데이터 수신`);
-
-        // 3. 각 DataSet에 오늘 데이터 추가 및 오래된 데이터 제거 (100일 유지)
-        const todayStr = new Date().toISOString().split('T')[0];
-        let updated = 0;
-        let skipped = 0;
-
-        for (const dataset of datasets) {
-            const todayData = todayDataMap.get(dataset.ticker);
-            if (!todayData || todayData.close == null) {
-                skipped++;
-                continue;
-            }
-
-            let candles = dataset.candles || [];
-
-            // 오늘 날짜 데이터가 이미 있으면 업데이트, 없으면 추가
-            const existingIdx = candles.findIndex(c => c.date === todayStr);
-            const newCandle = {
-                date: todayStr,
-                open: todayData.open,
-                high: todayData.high,
-                low: todayData.low,
-                close: todayData.close,
-                volume: todayData.volume
-            };
-
-            if (existingIdx >= 0) {
-                candles[existingIdx] = newCandle;
-            } else {
-                candles.push(newCandle);
-            }
-
-            // 날짜순 정렬 후 최근 100개만 유지
-            candles.sort((a, b) => a.date.localeCompare(b.date));
-            if (candles.length > 100) {
-                candles = candles.slice(-100);
-            }
-
-            const { error: updateError } = await supabase
-                .from('stock_dataset')
-                .update({
-                    candles,
-                    last_updated: new Date().toISOString(),
-                    data_count: candles.length
-                })
-                .eq('id', dataset.id);
-
-            if (!updateError) {
-                updated++;
-            } else {
-                console.warn(`[UpdateDataSet] ${dataset.ticker} 업데이트 실패:`, updateError.message);
-            }
-        }
-
-        console.log(`[UpdateDataSet] 완료 - 업데이트: ${updated}, 스킵: ${skipped}`);
-
-        return res.status(200).json({
-            success: true,
-            total: datasets.length,
-            updated,
-            skipped,
-            todayDate: todayStr
-        });
-    } catch (e) {
-        console.error('[UpdateDataSet Error]', e);
         return res.status(500).json({ error: e.message });
     }
 }

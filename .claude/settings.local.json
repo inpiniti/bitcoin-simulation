@@ -6,7 +6,10 @@
       "Bash(npm list:*)",
       "Bash(repomix --version)",
       "Bash(repomix --output /c/Users/USER/.claude/repomix-frontend.txt --ignore \"node_modules,dist,.git,public\" /c/Users/USER/git/bitcoin-simulation)",
-      "Bash(repomix --output /c/Users/USER/.claude/repomix-backend.txt --ignore \"node_modules,dist,.git,__pycache__,*.pyc,temp\" /c/Users/USER/git/bitcoin-ai-backend)"
+      "Bash(repomix --output /c/Users/USER/.claude/repomix-backend.txt --ignore \"node_modules,dist,.git,__pycache__,*.pyc,temp\" /c/Users/USER/git/bitcoin-ai-backend)",
+      "Bash(rm \"c:/Users/USER/git/bitcoin-simulation/.github/workflows/cron_automation.yml\" \"c:/Users/USER/git/bitcoin-simulation/.github/workflows/cron_email.yml\" \"c:/Users/USER/git/bitcoin-simulation/.github/workflows/cron_hourly_email.yml\" \"c:/Users/USER/git/bitcoin-simulation/.github/workflows/cron_update_dataset.yml\")",
+      "Bash(rm \"c:/Users/USER/git/bitcoin-simulation/api/cron/[path].js\" \"c:/Users/USER/git/bitcoin-simulation/api/cron/auto-trade-dl.js\")",
+      "Bash(rmdir \"c:/Users/USER/git/bitcoin-simulation/api/cron\")"
     ]
   }
 }
