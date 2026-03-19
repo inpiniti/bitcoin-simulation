@@ -452,6 +452,18 @@ export default defineConfig(({ mode }) => {
                             res.end(JSON.stringify({ error: e.message }));
                         }
                     });
+                    // NYSE 시장 휴장일
+                    server.middlewares.use('/api/market-holidays', async (req, res) => {
+                        try {
+                            const { default: handler } = await import('./api/market-holidays.js');
+                            await handler(req, res);
+                        } catch (e) {
+                            console.error('[market-holidays middleware]', e);
+                            res.statusCode = 500;
+                            res.end(JSON.stringify({ error: e.message }));
+                        }
+                    });
+
                     server.middlewares.use('/api/dataroma', async (req, res, next) => {
                         try {
                             const cheerio = await import('cheerio');

@@ -87,6 +87,64 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
+/* react-day-picker dark theme for market calendar */
+.rdp-market {
+  --rdp-accent-color: #0e639c;
+  --rdp-accent-background-color: #094771;
+  --rdp-day-height: 36px;
+  --rdp-day-width: 36px;
+  --rdp-day_button-height: 34px;
+  --rdp-day_button-width: 34px;
+  --rdp-today-color: #4ec9b0;
+  --rdp-outside-opacity: 0.3;
+  --rdp-disabled-opacity: 0.25;
+
+  color: #cccccc;
+  background: transparent;
+}
+.rdp-market .rdp-month_caption {
+  color: #e1e1e1;
+  font-size: 13px;
+}
+.rdp-market .rdp-weekday {
+  color: #666;
+  font-size: 11px;
+}
+.rdp-market .rdp-day_button {
+  color: #cccccc;
+  border-radius: 50%;
+  font-size: 12px;
+}
+.rdp-market .rdp-day_button:hover:not(:disabled) {
+  background: #2d2d2d;
+}
+.rdp-market .rdp-selected .rdp-day_button {
+  background: #0e639c;
+  color: white;
+}
+.rdp-market .rdp-today .rdp-day_button {
+  color: #4ec9b0;
+  font-weight: bold;
+}
+.rdp-market .rdp-disabled .rdp-day_button {
+  text-decoration: line-through;
+  color: #555;
+}
+.rdp-market button[class*="nav"] {
+  color: #9d9d9d;
+  background: transparent;
+  border: none;
+}
+.rdp-market button[class*="nav"]:hover {
+  background: #2d2d2d;
+  border-radius: 4px;
+}
+/* 공휴일 modifier */
+.rdp-market .rdp-holiday .rdp-day_button {
+  color: #f44747 !important;
+  font-weight: bold;
+}
+
 /* VS Code Style Scrollbar */
 ::-webkit-scrollbar {
   width: 10px;

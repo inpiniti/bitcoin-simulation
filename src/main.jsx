@@ -1,5 +1,6 @@
 import { createRoot } from 'react-dom/client'
 import './index.css'
+import 'react-day-picker/src/style.css'
 import App from './App.jsx'
 
 // 참고: React.StrictMode는 개발 모드에서 PerformanceMeasure를 대량 생성하여

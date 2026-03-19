@@ -9,7 +9,9 @@
       "Bash(repomix --output /c/Users/USER/.claude/repomix-backend.txt --ignore \"node_modules,dist,.git,__pycache__,*.pyc,temp\" /c/Users/USER/git/bitcoin-ai-backend)",
       "Bash(rm \"c:/Users/USER/git/bitcoin-simulation/.github/workflows/cron_automation.yml\" \"c:/Users/USER/git/bitcoin-simulation/.github/workflows/cron_email.yml\" \"c:/Users/USER/git/bitcoin-simulation/.github/workflows/cron_hourly_email.yml\" \"c:/Users/USER/git/bitcoin-simulation/.github/workflows/cron_update_dataset.yml\")",
       "Bash(rm \"c:/Users/USER/git/bitcoin-simulation/api/cron/[path].js\" \"c:/Users/USER/git/bitcoin-simulation/api/cron/auto-trade-dl.js\")",
-      "Bash(rmdir \"c:/Users/USER/git/bitcoin-simulation/api/cron\")"
+      "Bash(rmdir \"c:/Users/USER/git/bitcoin-simulation/api/cron\")",
+      "Bash(grep -E \"\\\\.css$\")",
+      "Bash(node -e \"const {DayPicker} = require\\(''c:/Users/USER/git/bitcoin-simulation/node_modules/react-day-picker/dist/cjs/index.js''\\); console.log\\(Object.keys\\(DayPicker\\)\\)\")"
     ]
   }
 }
