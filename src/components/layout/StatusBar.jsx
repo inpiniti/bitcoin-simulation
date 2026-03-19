@@ -1,9 +1,9 @@
 import { cn } from "@/lib/utils"
 import { useStore } from "@/store/useStore"
-import { GitBranch, Check, Loader2 } from "lucide-react"
+import { Loader2 } from "lucide-react"
 
 export function StatusBar() {
-    const { hist, loadingInterval, selectedResult, isAnalyzing, analysisProgress, mode, ticker, interval } = useStore()
+    const { hist, loadingInterval, selectedResult, isAnalyzing, analysisProgress, ticker, interval } = useStore()
 
     const dataCount = hist[interval]?.length || 0
     const isLoading = loadingInterval[interval] || loadingInterval['STOCK_BASE']
@@ -12,11 +12,6 @@ export function StatusBar() {
         <div className="h-6 bg-[#007acc] flex items-center px-2 text-white text-[11px] select-none">
             {/* Left */}
             <div className="flex items-center gap-3">
-                <div className="flex items-center gap-1">
-                    <GitBranch className="w-3 h-3" />
-                    main
-                </div>
-
                 {/* Data Loading Indicator */}
                 {isLoading && (
                     <div className="flex items-center gap-1">
@@ -34,20 +29,12 @@ export function StatusBar() {
                         </span>
                     </div>
                 )}
-
-                {!isLoading && !isAnalyzing && (
-                    <div className="flex items-center gap-1">
-                        <Check className="w-3 h-3" />
-                        준비됨
-                    </div>
-                )}
             </div>
 
             {/* Center */}
             <div className="flex-1 text-center">
                 <span>
-                    {mode === 'coin' ? 'BTC-KRW' : ticker} ({interval}) |
-                    데이터: <strong>{dataCount.toLocaleString()}</strong>개
+                    {ticker} ({interval}) | 데이터: <strong>{dataCount.toLocaleString()}</strong>개
                 </span>
             </div>
 
@@ -62,8 +49,7 @@ export function StatusBar() {
                         {selectedResult.summary?.totalProfit?.toLocaleString()}원
                     </span>
                 )}
-                <span>UTF-8</span>
-                <span>Bitcoin Simulation v2.0</span>
+                <span>주식 시뮬레이터 v2.0</span>
             </div>
         </div>
     )
