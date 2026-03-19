@@ -259,35 +259,10 @@ export function TitleBar() {
         <div className="h-[35px] bg-[#1e1e1e] flex items-center justify-between px-3 select-none border-b border-[#2b2b2b] shrink-0">
             {/* Left: App Title & Menu */}
             <div className="flex items-center gap-4">
-                <span className="text-[#007acc] font-bold text-[13px] flex items-center gap-1.5">
-                    <img src="/vite.svg" className="w-3.5 h-3.5" alt="Icon" />
-                    Bitcoin Sim v2.0
+                <span className="text-[#4ec9b0] font-bold text-[13px] flex items-center gap-1.5">
+                    <img src="/stock.svg" className="w-3.5 h-3.5" alt="Icon" />
+                    주식 시뮬 v2.0
                 </span>
-
-                <div className="flex bg-[#252526] rounded-md p-0.5 border border-[#3e3e42]">
-                    <button
-                        onClick={() => handleModeChange('coin')}
-                        className={cn(
-                            "px-2 py-0.5 text-[11px] rounded-sm transition-colors",
-                            mode === 'coin'
-                                ? "bg-[#f7931a] text-white font-medium shadow-sm"
-                                : "text-[#777777] hover:text-[#cccccc]"
-                        )}
-                    >
-                        Coin
-                    </button>
-                    <button
-                        onClick={() => handleModeChange('stock')}
-                        className={cn(
-                            "px-2 py-0.5 text-[11px] rounded-sm transition-colors",
-                            mode === 'stock'
-                                ? "bg-[#0e639c] text-white font-medium shadow-sm"
-                                : "text-[#777777] hover:text-[#cccccc]"
-                        )}
-                    >
-                        Stock
-                    </button>
-                </div>
 
                 <div className="flex bg-[#252526] rounded-md p-0.5 border border-[#3e3e42]">
                     <button
@@ -319,18 +294,13 @@ export function TitleBar() {
 
             {/* Center: Stock Ticker Input */}
             <div className="flex-1 flex justify-center items-center">
-                {mode === 'stock' && (
-                    <div className="flex items-center gap-2 relative">
-                        <span className="text-xs font-bold text-[#e1e1e1]">
-                            {useStore.getState().tickerNames[ticker]
-                                ? `${useStore.getState().tickerNames[ticker]} (${ticker})`
-                                : ticker}
-                        </span>
-                    </div>
-                )}
-                {mode === 'coin' && (
-                    <span className="text-xs text-[#6d6d6d]">KRW-BTC (Daily)</span>
-                )}
+                <div className="flex items-center gap-2 relative">
+                    <span className="text-xs font-bold text-[#e1e1e1]">
+                        {useStore.getState().tickerNames[ticker]
+                            ? `${useStore.getState().tickerNames[ticker]} (${ticker})`
+                            : ticker}
+                    </span>
+                </div>
             </div>
 
             {/* Right: Status & Window Controls */}
