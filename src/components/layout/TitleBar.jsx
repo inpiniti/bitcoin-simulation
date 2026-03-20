@@ -361,12 +361,6 @@ export function TitleBar() {
                     </button>
                 )}
 
-                {/* Window Controls (Mock) */}
-                <div className="flex items-center gap-4 text-[#7d7d7d]">
-                    <button className="hover:text-[#cccccc] text-xs">−</button>
-                    <button className="hover:text-[#cccccc] text-xs">□</button>
-                    <button className="hover:text-[#cccccc] hover:bg-red-600 px-2 text-xs">×</button>
-                </div>
             </div>
 
             {/* TitleBar Local Alert Dialog */}
