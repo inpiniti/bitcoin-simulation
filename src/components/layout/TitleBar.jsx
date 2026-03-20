@@ -1,6 +1,6 @@
 import { cn } from '@/lib/utils';
 import { useStore } from '@/store/useStore';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,13 +16,14 @@ import { KISAccountDialog } from '@/components/KISAccountDialog';
 import { KISOrderDialog } from '@/components/KISOrderDialog';
 import { GlobalAlertDialog } from '@/components/GlobalAlertDialog';
 import { AutoTradingDialog } from '@/components/AutoTradingDialog';
-import { Search, Clock, Zap, Menu } from 'lucide-react';
+import { Search, Clock, Zap, Menu, X, RotateCcw, ChevronDown, Terminal, Layers } from 'lucide-react';
 import { getMinutesUntilClose } from '@/lib/marketTime';
 import {
   ContextMenu,
   ContextMenuTrigger,
   ContextMenuContent,
   ContextMenuItem,
+  ContextMenuSeparator,
 } from '@/components/ui/context-menu';
 
 const BACKEND_URL =
@@ -30,8 +31,204 @@ const BACKEND_URL =
   'https://younginpiniti-bitcoin-ai-backend.hf.space';
 const PING_INTERVAL_MS = 60_000; // 1분마다 상태 확인
 
+// ── 로그 라인 컬러링 ─────────────────────────────────────
+function colorizeLog(text) {
+  if (!text) return { text: '', color: '#c9d1d9' };
+  const lower = text.toLowerCase();
+  if (lower.includes('error') || lower.includes('exception') || lower.includes('traceback') || lower.includes('failed'))
+    return { text, color: '#f85149' };
+  if (lower.includes('warning') || lower.includes('warn'))
+    return { text, color: '#e3b341' };
+  if (lower.includes('info') || lower.includes('started') || lower.includes('running') || lower.includes('success') || lower.includes('ok'))
+    return { text, color: '#3fb950' };
+  if (lower.includes('debug'))
+    return { text, color: '#8b949e' };
+  return { text, color: '#c9d1d9' };
+}
+
+// ── 서버 로그 터미널 패널 ──────────────────────────────────
+function ServerLogPanel({ logType, onClose }) {
+  const [lines, setLines] = useState([]);
+  const [status, setStatus] = useState('connecting'); // connecting | streaming | error | closed
+  const [autoScroll, setAutoScroll] = useState(true);
+  const [errorMsg, setErrorMsg] = useState('');
+  const bodyRef = useRef(null);
+  const esRef = useRef(null);
+  const lineCountRef = useRef(0);
+
+  const title = logType === 'run' ? '컨테이너 로그' : '빌드 로그';
+  const icon = logType === 'run' ? <Terminal className="w-3.5 h-3.5" /> : <Layers className="w-3.5 h-3.5" />;
+
+  const connect = useCallback(() => {
+    if (esRef.current) {
+      esRef.current.close();
+      esRef.current = null;
+    }
+    setLines([]);
+    lineCountRef.current = 0;
+    setStatus('connecting');
+    setErrorMsg('');
+
+    // Vite 프록시를 통해 SSE 연결
+    const es = new EventSource(`/api/hf-logs/${logType}`);
+    esRef.current = es;
+
+    es.onopen = () => setStatus('streaming');
+
+    es.onmessage = (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        if (data.error) {
+          setStatus('error');
+          setErrorMsg(data.error);
+          es.close();
+          return;
+        }
+        // HF log format: { timestamp, type, data } 또는 plain text
+        const raw = data.data ?? data.message ?? e.data;
+        if (!raw) return;
+        lineCountRef.current += 1;
+        setLines(prev => {
+          const next = [...prev, { id: lineCountRef.current, raw, ...colorizeLog(raw) }];
+          // 최대 2000 라인 유지
+          return next.length > 2000 ? next.slice(next.length - 2000) : next;
+        });
+      } catch {
+        // 파싱 실패 시 원문 그대로
+        lineCountRef.current += 1;
+        const raw = e.data;
+        setLines(prev => {
+          const next = [...prev, { id: lineCountRef.current, raw, ...colorizeLog(raw) }];
+          return next.length > 2000 ? next.slice(next.length - 2000) : next;
+        });
+      }
+    };
+
+    es.onerror = () => {
+      setStatus('error');
+      setErrorMsg('스트림 연결이 끊겼습니다.');
+      es.close();
+    };
+  }, [logType]);
+
+  useEffect(() => {
+    connect();
+    return () => {
+      esRef.current?.close();
+    };
+  }, [connect]);
+
+  // 자동 스크롤
+  useEffect(() => {
+    if (autoScroll && bodyRef.current) {
+      bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
+    }
+  }, [lines, autoScroll]);
+
+  const handleScroll = () => {
+    if (!bodyRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = bodyRef.current;
+    const isAtBottom = scrollHeight - scrollTop - clientHeight < 40;
+    setAutoScroll(isAtBottom);
+  };
+
+  const statusDot = {
+    connecting: <span className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse" />,
+    streaming: <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />,
+    error: <span className="w-2 h-2 rounded-full bg-red-400" />,
+    closed: <span className="w-2 h-2 rounded-full bg-gray-500" />,
+  }[status];
+
+  const statusText = {
+    connecting: '연결 중...',
+    streaming: `스트리밍 중 · ${lines.length}줄`,
+    error: `오류: ${errorMsg}`,
+    closed: '연결 종료',
+  }[status];
+
+  return (
+    <div
+      className="fixed bottom-0 left-0 right-0 z-50 flex flex-col"
+      style={{ height: '340px' }}
+    >
+      {/* 패널 헤더 */}
+      <div className="flex items-center justify-between px-3 py-1.5 bg-[#161b22] border-t border-[#30363d] shrink-0 select-none">
+        <div className="flex items-center gap-2 text-[12px] text-[#8b949e]">
+          <span className="flex items-center gap-1 text-[#c9d1d9] font-medium">
+            {icon}
+            {title}
+          </span>
+          <span className="w-px h-3 bg-[#30363d]" />
+          {statusDot}
+          <span className={status === 'error' ? 'text-red-400' : ''}>{statusText}</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setAutoScroll(v => !v)}
+            title="자동 스크롤"
+            className={cn(
+              'flex items-center gap-1 px-2 py-0.5 text-[10px] rounded border transition-colors',
+              autoScroll
+                ? 'border-[#388bfd] text-[#388bfd] bg-[#388bfd1a]'
+                : 'border-[#30363d] text-[#8b949e] hover:border-[#8b949e]'
+            )}
+          >
+            <ChevronDown className="w-3 h-3" />
+            Auto
+          </button>
+          <button
+            onClick={() => setLines([])}
+            title="지우기"
+            className="px-2 py-0.5 text-[10px] border border-[#30363d] text-[#8b949e] rounded hover:border-[#8b949e] transition-colors"
+          >
+            지우기
+          </button>
+          <button
+            onClick={connect}
+            title="재연결"
+            className="p-1 text-[#8b949e] hover:text-[#c9d1d9] transition-colors rounded hover:bg-[#21262d]"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={onClose}
+            title="닫기"
+            className="p-1 text-[#8b949e] hover:text-[#c9d1d9] transition-colors rounded hover:bg-[#21262d]"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+
+      {/* 로그 본문 */}
+      <div
+        ref={bodyRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto bg-[#0d1117] px-3 py-2 font-mono text-[11px] leading-5"
+        style={{ fontFamily: '"Cascadia Code", "Fira Code", Consolas, monospace' }}
+      >
+        {lines.length === 0 && status === 'connecting' && (
+          <div className="text-[#8b949e] animate-pulse">HuggingFace Space 로그 스트림에 연결 중...</div>
+        )}
+        {lines.map(line => (
+          <div key={line.id} style={{ color: line.color }}>
+            {line.raw}
+          </div>
+        ))}
+        {status === 'error' && (
+          <div className="mt-2 text-red-400">
+            ⚠ {errorMsg}
+            <button onClick={connect} className="ml-2 underline hover:no-underline">재연결</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ServerStatus() {
   const [status, setStatus] = useState('checking'); // "checking" | "online" | "offline" | "waking"
+  const [logPanel, setLogPanel] = useState(null); // null | 'run' | 'build'
 
   const checkStatus = async () => {
     try {
@@ -102,18 +299,36 @@ function ServerStatus() {
   })();
 
   return (
-    <ContextMenu>
-      <ContextMenuTrigger asChild>
-        <div>{badge}</div>
-      </ContextMenuTrigger>
-      <ContextMenuContent>
-        <ContextMenuItem
-          onSelect={() => window.open(`${BACKEND_URL}/redoc`, '_blank')}
-        >
-          서버 API 문서
-        </ContextMenuItem>
-      </ContextMenuContent>
-    </ContextMenu>
+    <>
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
+          <div>{badge}</div>
+        </ContextMenuTrigger>
+        <ContextMenuContent>
+          <ContextMenuItem
+            onSelect={() => window.open(`${BACKEND_URL}/redoc`, '_blank')}
+          >
+            서버 API 문서
+          </ContextMenuItem>
+          <ContextMenuSeparator />
+          <ContextMenuItem onSelect={() => setLogPanel('run')}>
+            <Terminal className="w-3.5 h-3.5 mr-2 text-green-400" />
+            컨테이너 로그
+          </ContextMenuItem>
+          <ContextMenuItem onSelect={() => setLogPanel('build')}>
+            <Layers className="w-3.5 h-3.5 mr-2 text-blue-400" />
+            빌드 로그
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
+
+      {logPanel && (
+        <ServerLogPanel
+          logType={logPanel}
+          onClose={() => setLogPanel(null)}
+        />
+      )}
+    </>
   );
 }
 

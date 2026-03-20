@@ -658,6 +658,68 @@ export default defineConfig(({ mode }) => {
                     });
 
 
+                    // HuggingFace Space 로그 SSE 프록시 (빌드/컨테이너 로그)
+                    server.middlewares.use('/api/hf-logs', async (req, res) => {
+                        const urlObj = new URL(req.originalUrl || req.url, `http://${req.headers.host}`);
+                        // /api/hf-logs/run  → container logs
+                        // /api/hf-logs/build → build logs
+                        const logType = urlObj.pathname.split('/').pop(); // 'run' | 'build'
+                        if (!['run', 'build'].includes(logType)) {
+                            res.statusCode = 400;
+                            res.end(JSON.stringify({ error: 'logType must be run or build' }));
+                            return;
+                        }
+
+                        const token = env.VITE_HF_TOKEN || env.HF_TOKEN;
+                        if (!token) {
+                            res.statusCode = 401;
+                            res.end(JSON.stringify({ error: 'HF_TOKEN not configured' }));
+                            return;
+                        }
+
+                        const HF_SPACE = env.VITE_HF_SPACE || 'younginpiniti/bitcoin-ai-backend';
+                        const targetUrl = `https://huggingface.co/api/spaces/${HF_SPACE}/logs/${logType}`;
+
+                        res.setHeader('Content-Type', 'text/event-stream');
+                        res.setHeader('Cache-Control', 'no-cache');
+                        res.setHeader('Connection', 'keep-alive');
+                        res.setHeader('Access-Control-Allow-Origin', '*');
+
+                        try {
+                            const fetch = (await import('node-fetch')).default || global.fetch;
+                            const upstream = await fetch(targetUrl, {
+                                headers: {
+                                    'Authorization': `Bearer ${token}`,
+                                    'Accept': 'text/event-stream',
+                                    'User-Agent': 'Mozilla/5.0',
+                                },
+                            });
+
+                            if (!upstream.ok) {
+                                res.statusCode = upstream.status;
+                                res.end(`data: {"error":"HF API error: ${upstream.status} ${upstream.statusText}"}\n\n`);
+                                return;
+                            }
+
+                            // 클라이언트 연결 끊길 때 upstream도 중단
+                            req.on('close', () => {
+                                upstream.body?.destroy?.();
+                            });
+
+                            // SSE 스트림 그대로 전달
+                            for await (const chunk of upstream.body) {
+                                if (res.writableEnded) break;
+                                res.write(chunk);
+                            }
+                            res.end();
+                        } catch (e) {
+                            console.error('[HF-Logs Proxy] Error:', e.message);
+                            if (!res.writableEnded) {
+                                res.end(`data: {"error":"${e.message}"}\n\n`);
+                            }
+                        }
+                    });
+
                     // Gemini API Proxy (Local Dev)
                     server.middlewares.use('/api/gemini', async (req, res, next) => {
                         res.setHeader('Access-Control-Allow-Origin', '*');
