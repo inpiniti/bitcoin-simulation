@@ -218,7 +218,7 @@ function ServerLogPanel({ logType, onClose }) {
       <div
         ref={bodyRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto bg-[#0d1117] px-3 py-2 font-mono text-[11px] leading-5"
+        className="flex-1 overflow-y-auto bg-[#0d1117] px-3 py-2 font-mono text-[11px] leading-5 select-text cursor-text"
         style={{ fontFamily: '"Cascadia Code", "Fira Code", Consolas, monospace' }}
       >
         {lines.length === 0 && status === 'connecting' && (
