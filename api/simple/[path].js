@@ -134,7 +134,7 @@ async function handleForecast(req, res) {
     const { symbol, interval = 'day' } = req.body;
     if (!symbol) return res.status(400).json({ error: 'Symbol is required' });
 
-    const targetUrl = 'https://younginpiniti-bitcoin-ai-backend.hf.space/v1/forecast';
+    const targetUrl = `${process.env.BACKEND_URL || 'https://younginpiniti-bitcoin-ai-backend.hf.space'}/v1/forecast`;
     const apiResponse = await fetch(targetUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json", "User-Agent": "Motia/1.0" },
@@ -237,7 +237,7 @@ async function handleWhale(req, res) {
     const { symbol, interval = 'day' } = req.body;
     if (!symbol) return res.status(400).json({ error: 'Symbol is required' });
 
-    const targetUrl = 'https://younginpiniti-bitcoin-ai-backend.hf.space/v1/whale';
+    const targetUrl = `${process.env.BACKEND_URL || 'https://younginpiniti-bitcoin-ai-backend.hf.space'}/v1/whale`;
     const apiResponse = await fetch(targetUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json", "User-Agent": "Motia/1.0" },

@@ -878,7 +878,7 @@ export default defineConfig(({ mode }) => {
                             // 경로 추출 (예: /api/xgb/train -> /v1/xgb/train)
                             const urlObj = new URL(req.originalUrl || req.url, `http://${req.headers.host}`);
                             const subPath = urlObj.pathname.replace(/^\/api\/xgb/, '');
-                            const targetUrl = `https://younginpiniti-bitcoin-ai-backend.hf.space/v1/xgb${subPath}`;
+                            const targetUrl = `${process.env.BACKEND_URL || 'https://younginpiniti-bitcoin-ai-backend.hf.space'}/v1/xgb${subPath}`;
 
                             console.log('[XGB Middleware] Forwarding to:', targetUrl);
                             console.log('[XGB Middleware] Body size:', bodyStr.length, 'bytes');
@@ -1079,7 +1079,7 @@ export default defineConfig(({ mode }) => {
                     },
                 },
                 '/api/simple/forecast': {
-                    target: 'https://younginpiniti-bitcoin-ai-backend.hf.space',
+                    target: process.env.BACKEND_URL || 'https://younginpiniti-bitcoin-ai-backend.hf.space',
                     changeOrigin: true,
                     secure: false,
                     rewrite: (path) => path.replace(/^\/api\/simple\/forecast/, '/v1/forecast'),
@@ -1106,7 +1106,7 @@ export default defineConfig(({ mode }) => {
                     rewrite: (path) => path.replace(/^\/api\/simple\/hf/, '/hf-inference/models/ProsusAI/finbert'),
                 },
                 '/api/simple/whale': {
-                    target: 'https://younginpiniti-bitcoin-ai-backend.hf.space',
+                    target: process.env.BACKEND_URL || 'https://younginpiniti-bitcoin-ai-backend.hf.space',
                     changeOrigin: true,
                     secure: false,
                     rewrite: (path) => path.replace(/^\/api\/simple\/whale/, '/v1/whale'),

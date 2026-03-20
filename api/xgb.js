@@ -25,7 +25,7 @@ export default async function handler(req, res) {
         if (targetPath === '') targetPath = ''; // 루트 경로 처리
 
         // 타겟 URL 설정 (Hugging Face Backend)
-        const baseUrl = 'https://younginpiniti-bitcoin-ai-backend.hf.space/v1/xgb';
+        const baseUrl = `${process.env.BACKEND_URL || 'https://younginpiniti-bitcoin-ai-backend.hf.space'}/v1/xgb`;
         const targetUrl = targetPath ? `${baseUrl}/${targetPath}${queryString}` : `${baseUrl}${queryString}`;
 
         console.log(`[XGB Proxy] ${req.method} ${fullUrl} -> ${targetUrl}`);
