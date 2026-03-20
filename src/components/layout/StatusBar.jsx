@@ -105,6 +105,105 @@ function useMarketStatus() {
     return status
 }
 
+// ─── 한투 API 발급 가이드 팝오버 ─────────────────────────────────────────────
+const KIS_STEPS = [
+    {
+        step: 1,
+        title: '계좌 개설',
+        desc: '한국투자증권 계좌가 없다면 먼저 개설해야 합니다.',
+        detail: '스마트폰 앱(한국투자증권)으로 비대면 계좌개설이 가능합니다. 신분증 촬영만으로 빠르게 개설할 수 있습니다.',
+    },
+    {
+        step: 2,
+        title: 'ID 등록 및 연결',
+        desc: 'KIS Developers에 한국투자증권 계좌와 ID를 연결합니다.',
+        detail: '홈페이지 또는 MTS(모바일 트레이딩 시스템) 앱에서 ID 등록을 진행합니다. 이미 계좌와 ID가 연결되어 있다면 이 단계는 건너뛸 수 있습니다.',
+    },
+    {
+        step: 3,
+        title: '오픈API 서비스 신청',
+        desc: '한국투자증권 홈페이지 또는 MTS 앱에서 오픈API 서비스를 신청합니다.',
+        detail: '신청 완료 시 KIS Developers ID가 생성되고, 임시 비밀번호가 알림톡으로 발송됩니다.',
+    },
+    {
+        step: 4,
+        title: 'APP Key / APP Secret 발급',
+        desc: 'KIS Developers에 로그인하여 API 키를 발급받습니다.',
+        detail: 'APP Key와 APP Secret은 API 호출에 필요한 개인 고유 토큰입니다. 발급 후 외부에 노출되지 않도록 주의하세요.',
+    },
+    {
+        step: 5,
+        title: '계좌번호 확인 후 설정 입력',
+        desc: '발급받은 APP Key, APP Secret, 계좌번호를 이 앱의 설정에 입력합니다.',
+        detail: '설정이 올바르게 입력되면 실시간 연결이 활성화됩니다.',
+    },
+]
+
+function KisApiGuide({ children }) {
+    const [open, setOpen] = useState(false)
+    const [expanded, setExpanded] = useState(null)
+
+    return (
+        <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+                {children}
+            </PopoverTrigger>
+            <PopoverContent
+                align="start"
+                side="top"
+                sideOffset={6}
+                className="w-[360px] p-0 bg-[#1e1e1e] border border-[#3e3e42] shadow-xl"
+            >
+                {/* 헤더 */}
+                <div className="px-4 py-3 border-b border-[#3e3e42]">
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold text-white">한국투자증권 오픈API 설정 가이드</span>
+                    </div>
+                    <p className="text-[11px] text-[#9d9d9d] mt-1">
+                        실시간 연결을 위해 APP Key / APP Secret이 필요합니다.
+                    </p>
+                </div>
+
+                {/* 스텝 목록 */}
+                <div className="py-2">
+                    {KIS_STEPS.map((s) => (
+                        <div key={s.step}>
+                            <button
+                                className="w-full flex items-start gap-3 px-4 py-2.5 hover:bg-white/5 transition-colors text-left"
+                                onClick={() => setExpanded(expanded === s.step ? null : s.step)}
+                            >
+                                {/* 스텝 번호 */}
+                                <span className="mt-0.5 w-5 h-5 rounded-full bg-[#007acc] flex items-center justify-center text-[10px] font-bold text-white shrink-0">
+                                    {s.step}
+                                </span>
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <span className="text-[12px] font-medium text-white">{s.title}</span>
+                                        <span className="text-[#555] text-[10px]">{expanded === s.step ? '▲' : '▼'}</span>
+                                    </div>
+                                    <p className="text-[11px] text-[#9d9d9d] mt-0.5 leading-relaxed">{s.desc}</p>
+                                    {expanded === s.step && (
+                                        <p className="text-[11px] text-[#4ec9b0] mt-1.5 leading-relaxed border-l-2 border-[#007acc] pl-2">
+                                            {s.detail}
+                                        </p>
+                                    )}
+                                </div>
+                            </button>
+                        </div>
+                    ))}
+                </div>
+
+                {/* 푸터 */}
+                <div className="px-4 py-2.5 border-t border-[#3e3e42] bg-[#252526]">
+                    <p className="text-[10px] text-[#666]">
+                        KIS Developers 공식 사이트에서 자세한 내용을 확인할 수 있습니다.
+                    </p>
+                </div>
+            </PopoverContent>
+        </Popover>
+    )
+}
+
 // ─── 시장 캘린더 팝오버 ───────────────────────────────────────────────────────
 function MarketCalendar({ children }) {
     const today = new Date()
@@ -205,7 +304,14 @@ export function StatusBar() {
                 {wsStatus?.connected ? (
                     <span className="text-[#4ec9b0]">⚡ 실시간</span>
                 ) : (
-                    <span className="text-[#bbb]">⚡ 오프라인</span>
+                    <KisApiGuide>
+                        <button
+                            className="flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-white/10 transition-colors cursor-pointer text-[#bbb]"
+                            title="API 설정 가이드 보기"
+                        >
+                            ⚡ 오프라인
+                        </button>
+                    </KisApiGuide>
                 )}
 
                 {/* 자동 매매 */}
