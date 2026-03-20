@@ -585,9 +585,9 @@ export function DeepLearningPanel() {
         setServerTrainResult(null)
         setServerTrainError(null)
 
-        // WebSocket 연결 (vite proxy: /api/ws → backend /ws)
-        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-        const wsUrl = `${wsProtocol}//${window.location.host}/api/ws/train`
+        // HuggingFace 백엔드에 직접 WebSocket 연결 (Vercel 프록시 미경유)
+        const backendUrl = import.meta.env.VITE_BACKEND_URL || 'https://younginpiniti-bitcoin-ai-backend.hf.space'
+        const wsUrl = backendUrl.replace(/^https/, 'wss').replace(/^http/, 'ws') + '/ws/train'
         const ws = new WebSocket(wsUrl)
         wsRef.current = ws
 
