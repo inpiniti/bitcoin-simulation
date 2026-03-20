@@ -16,7 +16,7 @@ import { KISAccountDialog } from '@/components/KISAccountDialog';
 import { KISOrderDialog } from '@/components/KISOrderDialog';
 import { GlobalAlertDialog } from '@/components/GlobalAlertDialog';
 import { AutoTradingDialog } from '@/components/AutoTradingDialog';
-import { Search, Clock, Zap } from 'lucide-react';
+import { Search, Clock, Zap, Menu } from 'lucide-react';
 import { getMinutesUntilClose } from '@/lib/marketTime';
 import {
   ContextMenu,
@@ -110,7 +110,7 @@ function ServerStatus() {
         <ContextMenuItem
           onSelect={() => window.open(`${BACKEND_URL}/redoc`, '_blank')}
         >
-          서버 page 이동 →
+          서버 API 문서
         </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>
@@ -205,6 +205,7 @@ export function TitleBar() {
     reloginKIS,
     interval,
     setInterval,
+    toggleSidebar,
   } = useStore();
   const [localTicker, setLocalTicker] = useState(ticker);
   const [filterText, setFilterText] = useState(''); // 드롭다운 필터용 (포커스 시 리셋)
@@ -297,6 +298,14 @@ export function TitleBar() {
     <div className="h-[35px] bg-[#1e1e1e] flex items-center justify-between px-3 select-none border-b border-[#2b2b2b] shrink-0">
       {/* Left: App Title & Menu */}
       <div className="flex items-center gap-4">
+        <button
+          onClick={toggleSidebar}
+          className="p-1 rounded text-[#9d9d9d] hover:text-white hover:bg-[#2d2d2d] transition-colors"
+          title="사이드바 토글"
+        >
+          <Menu className="w-4 h-4" />
+        </button>
+
         <span className="text-[#4ec9b0] font-bold text-[13px] flex items-center gap-1.5">
           <img src="/stock.svg" className="w-3.5 h-3.5" alt="Icon" />
           주식 시뮬 v2.0

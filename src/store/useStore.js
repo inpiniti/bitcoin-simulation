@@ -1312,6 +1312,10 @@ export const useStore = create(
                     }
                 },
 
+                // Sidebar visibility
+                sidebarOpen: true,
+                toggleSidebar: () => set(state => ({ sidebarOpen: !state.sidebarOpen })),
+
                 // Ticker Tab Management
                 activeTickers: [], // ['AAPL', 'TSLA', ...]
                 tickerNames: {}, // { 'AAPL': 'Apple Inc.', ... }
