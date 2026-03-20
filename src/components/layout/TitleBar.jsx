@@ -254,7 +254,9 @@ function ServerStatus() {
       const res = await fetch(`${BACKEND_URL}/`, {
         signal: AbortSignal.timeout(8000),
       });
-      setStatus(res.ok ? 'online' : 'offline');
+      if (!res.ok) { setStatus('offline'); return; }
+      const data = await res.json().catch(() => null);
+      setStatus(data?.status === 'ok' ? 'online' : 'offline');
     } catch {
       setStatus('offline');
     }
