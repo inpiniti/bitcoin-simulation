@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Loader2 } from "lucide-react"
 import { useStore } from "@/store/useStore"
+import { useShallow } from "zustand/react/shallow"
 import { cn } from "@/lib/utils"
 
 const STRATEGIES = [
@@ -23,7 +24,15 @@ export function SimulationPanel() {
         runFixedSimulation,
         runMartingaleSimulation,
         setSelectedResult
-    } = useStore()
+    } = useStore(useShallow(state => ({
+        activeInterval: state.activeInterval,
+        hist: state.hist,
+        simul: state.simul,
+        loadingSimul: state.loadingSimul,
+        runFixedSimulation: state.runFixedSimulation,
+        runMartingaleSimulation: state.runMartingaleSimulation,
+        setSelectedResult: state.setSelectedResult,
+    })))
 
     const isDisabled = !activeInterval || hist[activeInterval]?.length === 0
 

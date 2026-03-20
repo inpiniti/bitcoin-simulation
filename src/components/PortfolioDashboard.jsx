@@ -8,6 +8,7 @@
  */
 import { useState, useEffect, useMemo } from "react"
 import { useStore } from "@/store/useStore"
+import { useShallow } from "zustand/react/shallow"
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts"
 import { Loader2, TrendingUp, TrendingDown, AlertTriangle, RefreshCcw, PieChartIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -37,7 +38,11 @@ const STOCK_COLORS = [
 ]
 
 export function PortfolioDashboard() {
-    const { kisAuth, strategyOptions } = useStore()
+    const { kisAuth, strategyOptions, dataCache } = useStore(useShallow(state => ({
+        kisAuth: state.kisAuth,
+        strategyOptions: state.strategyOptions,
+        dataCache: state.dataCache,
+    })))
     const [loading, setLoading] = useState(true)
     const [refreshing, setRefreshing] = useState(false)
     const [holdings, setHoldings] = useState([])
@@ -78,65 +83,68 @@ export function PortfolioDashboard() {
         }
     }
 
-    // 리스크 지표 계산 및 매매 신호 분석
+    // 리스크 지표 계산 및 매매 신호 분석 (병렬 처리 + 캐시 활용)
     const calculateRiskAndSignals = async (holdingsList) => {
         if (holdingsList.length === 0) return
 
-        const signalMap = {}
-        let totalVolatility = 0
-        let maxDrawdown = 0
-        let validCount = 0
+        const today = new Date().toISOString().split('T')[0]
 
-        for (const holding of holdingsList) {
+        const analyzeHolding = async (holding) => {
             const ticker = holding.pdno
-            try {
-                // 과거 데이터 로드 (최근 60일)
-                const histData = await fetchStockHistory(ticker, 60)
-                if (histData && histData.length > 20) {
-                    const dataWithIndicators = addDerivedData(histData)
+            // dataCache 우선 활용 (1d 당일 캐시)
+            const cachedEntry = dataCache[ticker]
+            let histData = (cachedEntry && new Date(cachedEntry.timestamp).toISOString().split('T')[0] === today)
+                ? cachedEntry.data
+                : await fetchStockHistory(ticker, 60)
 
-                    // 매매 신호 분석
-                    const signalResult = analyzeSignal(dataWithIndicators, strategyOptions)
-                    signalMap[ticker] = signalResult
+            if (!histData || histData.length <= 20) return null
 
-                    // 변동성 계산 (일일 수익률의 표준편차)
-                    const returns = []
-                    for (let i = 1; i < dataWithIndicators.length; i++) {
-                        const prevClose = dataWithIndicators[i - 1].close
-                        const currClose = dataWithIndicators[i].close
-                        if (prevClose > 0) {
-                            returns.push((currClose - prevClose) / prevClose)
-                        }
-                    }
-                    if (returns.length > 0) {
-                        const mean = returns.reduce((a, b) => a + b, 0) / returns.length
-                        const variance = returns.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / returns.length
-                        const dailyVol = Math.sqrt(variance)
-                        const annualVol = dailyVol * Math.sqrt(252) * 100 // 연환산 변동성 %
-                        totalVolatility += annualVol
-                        validCount++
-                    }
+            const dataWithIndicators = addDerivedData(histData)
+            const signalResult = analyzeSignal(dataWithIndicators, strategyOptions)
 
-                    // MDD 계산
-                    let peak = dataWithIndicators[0].close
-                    let currentMDD = 0
-                    for (const item of dataWithIndicators) {
-                        if (item.close > peak) peak = item.close
-                        const drawdown = ((peak - item.close) / peak) * 100
-                        if (drawdown > currentMDD) currentMDD = drawdown
-                    }
-                    if (currentMDD > maxDrawdown) maxDrawdown = currentMDD
-                }
-            } catch (error) {
-                console.warn(`${ticker} 분석 실패:`, error)
+            const returns = []
+            for (let i = 1; i < dataWithIndicators.length; i++) {
+                const prevClose = dataWithIndicators[i - 1].close
+                const currClose = dataWithIndicators[i].close
+                if (prevClose > 0) returns.push((currClose - prevClose) / prevClose)
             }
+            let annualVol = 0
+            if (returns.length > 0) {
+                const mean = returns.reduce((a, b) => a + b, 0) / returns.length
+                const variance = returns.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / returns.length
+                annualVol = Math.sqrt(variance) * Math.sqrt(252) * 100
+            }
+
+            let peak = dataWithIndicators[0].close
+            let mdd = 0
+            for (const item of dataWithIndicators) {
+                if (item.close > peak) peak = item.close
+                const drawdown = ((peak - item.close) / peak) * 100
+                if (drawdown > mdd) mdd = drawdown
+            }
+
+            return { ticker, signal: signalResult, annualVol, mdd }
+        }
+
+        // 보유 종목 전체 병렬 처리
+        const settled = await Promise.allSettled(holdingsList.map(analyzeHolding))
+
+        const signalMap = {}
+        let totalVolatility = 0, maxDrawdown = 0, validCount = 0
+
+        for (const result of settled) {
+            if (result.status !== 'fulfilled' || !result.value) continue
+            const { ticker, signal, annualVol, mdd } = result.value
+            signalMap[ticker] = signal
+            if (annualVol > 0) { totalVolatility += annualVol; validCount++ }
+            if (mdd > maxDrawdown) maxDrawdown = mdd
         }
 
         setSignals(signalMap)
         setRiskMetrics({
             mdd: maxDrawdown,
             volatility: validCount > 0 ? totalVolatility / validCount : 0,
-            sharpeRatio: 0, // 추후 구현 (무위험 수익률 필요)
+            sharpeRatio: 0,
         })
     }
 

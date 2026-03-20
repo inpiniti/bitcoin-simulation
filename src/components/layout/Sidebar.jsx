@@ -29,7 +29,7 @@ export function Sidebar() {
 
     useEffect(() => {
         fetchAiModels()
-    }, [])
+    }, [fetchAiModels])
 
     const [activeTab, setActiveTab] = useState('strategy') // 'strategy' | 'ticker'
     const [prevViewMode, setPrevViewMode] = useState(viewMode)

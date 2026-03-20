@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils"
 import { useStore } from "@/store/useStore"
+import { useShallow } from "zustand/react/shallow"
 import { Loader2 } from "lucide-react"
 import { useState, useEffect } from "react"
 import { isUSDST } from "@/lib/marketTime"
@@ -266,7 +267,18 @@ export function StatusBar() {
     const {
         hist, loadingInterval, selectedResult, isAnalyzing, analysisProgress,
         ticker, interval, realtimePrices, wsStatus, autoTradeSettings
-    } = useStore()
+    } = useStore(useShallow(state => ({
+        hist: state.hist,
+        loadingInterval: state.loadingInterval,
+        selectedResult: state.selectedResult,
+        isAnalyzing: state.isAnalyzing,
+        analysisProgress: state.analysisProgress,
+        ticker: state.ticker,
+        interval: state.interval,
+        realtimePrices: state.realtimePrices,
+        wsStatus: state.wsStatus,
+        autoTradeSettings: state.autoTradeSettings,
+    })))
 
     const dataCount = hist[interval]?.length || 0
     const isLoading = loadingInterval[interval] || loadingInterval['STOCK_BASE']

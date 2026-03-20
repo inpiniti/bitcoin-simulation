@@ -26,7 +26,16 @@
       "Bash(ls c:/Users/USER/git/bitcoin-simulation/.env*)",
       "Bash(grep \"HF_TOKEN\\\\|VITE_HF\" c:/Users/USER/git/bitcoin-simulation/api/simple/[path].js)",
       "WebFetch(domain:raw.githubusercontent.com)",
-      "Bash(python -c \"import json,sys; p=json.load\\(sys.stdin\\); print\\(''''exports:'''', json.dumps\\(p.get\\(''''exports'''', {}\\), indent=2\\)\\); print\\(''''main:'''', p.get\\(''''main''''\\)\\); print\\(''''module:'''', p.get\\(''''module''''\\)\\)\")"
+      "Bash(python -c \"import json,sys; p=json.load\\(sys.stdin\\); print\\(''''exports:'''', json.dumps\\(p.get\\(''''exports'''', {}\\), indent=2\\)\\); print\\(''''main:'''', p.get\\(''''main''''\\)\\); print\\(''''module:'''', p.get\\(''''module''''\\)\\)\")",
+      "WebFetch(domain:www.remotion.dev)",
+      "WebFetch(domain:skills.sh)",
+      "WebFetch(domain:github.com)",
+      "Bash(python -c \"import json,sys; p=json.load\\(sys.stdin\\); deps={**p.get\\(''''dependencies'''',{}\\), **p.get\\(''''devDependencies'''',{}\\)}; [print\\(k\\) for k in sorted\\(deps.keys\\(\\)\\)]\")",
+      "Bash(npx skills:*)",
+      "Bash(find /c/Users/USER/git/bitcoin-simulation/src -type f \\\\\\( -name \"*.jsx\" -o -name \"*.tsx\" \\\\\\) -exec wc -l {} +)",
+      "Bash(grep -l \"useStore\\(state =>\" c:/Users/USER/git/bitcoin-simulation/src/components/*.jsx c:/Users/USER/git/bitcoin-simulation/src/components/**/*.jsx)",
+      "Bash(grep -v \"//\")",
+      "Bash(grep -n \"^    //\" c:/Users/USER/git/bitcoin-simulation/src/components/DeepLearningPanel.jsx)"
     ]
   }
 }

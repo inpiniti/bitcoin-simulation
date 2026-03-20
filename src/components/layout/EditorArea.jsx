@@ -1,6 +1,7 @@
 import { useState, useEffect, Suspense, lazy } from "react"
 import { cn } from "@/lib/utils"
 import { useStore } from "@/store/useStore"
+import { useShallow } from "zustand/react/shallow"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Button } from "@/components/ui/button"
 import {
@@ -63,7 +64,15 @@ function formatBtcPrice(price) {
  * @returns {JSX.Element} The rendered EditorArea component
  */
 export function EditorArea() {
-    const { selectedResult, viewMode, hist, ticker, activeTickers, openTicker, interval } = useStore()
+    const { selectedResult, viewMode, hist, ticker, activeTickers, openTicker, interval } = useStore(useShallow(state => ({
+        selectedResult: state.selectedResult,
+        viewMode: state.viewMode,
+        hist: state.hist,
+        ticker: state.ticker,
+        activeTickers: state.activeTickers,
+        openTicker: state.openTicker,
+        interval: state.interval,
+    })))
     const [currentPage, setCurrentPage] = useState(1)
 
     // 페이지네이션 초기화

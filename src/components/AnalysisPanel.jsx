@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react"
 import { useStore } from "@/store/useStore"
+import { useShallow } from "zustand/react/shallow"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -18,12 +19,21 @@ import { Sparkline } from "@/components/ui/Sparkline"
  * @returns {JSX.Element} 시장 분석 결과 패널
  */
 export function AnalysisPanel() {
-    const analysisResult = useStore(state => state.analysisResult);
-    const isAnalyzing = useStore(state => state.isAnalyzing);
-    const isRealtimeAnalysis = useStore(state => state.isRealtimeAnalysis);
-    const realtimeAnalysisData = useStore(state => state.realtimeAnalysisData);
-    const setTicker = useStore(state => state.setTicker);
-    const setAnalysisMode = useStore(state => state.setAnalysisMode);
+    const {
+        analysisResult,
+        isAnalyzing,
+        isRealtimeAnalysis,
+        realtimeAnalysisData,
+        setTicker,
+        setAnalysisMode,
+    } = useStore(useShallow(state => ({
+        analysisResult: state.analysisResult,
+        isAnalyzing: state.isAnalyzing,
+        isRealtimeAnalysis: state.isRealtimeAnalysis,
+        realtimeAnalysisData: state.realtimeAnalysisData,
+        setTicker: state.setTicker,
+        setAnalysisMode: state.setAnalysisMode,
+    })));
 
     // Order Dialog State
     const [orderDialogOpen, setOrderDialogOpen] = useState(false)

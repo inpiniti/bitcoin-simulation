@@ -5,6 +5,7 @@ import { getSupabaseClient } from '@/lib/supabaseClient'
 import { fetchCoinDailyData, fetchStockHistory, fetchStockNews, getSentimentScore } from '@/lib/api'
 import { addDerivedData, generateIntegratedTrades, generateAiTrades, calculateFixedQuantityResult, calculateCumulativeResult, calculateMartingaleResult, analyzeSignal } from '@/lib/dataProcessor'
 import { processStockDataForPrediction } from '@/lib/mlProcessor'
+import { processTickerRealtime } from './realtimeHelpers'
 
 // IndexedDB 스토리지 어댑터
 const indexedDBStorage = {
@@ -363,199 +364,55 @@ export const useStore = create(
                     }
                 })),
                 batchUpdateRealtimePrices: (updates) => set(state => {
-                    // 성능 최적화: 업데이트할 티커만 새 객체로 생성
                     const newPrices = { ...state.realtimePrices };
-                    let analysisUpdated = false;
                     let analysisData = state.realtimeAnalysisData;
                     let newAnalysisResult = state.analysisResult;
                     let newTrades = state.realtimeTrades;
                     let newPositions = state.realtimePositions;
-                    let tradesUpdated = false;
+                    let anyAnalysisUpdated = false;
+                    let anyTradesUpdated = false;
 
-                    // Copy objects only if we need to modify them for analysis
-                    // 최적화: 필요한 경우에만 얕은 복사를 수행
-                    const needsAnalysisUpdate = state.isRealtimeAnalysis && state.realtimeAnalysisTickers.some(t => updates[t]);
+                    const needsAnalysisUpdate = state.isRealtimeAnalysis &&
+                        state.realtimeAnalysisTickers.some(t => updates[t]);
 
                     if (needsAnalysisUpdate) {
                         analysisData = { ...analysisData };
-                        newAnalysisResult = [...newAnalysisResult];
-                        newTrades = [...newTrades];
-                        newPositions = { ...newPositions };
                     }
 
                     Object.entries(updates).forEach(([ticker, data]) => {
                         newPrices[ticker] = { ...newPrices[ticker], ...data };
 
-                        // Real-time Analysis Update
                         if (state.isRealtimeAnalysis && state.realtimeAnalysisTickers.includes(ticker)) {
-                            const tickerEntry = analysisData[ticker];
-                            if (tickerEntry && tickerEntry.data && tickerEntry.data.length > 0) {
-                                // 1. Update Last Candle
-                                const lastIndex = tickerEntry.data.length - 1;
-                                const originalLastCandle = tickerEntry.data[lastIndex];
+                            const { analysisEntry, updatedResult, positions, trades, analysisUpdated, tradesUpdated } =
+                                processTickerRealtime({
+                                    ticker,
+                                    data,
+                                    tickerEntry: analysisData[ticker],
+                                    analysisResult: newAnalysisResult,
+                                    positions: newPositions,
+                                    trades: newTrades,
+                                    strategyOptions: state.strategyOptions,
+                                });
 
-                                const price = data.price;
-                                const newLastCandle = {
-                                    ...originalLastCandle,
-                                    close: price,
-                                    high: Math.max(originalLastCandle.high, price),
-                                    low: Math.min(originalLastCandle.low, price),
-                                    // Volume handling: KIS sends daily accumulated volume. 
-                                    // Usage of volume in 1m analysis might be inaccurate if we don't have start-of-minute volume.
-                                    // We'll update the volume if provided (assuming daily chart) or ignore/approximate.
-                                    // reliable 'volume' from socket is daily total.
-                                    // For '1d', this is perfect. For '1m', this is accumulated.
-                                    // Ideally we need volume delta, but let's just stick to price for strategy signal update.
-                                };
-
-                                const newData = [...tickerEntry.data];
-                                newData[lastIndex] = newLastCandle;
-
-                                // 2. Recalculate Analysis (Derived Data + Signal)
-                                // Optimization: derived data calculation on 300 items is fast enough (~1-2ms).
-                                const dataWithSlope = addDerivedData(newData);
-                                const analysis = analyzeSignal(dataWithSlope, { ...state.strategyOptions, isRealtimeMode: true });
-
-                                // 3. Update Result List
-                                const resultIdx = newAnalysisResult.findIndex(r => r.ticker === ticker);
-                                if (resultIdx !== -1) {
-                                    const prevCandle = newData.length >= 2 ? newData[newData.length - 2] : null;
-                                    const changeRate = prevCandle
-                                        ? ((price - prevCandle.close) / prevCandle.close * 100)
-                                        : 0;
-
-                                    newAnalysisResult[resultIdx] = {
-                                        ...newAnalysisResult[resultIdx],
-                                        price: price,
-                                        changeRate: changeRate,
-                                        signal: analysis.signal,
-                                        reason: analysis.reason,
-                                        slope: dataWithSlope[dataWithSlope.length - 1].slope,
-                                        bbStatus: dataWithSlope[dataWithSlope.length - 1].bbStatus,
-                                        timestamp: Date.now() // Update timestamp to force refresh if needed
-                                    };
-                                }
-
-                                // 4. Virtual Trading Logic (Paper Trading)
-                                const currentPosition = newPositions[ticker];
-                                const timestamp = new Date().toISOString();
-                                const isVMartingale = state.strategyOptions.useVMartingale;
-
-                                if (analysis.signal === 'BUY') {
-                                    // 매수 진입 또는 추가 매수 (V-Martingale 시)
-                                    if (!currentPosition || isVMartingale) {
-                                        // V-Martingale 시 현재 몇 번째 매수인지 계산하여 수량 결정
-                                        const entryCount = currentPosition ? (currentPosition.entryCount || 0) : 0;
-
-                                        // V-Martingale 추가 매수 조건: 평단가 대비 손실률 체크
-                                        let canAddBuy = true;
-                                        if (currentPosition && isVMartingale) {
-                                            const addBuyThreshold = state.strategyOptions.vMartingaleAddBuyThreshold || 0;
-                                            if (addBuyThreshold < 0) {
-                                                // 평단가 대비 현재 손실률 계산
-                                                const currentLossRate = ((price - currentPosition.avgPrice) / currentPosition.avgPrice) * 100;
-                                                // 손실률이 임계값보다 크면(덜 손실이면) 추가 매수 불가
-                                                if (currentLossRate > addBuyThreshold) {
-                                                    canAddBuy = false;
-                                                    // console.log(`[V-Martingale] ${ticker} 추가 매수 스킵: 손실률 ${currentLossRate.toFixed(2)}% > 임계값 ${addBuyThreshold}%`);
-                                                }
-                                            }
-                                        }
-
-                                        // 이미 같은 캔들(시간대)에서 매수했는지 체크 (중복 피드백 방지)
-                                        const lastBuyTime = currentPosition?.lastTime;
-                                        if (canAddBuy && lastBuyTime !== originalLastCandle.timestamp) {
-                                            const multiplier = isVMartingale
-                                                ? (state.strategyOptions.vMartingaleMultiplierMode === 'fixed' ? 1 : Math.pow(2, entryCount))
-                                                : 1;
-
-                                            const qty = multiplier; // 가상 단위 수량
-                                            const cost = price * qty;
-
-                                            // console.log(`[Realtime Trade] ${ticker} BUY Signal! Entry #${entryCount + 1}, Qty: ${qty}`);
-
-                                            if (!currentPosition) {
-                                                // 첫 매수
-                                                const timestampStr = new Date().toISOString();
-                                                newPositions[ticker] = {
-                                                    avgPrice: price,
-                                                    totalQty: qty,
-                                                    totalCost: cost,
-                                                    lastTime: originalLastCandle.timestamp,
-                                                    entryCount: 1,
-                                                    startTime: timestampStr
-                                                };
-                                            } else {
-                                                // 추가 매입 (물타기)
-                                                const nextQty = currentPosition.totalQty + qty;
-                                                const nextCost = currentPosition.totalCost + cost;
-                                                newPositions[ticker] = {
-                                                    ...currentPosition,
-                                                    avgPrice: nextCost / nextQty,
-                                                    totalQty: nextQty,
-                                                    totalCost: nextCost,
-                                                    lastTime: originalLastCandle.timestamp,
-                                                    entryCount: entryCount + 1
-                                                };
-                                            }
-
-                                            // 메모리 누수 방지: 거래 로그 최대 100개 유지
-                                            if (newTrades.length >= 100) {
-                                                newTrades = newTrades.slice(0, 99);
-                                            }
-                                            newTrades.unshift({
-                                                id: Date.now() + Math.random(),
-                                                time: new Date().toISOString(),
-                                                type: 'BUY',
-                                                ticker: ticker,
-                                                price: price,
-                                                quantity: qty,
-                                                entryCount: entryCount + 1,
-                                                reason: analysis.reason + (entryCount > 0 ? ` (V-Martingale #${entryCount + 1})` : '')
-                                            });
-                                            tradesUpdated = true;
-                                        }
-                                    }
-                                } else if (analysis.signal === 'SELL' && currentPosition) {
-                                    // 매도 청산 (전량 매도)
-                                    const avgPrice = currentPosition.avgPrice;
-                                    const totalQty = currentPosition.totalQty;
-                                    const profit = (price - avgPrice) * totalQty;
-                                    const profitRate = ((price - avgPrice) / avgPrice) * 100;
-
-                                    // 메모리 누수 방지: 거래 로그 최대 100개 유지
-                                    if (newTrades.length >= 100) {
-                                        newTrades = newTrades.slice(0, 99);
-                                    }
-                                    newTrades.unshift({
-                                        id: Date.now() + Math.random(),
-                                        time: timestamp,
-                                        type: 'SELL',
-                                        ticker: ticker,
-                                        price: price,
-                                        quantity: totalQty,
-                                        profit: profit,
-                                        profitRate: profitRate,
-                                        reason: analysis.reason
-                                    });
-
-                                    delete newPositions[ticker];
-                                    tradesUpdated = true;
-                                }
-
-                                // 5. Save back to data state
-                                analysisData[ticker] = { ...tickerEntry, data: newData };
-                                analysisUpdated = true;
+                            if (analysisUpdated) {
+                                analysisData[ticker] = analysisEntry;
+                                newAnalysisResult = updatedResult;
+                                anyAnalysisUpdated = true;
+                            }
+                            if (tradesUpdated) {
+                                newPositions = positions;
+                                newTrades = trades;
+                                anyTradesUpdated = true;
                             }
                         }
                     });
 
                     const newState = { realtimePrices: newPrices };
-                    if (analysisUpdated) {
+                    if (anyAnalysisUpdated) {
                         newState.realtimeAnalysisData = analysisData;
                         newState.analysisResult = newAnalysisResult;
                     }
-                    if (tradesUpdated) {
+                    if (anyTradesUpdated) {
                         newState.realtimeTrades = newTrades;
                         newState.realtimePositions = newPositions;
                     }
@@ -961,107 +818,97 @@ export const useStore = create(
                     const results = [];
                     const options = state.strategyOptions;
                     let processedCount = 0;
+                    const BATCH_SIZE = 5;
+                    const { fetchStockMinuteData, fetchStockHistory: fetchHistory } = await import('@/lib/api');
+                    const today = new Date().toISOString().split('T')[0];
+                    const interval = state.interval;
 
-                    for (const stock of stocks) {
-                        // 사용자 중지 체크
-                        if (!get().isAnalyzing) break;
+                    // 단일 종목 분석 (배치 내에서 병렬 실행)
+                    const analyzeStock = async (stock) => {
+                        const now = Date.now();
+                        let rawData;
+                        let exchange = stock.exchange || 'NAS';
+                        const cachedEntry = state.dataCache[stock.ticker];
 
-                        try {
-                            const now = Date.now();
-                            const today = new Date().toISOString().split('T')[0];
-                            const interval = state.interval;
+                        if (interval === '1d' && cachedEntry && new Date(cachedEntry.timestamp).toISOString().split('T')[0] === today) {
+                            rawData = cachedEntry.data;
+                            if (cachedEntry.exchange) exchange = cachedEntry.exchange;
+                        } else {
+                            rawData = interval === '1m'
+                                ? await fetchStockMinuteData(stock.ticker)
+                                : await fetchHistory(stock.ticker);
 
-                            let rawData;
-                            let exchange = stock.exchange || 'NAS';
-                            const cachedEntry = state.dataCache[stock.ticker];
-
-                            // 1d일 때만 캐시 사용
-                            if (interval === '1d' && cachedEntry && new Date(cachedEntry.timestamp).toISOString().split('T')[0] === today) {
-                                rawData = cachedEntry.data;
-                                if (cachedEntry.exchange) exchange = cachedEntry.exchange;
-                            } else {
-                                if (interval === '1m') {
-                                    const { fetchStockMinuteData } = await import('@/lib/api');
-                                    rawData = await fetchStockMinuteData(stock.ticker);
-                                } else {
-                                    const { fetchStockHistory } = await import('@/lib/api');
-                                    rawData = await fetchStockHistory(stock.ticker);
-                                }
-
-                                if (rawData && rawData.exchange) exchange = rawData.exchange;
-
-                                // 1d일 때만 캐시 저장
-                                if (interval === '1d' && rawData && rawData.length > 0) {
-                                    set(s => ({
-                                        dataCache: {
-                                            ...s.dataCache,
-                                            [stock.ticker]: { timestamp: now, data: rawData, exchange }
-                                        }
-                                    }));
-                                }
+                            if (rawData && rawData.exchange) exchange = rawData.exchange;
+                            if (interval === '1d' && rawData && rawData.length > 0) {
+                                set(s => ({
+                                    dataCache: { ...s.dataCache, [stock.ticker]: { timestamp: now, data: rawData, exchange } }
+                                }));
                             }
-
-                            if (!rawData || rawData.length < 20) {
-                                results.push({ ticker: stock.ticker, signal: 'SKIP', reason: 'Not enough data' });
-                                processedCount++;
-                                set({
-                                    analysisProgress: { current: processedCount, total: stocks.length },
-                                    analysisResult: [...results]
-                                });
-                                continue;
-                            }
-
-                            const dataWithSlope = addDerivedData(rawData);
-                            const analysis = analyzeSignal(dataWithSlope, options);
-
-                            let sentimentScore = 0;
-                            let newsHeadlines = [];
-                            try {
-                                newsHeadlines = await fetchStockNews(stock.ticker);
-                                sentimentScore = await getSentimentScore(newsHeadlines);
-                            } catch (err) {
-                                console.warn(`News fetch failed for ${stock.ticker}`, err);
-                            }
-
-                            const lastCandle = dataWithSlope[dataWithSlope.length - 1];
-                            const prevCandle = dataWithSlope[dataWithSlope.length - 2];
-
-                            const changeRate = prevCandle
-                                ? ((lastCandle.close - prevCandle.close) / prevCandle.close * 100)
-                                : 0;
-
-                            results.push({
-                                ticker: stock.ticker,
-                                name: stock.name || stock.ticker,
-                                signal: analysis.signal,
-                                reason: analysis.reason,
-                                price: lastCandle.close,
-                                changeRate: changeRate,
-                                slope: lastCandle.slope,
-                                bbStatus: lastCandle.bbStatus,
-                                sentiment: sentimentScore,
-                                news: newsHeadlines,
-                                timestamp: lastCandle.timestamp,
-                                exchange: exchange
-                            });
-
-                        } catch (e) {
-                            console.warn(`Analysis failed for ${stock.ticker}:`, e);
-                            results.push({
-                                ticker: stock.ticker,
-                                signal: 'ERROR',
-                                reason: 'Load Failed',
-                                price: 0
-                            });
                         }
 
-                        processedCount++;
+                        if (!rawData || rawData.length < 20) {
+                            return { ticker: stock.ticker, signal: 'SKIP', reason: 'Not enough data' };
+                        }
+
+                        const dataWithSlope = addDerivedData(rawData);
+                        const analysis = analyzeSignal(dataWithSlope, options);
+
+                        // 주가 데이터 조회와 뉴스 조회를 병렬 처리
+                        let sentimentScore = 0;
+                        let newsHeadlines = [];
+                        try {
+                            newsHeadlines = await fetchStockNews(stock.ticker);
+                            sentimentScore = await getSentimentScore(newsHeadlines);
+                        } catch (err) {
+                            console.warn(`News fetch failed for ${stock.ticker}`, err);
+                        }
+
+                        const lastCandle = dataWithSlope[dataWithSlope.length - 1];
+                        const prevCandle = dataWithSlope[dataWithSlope.length - 2];
+                        const changeRate = prevCandle
+                            ? ((lastCandle.close - prevCandle.close) / prevCandle.close * 100) : 0;
+
+                        return {
+                            ticker: stock.ticker,
+                            name: stock.name || stock.ticker,
+                            signal: analysis.signal,
+                            reason: analysis.reason,
+                            price: lastCandle.close,
+                            changeRate,
+                            slope: lastCandle.slope,
+                            bbStatus: lastCandle.bbStatus,
+                            sentiment: sentimentScore,
+                            news: newsHeadlines,
+                            timestamp: lastCandle.timestamp,
+                            exchange,
+                        };
+                    };
+
+                    // 5개씩 배치 병렬 처리
+                    for (let i = 0; i < stocks.length; i += BATCH_SIZE) {
+                        if (!get().isAnalyzing) break;
+
+                        const batch = stocks.slice(i, i + BATCH_SIZE);
+                        const batchResults = await Promise.allSettled(batch.map(analyzeStock));
+
+                        for (const settled of batchResults) {
+                            if (settled.status === 'fulfilled') {
+                                results.push(settled.value);
+                            } else {
+                                const stock = batch[batchResults.indexOf(settled)];
+                                console.warn(`Analysis failed for ${stock?.ticker}:`, settled.reason);
+                                results.push({ ticker: stock?.ticker, signal: 'ERROR', reason: 'Load Failed', price: 0 });
+                            }
+                        }
+
+                        processedCount += batch.length;
                         set({
-                            analysisProgress: { current: processedCount, total: stocks.length },
+                            analysisProgress: { current: Math.min(processedCount, stocks.length), total: stocks.length },
                             analysisResult: [...results]
                         });
 
-                        await new Promise(r => setTimeout(r, 10));
+                        // 배치 간 짧은 딜레이로 API Rate Limit 방지
+                        await new Promise(r => setTimeout(r, 50));
                     }
 
                     const priority = { 'BUY': 0, 'SELL': 1, 'HOLD': 2, 'SKIP': 3, 'ERROR': 4 };
@@ -1199,7 +1046,7 @@ export const useStore = create(
                     kisWebSocket.subscribeAnalysis(subList);
                 },
 
-                stopRealtimeAnalysis: () => {
+                stopRealtimeAnalysis: async () => {
                     // console.log('[실시간 분석] 중지 및 메모리 정리 시작');
 
                     // 메모리 정리: 실시간 분석 관련 데이터 초기화
@@ -1211,10 +1058,13 @@ export const useStore = create(
                         // realtimeTrades, realtimePositions는 사용자가 참고할 수 있으므로 유지
                     });
 
-                    // WebSocket 구독 해제
-                    import('@/lib/kisWebSocket').then(({ kisWebSocket }) => {
+                    // WebSocket 구독 해제 (동기적으로 처리하여 메모리 누수 방지)
+                    try {
+                        const { kisWebSocket } = await import('@/lib/kisWebSocket');
                         kisWebSocket.subscribeAnalysis([]);
-                    });
+                    } catch {
+                        // ignore
+                    }
 
                     // console.log('[실시간 분석] 메모리 정리 완료');
                 },

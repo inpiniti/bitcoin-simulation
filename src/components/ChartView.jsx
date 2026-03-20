@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react"
 import { cn } from "@/lib/utils"
 import { useStore } from "@/store/useStore"
+import { useShallow } from "zustand/react/shallow"
 import { fetchForecast } from "@/lib/api"
 import { LineChart as LineChartIcon, Loader2, Settings2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -197,7 +198,12 @@ function CustomTooltip({ active, payload, label }) {
  * 고성능 캔들스틱 차트 컴포넌트
  */
 export function ChartView() {
-    const { hist, ticker, mode, interval } = useStore()
+    const { hist, ticker, mode, interval } = useStore(useShallow(state => ({
+        hist: state.hist,
+        ticker: state.ticker,
+        mode: state.mode,
+        interval: state.interval,
+    })))
     const [isLoadingForecast, setIsLoadingForecast] = useState(false)
     const [forecastData, setForecastData] = useState(null)
 

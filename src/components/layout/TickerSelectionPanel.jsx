@@ -1,4 +1,5 @@
 import { useStore } from "@/store/useStore"
+import { useShallow } from "zustand/react/shallow"
 import { cn } from "@/lib/utils"
 import { Search, Loader2 } from "lucide-react"
 import { useState, useEffect, useRef, useMemo, useCallback, memo } from "react"
@@ -103,7 +104,16 @@ export function TickerSelectionPanel() {
         loadingGroupStocks,
         kisAuth,
         recommendedStocks,
-    } = useStore()
+    } = useStore(useShallow(state => ({
+        ticker: state.ticker,
+        openTicker: state.openTicker,
+        tickerGroup: state.tickerGroup,
+        setTickerGroup: state.setTickerGroup,
+        groupStocks: state.groupStocks,
+        loadingGroupStocks: state.loadingGroupStocks,
+        kisAuth: state.kisAuth,
+        recommendedStocks: state.recommendedStocks,
+    })))
 
     const [filterText, setFilterText] = useState('')
     const visibleStocksRef = useRef(new Map()); // 현재 화면에 보이는 종목 관리

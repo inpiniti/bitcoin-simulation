@@ -1,4 +1,5 @@
 import { useStore } from "@/store/useStore"
+import { useShallow } from "zustand/react/shallow"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
 
@@ -7,7 +8,12 @@ import { Badge } from "@/components/ui/badge"
  * @returns {JSX.Element}
  */
 export function RealtimeTradeLog() {
-    const { realtimeTrades, realtimePositions, realtimePrices, clearRealtimeTrades } = useStore()
+    const { realtimeTrades, realtimePositions, realtimePrices, clearRealtimeTrades } = useStore(useShallow(state => ({
+        realtimeTrades: state.realtimeTrades,
+        realtimePositions: state.realtimePositions,
+        realtimePrices: state.realtimePrices,
+        clearRealtimeTrades: state.clearRealtimeTrades,
+    })))
 
     // 실현 손익 계산 (판매 완료된 건들)
     const realizedProfit = realtimeTrades
