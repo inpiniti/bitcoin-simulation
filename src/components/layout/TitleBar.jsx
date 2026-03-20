@@ -16,7 +16,7 @@ import { KISAccountDialog } from '@/components/KISAccountDialog';
 import { KISOrderDialog } from '@/components/KISOrderDialog';
 import { GlobalAlertDialog } from '@/components/GlobalAlertDialog';
 import { AutoTradingDialog } from '@/components/AutoTradingDialog';
-import { Search, Clock, Zap, Menu, X, RotateCcw, ChevronDown, Terminal, Layers } from 'lucide-react';
+import { Search, Clock, Zap, Menu, X, RotateCcw, ChevronDown, Terminal, Layers, Maximize2, Minimize2 } from 'lucide-react';
 import { getMinutesUntilClose } from '@/lib/marketTime';
 import {
   ContextMenu,
@@ -52,6 +52,7 @@ function ServerLogPanel({ logType, onClose }) {
   const [status, setStatus] = useState('connecting'); // connecting | streaming | error | closed
   const [autoScroll, setAutoScroll] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
+  const [maximized, setMaximized] = useState(false);
   const bodyRef = useRef(null);
   const esRef = useRef(null);
   const lineCountRef = useRef(0);
@@ -155,7 +156,7 @@ function ServerLogPanel({ logType, onClose }) {
   return (
     <div
       className="fixed bottom-0 left-0 right-0 z-50 flex flex-col"
-      style={{ height: '340px' }}
+      style={{ height: maximized ? 'calc(100vh - 35px)' : '340px' }}
     >
       {/* 패널 헤더 */}
       <div className="flex items-center justify-between px-3 py-1.5 bg-[#161b22] border-t border-[#30363d] shrink-0 select-none">
@@ -195,6 +196,13 @@ function ServerLogPanel({ logType, onClose }) {
             className="p-1 text-[#8b949e] hover:text-[#c9d1d9] transition-colors rounded hover:bg-[#21262d]"
           >
             <RotateCcw className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => setMaximized(v => !v)}
+            title={maximized ? '원래 크기로' : '전체 화면'}
+            className="p-1 text-[#8b949e] hover:text-[#c9d1d9] transition-colors rounded hover:bg-[#21262d]"
+          >
+            {maximized ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
           </button>
           <button
             onClick={onClose}
