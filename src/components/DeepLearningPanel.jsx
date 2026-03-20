@@ -48,6 +48,88 @@ export function DeepLearningPanel() {
         fetchModelsFromSupabase()
     }, [])
 
+    // 재접속 시 서버 진행 상태 복원 (폴링)
+    const pollRef = useRef(null)
+    useEffect(() => {
+        const checkStatus = async () => {
+            try {
+                const res = await fetch('/api/xgb/train-status')
+                if (!res.ok) return
+                const job = await res.json()
+
+                if (job.status === 'collecting') {
+                    setServerTraining(true)
+                    setServerCollectProgress(job.collect_progress ?? 0)
+                    setServerTrainProgress(0)
+                } else if (job.status === 'training') {
+                    setServerTraining(true)
+                    setServerCollectProgress(100)
+                    setServerTrainProgress(job.train_progress ?? 10)
+                } else if (job.status === 'complete' && job.result) {
+                    setServerTraining(false)
+                    setServerCollectProgress(100)
+                    setServerTrainProgress(100)
+                    setServerTrainResult(job.result)
+                    fetchModelsFromSupabase()
+                    clearInterval(pollRef.current)
+                } else if (job.status === 'error') {
+                    setServerTraining(false)
+                    setServerTrainError(job.error)
+                    clearInterval(pollRef.current)
+                } else {
+                    // idle — 진행 중인 작업 없음
+                    clearInterval(pollRef.current)
+                }
+            } catch {
+                // 서버 오류 무시
+            }
+        }
+
+        // 마운트 시 즉시 한 번 확인 후, 진행 중이면 5초마다 폴링
+        checkStatus().then(() => {
+            if (serverTraining) {
+                pollRef.current = setInterval(checkStatus, 5000)
+            }
+        })
+
+        return () => clearInterval(pollRef.current)
+    }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+    // serverTraining 변경 시 폴링 시작/중지
+    useEffect(() => {
+        clearInterval(pollRef.current)
+        if (serverTraining) {
+            pollRef.current = setInterval(async () => {
+                try {
+                    const res = await fetch('/api/xgb/train-status')
+                    if (!res.ok) return
+                    const job = await res.json()
+
+                    if (job.status === 'collecting') {
+                        setServerCollectProgress(job.collect_progress ?? 0)
+                    } else if (job.status === 'training') {
+                        setServerCollectProgress(100)
+                        setServerTrainProgress(job.train_progress ?? 10)
+                    } else if (job.status === 'complete' && job.result) {
+                        setServerTraining(false)
+                        setServerCollectProgress(100)
+                        setServerTrainProgress(100)
+                        setServerTrainResult(job.result)
+                        fetchModelsFromSupabase()
+                        clearInterval(pollRef.current)
+                    } else if (job.status === 'error') {
+                        setServerTraining(false)
+                        setServerTrainError(job.error)
+                        clearInterval(pollRef.current)
+                    }
+                } catch {
+                    // 무시
+                }
+            }, 5000)
+        }
+        return () => clearInterval(pollRef.current)
+    }, [serverTraining]) // eslint-disable-line react-hooks/exhaustive-deps
+
     // 학습 상태
     const [trainMode, setTrainMode] = useState("single") // "single" | "group"
     const [trainTicker, setTrainTicker] = useState("AAPL")
@@ -635,14 +717,6 @@ export function DeepLearningPanel() {
         }
     }
 
-    const handleCancelServerTrain = () => {
-        if (wsRef.current) {
-            wsRef.current.close()
-            wsRef.current = null
-        }
-        setServerTraining(false)
-    }
-
     return (
         <div className="h-full bg-[#1e1e1e] text-[#e1e1e1] p-6 overflow-y-auto">
             <div className="flex justify-between items-center mb-6">
@@ -799,13 +873,10 @@ export function DeepLearningPanel() {
                                     </div>
 
                                     {serverTraining && (
-                                        <Button
-                                            onClick={handleCancelServerTrain}
-                                            variant="outline"
-                                            className="w-full border-red-800 text-red-400 hover:bg-red-900/20"
-                                        >
-                                            취소
-                                        </Button>
+                                        <div className="text-xs text-[#888888] text-center pt-1 space-y-0.5">
+                                            <div>시간이 오래 걸립니다. 잠시만 기다려주세요.</div>
+                                            <div className="text-[#555]">브라우저를 닫아도 서버에서 계속 학습하며, 완료 시 자동 저장됩니다.</div>
+                                        </div>
                                     )}
                                 </div>
                             )}

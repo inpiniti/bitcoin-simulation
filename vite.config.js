@@ -913,12 +913,33 @@ export default defineConfig(({ mode }) => {
                     // XGBoost API 미들웨어 (E2BIG 에러 방지를 위해 프록시 대신 미들웨어 사용)
                     server.middlewares.use('/api/xgb', async (req, res, next) => {
                         res.setHeader('Access-Control-Allow-Origin', '*');
-                        res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
+                        res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
                         res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
                         if (req.method === 'OPTIONS') {
                             res.statusCode = 200;
                             res.end();
+                            return;
+                        }
+
+                        const urlObj = new URL(req.originalUrl || req.url, `http://${req.headers.host}`);
+                        const subPath = urlObj.pathname.replace(/^\/api\/xgb/, '');
+                        const backendBase = process.env.BACKEND_URL || 'https://younginpiniti-bitcoin-ai-backend.hf.space';
+                        const fetch = (await import('node-fetch')).default || global.fetch;
+
+                        // GET 요청 (ex: /api/xgb/train-status)
+                        if (req.method === 'GET') {
+                            try {
+                                const targetUrl = `${backendBase}/v1/xgb${subPath}`;
+                                const apiResponse = await fetch(targetUrl);
+                                const responseText = await apiResponse.text();
+                                res.statusCode = apiResponse.status;
+                                res.setHeader('Content-Type', 'application/json');
+                                res.end(responseText);
+                            } catch (e) {
+                                res.statusCode = 500;
+                                res.end(JSON.stringify({ error: e.message }));
+                            }
                             return;
                         }
 
@@ -937,15 +958,11 @@ export default defineConfig(({ mode }) => {
                             const bodyStr = Buffer.concat(buffers).toString();
                             const body = JSON.parse(bodyStr);
 
-                            // 경로 추출 (예: /api/xgb/train -> /v1/xgb/train)
-                            const urlObj = new URL(req.originalUrl || req.url, `http://${req.headers.host}`);
-                            const subPath = urlObj.pathname.replace(/^\/api\/xgb/, '');
-                            const targetUrl = `${process.env.BACKEND_URL || 'https://younginpiniti-bitcoin-ai-backend.hf.space'}/v1/xgb${subPath}`;
+                            const targetUrl = `${backendBase}/v1/xgb${subPath}`;
 
                             console.log('[XGB Middleware] Forwarding to:', targetUrl);
                             console.log('[XGB Middleware] Body size:', bodyStr.length, 'bytes');
 
-                            const fetch = (await import('node-fetch')).default || global.fetch;
                             const apiResponse = await fetch(targetUrl, {
                                 method: 'POST',
                                 headers: {
