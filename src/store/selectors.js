@@ -42,26 +42,20 @@ export const useMLStore = () => useStore(useShallow(state => ({
 })))
 
 // ---------------------------------------------------------------------------
-// Auto Trading
-// State  : autoTradeSettings, autoTradeStatus, automationConfigList,
-//          loadingAutomation, autoTradeDlLogs, loadingAutoTradeDlLogs
-// Actions: setAutoTradeSettings, loadAutomationConfigs, saveAutomationConfig,
-//          deleteAutomationConfig, addAutoTradeLog, setLastRunDate,
-//          fetchAutoTradeDlLogs
+// Auto Trading (Server-side automation configs & DL trade logs)
+// State  : automationConfigList, loadingAutomation,
+//          autoTradeDlLogs, loadingAutoTradeDlLogs
+// Actions: loadAutomationConfigs, saveAutomationConfig,
+//          deleteAutomationConfig, fetchAutoTradeDlLogs
 // ---------------------------------------------------------------------------
 export const useAutoTradeStore = () => useStore(useShallow(state => ({
-    autoTradeSettings: state.autoTradeSettings,
-    autoTradeStatus: state.autoTradeStatus,
     automationConfigList: state.automationConfigList,
     loadingAutomation: state.loadingAutomation,
     autoTradeDlLogs: state.autoTradeDlLogs,
     loadingAutoTradeDlLogs: state.loadingAutoTradeDlLogs,
-    setAutoTradeSettings: state.setAutoTradeSettings,
     loadAutomationConfigs: state.loadAutomationConfigs,
     saveAutomationConfig: state.saveAutomationConfig,
     deleteAutomationConfig: state.deleteAutomationConfig,
-    addAutoTradeLog: state.addAutoTradeLog,
-    setLastRunDate: state.setLastRunDate,
     fetchAutoTradeDlLogs: state.fetchAutoTradeDlLogs,
 })))
 

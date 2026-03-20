@@ -266,7 +266,7 @@ function MarketCalendar({ children }) {
 export function StatusBar() {
     const {
         hist, loadingInterval, selectedResult, isAnalyzing, analysisProgress,
-        ticker, interval, realtimePrices, wsStatus, autoTradeSettings
+        ticker, interval, realtimePrices, wsStatus
     } = useStore(useShallow(state => ({
         hist: state.hist,
         loadingInterval: state.loadingInterval,
@@ -277,7 +277,6 @@ export function StatusBar() {
         interval: state.interval,
         realtimePrices: state.realtimePrices,
         wsStatus: state.wsStatus,
-        autoTradeSettings: state.autoTradeSettings,
     })))
 
     const dataCount = hist[interval]?.length || 0
@@ -324,11 +323,6 @@ export function StatusBar() {
                             ⚡ 오프라인
                         </button>
                     </KisApiGuide>
-                )}
-
-                {/* 자동 매매 */}
-                {autoTradeSettings?.isEnabled && (
-                    <span className="text-green-300 font-medium">🤖 자동매매 ON</span>
                 )}
 
                 {/* 데이터 로딩 */}

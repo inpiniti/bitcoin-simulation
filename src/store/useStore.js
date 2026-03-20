@@ -32,7 +32,6 @@ const indexedDBStorage = {
  * @property {Object} simul - 시뮬레이션 결과 저장소
  * @property {Object} dataCache - 티커별 데이터 캐시
  * @property {Object} strategyOptions - 매매 전략 설정
- * @property {Object} autoTradeSettings - 자동 매매 설정
  * @property {Object} kisAuth - 한국투자증권 인증 정보
  * 
  * @returns {StoreState} Zustand 스토어 객체
@@ -136,35 +135,6 @@ export const useStore = create(
                     baseQuantity: 100000,
                 },
 
-                // Auto Trading Settings
-                autoTradeSettings: {
-                    isEnabled: false,
-                    targetGroup: 'myholdings', // 'myholdings', 'sp500', 'superinvestor', etc.
-                    amountType: 'quantity', // 'quantity' | 'amount'
-                    buyAmount: 1, // 수량(주) 또는 금액($)
-                    executionTimeMinutes: 30, // 장 마감 N분 전
-                    // 전략 옵션 (자동 매매 전용)
-                    useBB: false, // 볼린저 밴드 필터
-                    useTrend: false, // 추세 필터 (MA50)
-                    useTrend20: false, // 추세 필터 (MA20)
-                    useRSI: false, // RSI 필터
-                    useVolumeFilter: false, // 거래량 필터
-                    // V-Martingale (강화 매수) 설정
-                    useVMartingale: false, // V-Martingale 활성화
-                    vMartingaleProfitCut: 2.0, // 최소 매도 수익률 (%)
-                    vMartingaleMultiplierMode: 'double', // 'double' | 'fixed'
-                    vMartingaleAddBuyThreshold: 0, // 추가 매수 조건: 평단가 대비 N% 이하일 때 (0=제한없음)
-                },
-
-                autoTradeStatus: {
-                    lastRunDate: null, // YYYY-MM-DD
-                    logs: [],
-                },
-
-                setAutoTradeSettings: (settings) => set(state => ({
-                    autoTradeSettings: { ...state.autoTradeSettings, ...settings }
-                })),
-
                 // Automation Config List (Supabase)
                 automationConfigList: [],
                 loadingAutomation: false,
@@ -240,13 +210,6 @@ export const useStore = create(
                     }
                 },
 
-                addAutoTradeLog: (message) => set(state => ({
-                    autoTradeStatus: {
-                        ...state.autoTradeStatus,
-                        logs: [{ time: new Date().toISOString(), message }, ...state.autoTradeStatus.logs].slice(0, 100) // 최근 100개 유지
-                    }
-                })),
-
                 // auto_trade_dl_logs (Supabase)
                 autoTradeDlLogs: [],
                 loadingAutoTradeDlLogs: false,
@@ -269,10 +232,6 @@ export const useStore = create(
                         set({ loadingAutoTradeDlLogs: false });
                     }
                 },
-
-                setLastRunDate: (dateStr) => set(state => ({
-                    autoTradeStatus: { ...state.autoTradeStatus, lastRunDate: dateStr }
-                })),
 
                 // Machine Learning Models
                 mlModels: [],
@@ -1545,8 +1504,6 @@ export const useStore = create(
                     lastRecommendedFetch: state.lastRecommendedFetch,
                     dataCache: state.dataCache,
                     kisAuth: state.kisAuth, // KIS 로그인 상태 저장
-                    autoTradeSettings: state.autoTradeSettings,
-                    autoTradeStatus: state.autoTradeStatus,
                 }),
             }
         ),

@@ -15,9 +15,7 @@ import { KISLoginDialog } from '@/components/KISLoginDialog';
 import { KISAccountDialog } from '@/components/KISAccountDialog';
 import { KISOrderDialog } from '@/components/KISOrderDialog';
 import { GlobalAlertDialog } from '@/components/GlobalAlertDialog';
-import { AutoTradingDialog } from '@/components/AutoTradingDialog';
-import { Search, Clock, Zap, Menu, X, RotateCcw, ChevronDown, Terminal, Layers, Maximize2, Minimize2 } from 'lucide-react';
-import { getMinutesUntilClose } from '@/lib/marketTime';
+import { Search, Zap, Menu, X, RotateCcw, ChevronDown, Terminal, Layers, Maximize2, Minimize2 } from 'lucide-react';
 import {
   ContextMenu,
   ContextMenuTrigger,
@@ -353,62 +351,6 @@ function ServerStatus() {
   );
 }
 
-function AutoTradeTimer({ executionTimeMinutes, isEnabled }) {
-  const { reloginKIS } = useStore();
-  const [timeLeft, setTimeLeft] = useState('');
-  const reloginAttemptedRef = useRef(false); // 재로그인 중복 방지 플래그
-
-  useEffect(() => {
-    if (!isEnabled) return;
-
-    const updateTimer = () => {
-      const minUntilClose = getMinutesUntilClose();
-      const minUntilExecution = minUntilClose - executionTimeMinutes;
-
-      // 자동 매매 5분 전 재로그인 (토큰 만료 방지)
-      if (minUntilExecution === 5 && !reloginAttemptedRef.current) {
-        console.log('[AutoTrade] 실행 5분 전 KIS 재로그인 시도...');
-        reloginKIS().then((result) => {
-          if (result.success) {
-            console.log('[AutoTrade] KIS 재로그인 성공');
-          } else {
-            console.error('[AutoTrade] KIS 재로그인 실패:', result.error);
-          }
-        });
-        reloginAttemptedRef.current = true;
-      }
-
-      // 재로그인 플래그 리셋 (다음 날 실행을 위해 시간이 충분히 지났을 때)
-      if (minUntilExecution > 30) {
-        reloginAttemptedRef.current = false;
-      }
-
-      if (minUntilExecution > 0) {
-        const hours = Math.floor(minUntilExecution / 60);
-        const mins = minUntilExecution % 60;
-        setTimeLeft(`${hours}h ${mins}m 후 실행`);
-      } else if (minUntilExecution > -10) {
-        setTimeLeft('실행 중/완료');
-      } else {
-        setTimeLeft('내일 실행 예정');
-      }
-    };
-
-    updateTimer();
-    const interval = setInterval(updateTimer, 60000); // 1분 갱신
-    return () => clearInterval(interval);
-  }, [executionTimeMinutes, isEnabled, reloginKIS]);
-
-  if (!isEnabled || !timeLeft) return null;
-
-  return (
-    <div className="flex items-center gap-1 text-[10px] text-[#dac422] bg-[#3a3a2a] px-1.5 py-0.5 rounded border border-[#5a5a3a]">
-      <Clock className="w-3 h-3" />
-      <span>{timeLeft}</span>
-    </div>
-  );
-}
-
 /**
  * 애플리케이션 상단 타이틀 바 컴포넌트입니다.
  * 모드 전환(코인/주식), 간격 선택, 데이터 로딩 상태 표시, 자동 매매 제어 및 KIS 계좌 연동을 담당합니다.
@@ -418,9 +360,7 @@ function AutoTradeTimer({ executionTimeMinutes, isEnabled }) {
  */
 export function TitleBar() {
   const {
-    mode,
     ticker,
-    setMode,
     setTicker,
     openTicker,
     recommendedStocks,
@@ -447,7 +387,6 @@ export function TitleBar() {
   const [filterText, setFilterText] = useState(''); // 드롭다운 필터용 (포커스 시 리셋)
   const [loginDialogOpen, setLoginDialogOpen] = useState(false);
   const [accountDialogOpen, setAccountDialogOpen] = useState(false);
-  const [autoTradeDialogOpen, setAutoTradeDialogOpen] = useState(false);
   const skipBlurRef = useRef(false);
 
   const isLoading = loadingInterval[interval] || loadingInterval['STOCK_BASE'];
@@ -488,16 +427,6 @@ export function TitleBar() {
         setAlertConfig((prev) => ({ ...prev, open: false }));
       },
     });
-  };
-
-  const handleModeChange = (newMode) => {
-    if (mode === newMode) return;
-
-    openAlert(
-      '모드 변경',
-      '모드를 변경하시겠습니까? 기존 데이터는 초기화됩니다.',
-      () => setMode(newMode),
-    );
   };
 
   const handleTickerSubmit = (e) => {
@@ -604,36 +533,6 @@ export function TitleBar() {
           )}
         </div>
 
-        {/* Auto Trade Button (Stock Mode Only) */}
-        {mode === 'stock' && (
-          <div className="flex items-center gap-2">
-            <AutoTradeTimer
-              executionTimeMinutes={
-                useStore.getState().autoTradeSettings.executionTimeMinutes
-              }
-              isEnabled={useStore.getState().autoTradeSettings.isEnabled}
-            />
-            <button
-              onClick={() => setAutoTradeDialogOpen(true)}
-              className={`px-2 py-0.5 text-[11px] rounded flex items-center gap-1 border ${
-                useStore.getState().autoTradeSettings.isEnabled
-                  ? 'bg-[#2d2d2d] border-green-700 text-green-500 hover:bg-[#333]'
-                  : 'bg-[#2d2d2d] border-[#3c3c3c] text-[#888888] hover:bg-[#333]'
-              }`}
-              title="자동 매매 설정"
-            >
-              <span>Auto Trade</span>
-              <span
-                className={`w-1.5 h-1.5 rounded-full ${
-                  useStore.getState().autoTradeSettings.isEnabled
-                    ? 'bg-green-500 animate-pulse'
-                    : 'bg-gray-500'
-                }`}
-              ></span>
-            </button>
-          </div>
-        )}
-
         {/* KIS Login/Account Button */}
         {kisAuth.isLoggedIn ? (
           <button
@@ -718,11 +617,6 @@ export function TitleBar() {
         }}
       />
 
-      {/* Auto Trading Dialog */}
-      <AutoTradingDialog
-        isOpen={autoTradeDialogOpen}
-        onOpenChange={setAutoTradeDialogOpen}
-      />
     </div>
   );
 }
