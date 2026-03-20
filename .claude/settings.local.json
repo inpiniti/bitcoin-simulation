@@ -12,7 +12,9 @@
       "Bash(rmdir \"c:/Users/USER/git/bitcoin-simulation/api/cron\")",
       "Bash(grep -E \"\\\\.css$\")",
       "Bash(node -e \"const {DayPicker} = require\\(''c:/Users/USER/git/bitcoin-simulation/node_modules/react-day-picker/dist/cjs/index.js''\\); console.log\\(Object.keys\\(DayPicker\\)\\)\")",
-      "Bash(node -e \"const pkg = require\\(''c:/Users/USER/git/bitcoin-simulation/node_modules/react-day-picker/package.json''\\); console.log\\(pkg.exports ? Object.keys\\(pkg.exports\\) : ''no exports''\\)\")"
+      "Bash(node -e \"const pkg = require\\(''c:/Users/USER/git/bitcoin-simulation/node_modules/react-day-picker/package.json''\\); console.log\\(pkg.exports ? Object.keys\\(pkg.exports\\) : ''no exports''\\)\")",
+      "Bash(xargs grep:*)",
+      "Bash(grep -n \"reschedule\" c:/Users/USER/git/bitcoin-simulation/api/simple/[path].js)"
     ]
   }
 }
