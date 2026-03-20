@@ -21,7 +21,10 @@
       "Bash(python -c \"import ast; ast.parse\\(open\\(''routers/train_ws.py''\\).read\\(\\)\\); print\\(''train_ws.py OK''\\)\")",
       "Bash(python -c \"import ast; ast.parse\\(open\\(''main.py''\\).read\\(\\)\\); print\\(''main.py OK''\\)\")",
       "Bash(python -c \":*)",
-      "Bash(node -e \":*)"
+      "Bash(node -e \":*)",
+      "Bash(grep -r \"HF_TOKEN\\\\|VITE_HF_TOKEN\" c:/Users/USER/git/bitcoin-simulation/.env*)",
+      "Bash(ls c:/Users/USER/git/bitcoin-simulation/.env*)",
+      "Bash(grep \"HF_TOKEN\\\\|VITE_HF\" c:/Users/USER/git/bitcoin-simulation/api/simple/[path].js)"
     ]
   }
 }
