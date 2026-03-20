@@ -94,7 +94,7 @@ function useMarketStatus() {
                 return { label: '애프터마켓', sub: null, color: '#f0a040', minutesLeft: null }
             }
             // 야간 (영업일이지만 모든 세션 외)
-            return { label: '야간', sub: null, color: '#666', minutesLeft: null }
+            return { label: '야간', sub: null, color: '#bbb', minutesLeft: null }
         }
 
         setStatus(calc())
@@ -205,7 +205,7 @@ export function StatusBar() {
                 {wsStatus?.connected ? (
                     <span className="text-[#4ec9b0]">⚡ 실시간</span>
                 ) : (
-                    <span className="text-[#888]">⚡ 오프라인</span>
+                    <span className="text-[#bbb]">⚡ 오프라인</span>
                 )}
 
                 {/* 자동 매매 */}
