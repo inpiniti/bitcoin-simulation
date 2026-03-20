@@ -1359,6 +1359,29 @@ export const useStore = create(
                     }
                 },
 
+                // 특정 탭 기준으로 다른 탭들을 닫는 배치 함수
+                closeOtherTickers: (keep) => {
+                    set({ activeTickers: [keep] });
+                    get().setTicker(keep);
+                },
+                closeRightTickers: (pivot) => {
+                    const state = get();
+                    const idx = state.activeTickers.indexOf(pivot);
+                    const newTickers = state.activeTickers.slice(0, idx + 1);
+                    set({ activeTickers: newTickers });
+                    if (!newTickers.includes(state.ticker)) get().setTicker(pivot);
+                },
+                closeLeftTickers: (pivot) => {
+                    const state = get();
+                    const idx = state.activeTickers.indexOf(pivot);
+                    const newTickers = state.activeTickers.slice(idx);
+                    set({ activeTickers: newTickers });
+                    if (!newTickers.includes(state.ticker)) get().setTicker(pivot);
+                },
+                closeAllTickers: () => {
+                    set({ activeTickers: [], ticker: '' });
+                },
+
                 /**
                  * 선택된 종목의 데이터를 로드합니다 (캐시 또는 API).
                  * interval 상태에 따라 일봉 또는 분봉을 로드합니다.
