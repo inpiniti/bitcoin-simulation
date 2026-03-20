@@ -105,8 +105,14 @@ function ServerLogPanel({ logType, onClose }) {
     };
 
     es.onerror = () => {
-      setStatus('error');
-      setErrorMsg('스트림 연결이 끊겼습니다.');
+      // 데이터를 받은 뒤 닫힌 경우 → 정상 종료 (빌드/컨테이너 완료)
+      // 데이터 없이 닫힌 경우 → 실제 오류
+      if (lineCountRef.current > 0) {
+        setStatus('closed');
+      } else {
+        setStatus('error');
+        setErrorMsg('스트림에 연결할 수 없습니다.');
+      }
       es.close();
     };
   }, [logType]);
@@ -136,14 +142,14 @@ function ServerLogPanel({ logType, onClose }) {
     connecting: <span className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse" />,
     streaming: <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />,
     error: <span className="w-2 h-2 rounded-full bg-red-400" />,
-    closed: <span className="w-2 h-2 rounded-full bg-gray-500" />,
+    closed: <span className="w-2 h-2 rounded-full bg-gray-400" />,
   }[status];
 
   const statusText = {
     connecting: '연결 중...',
     streaming: `스트리밍 중 · ${lines.length}줄`,
     error: `오류: ${errorMsg}`,
-    closed: '연결 종료',
+    closed: `스트림 종료 · ${lines.length}줄`,
   }[status];
 
   return (
@@ -215,6 +221,11 @@ function ServerLogPanel({ logType, onClose }) {
             {line.raw}
           </div>
         ))}
+        {status === 'closed' && (
+          <div className="mt-2 text-[#8b949e] border-t border-[#21262d] pt-2">
+            ─ 스트림이 종료되었습니다.
+          </div>
+        )}
         {status === 'error' && (
           <div className="mt-2 text-red-400">
             ⚠ {errorMsg}
