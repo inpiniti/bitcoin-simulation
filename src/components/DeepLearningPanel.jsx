@@ -48,6 +48,14 @@ export function DeepLearningPanel() {
         fetchModelsFromSupabase()
     }, [])
 
+    // 서버 사이드 학습 상태 (WebSocket)
+    const [serverTraining, setServerTraining] = useState(false)
+    const [serverCollectProgress, setServerCollectProgress] = useState(0)
+    const [serverTrainProgress, setServerTrainProgress] = useState(0)
+    const [serverTrainResult, setServerTrainResult] = useState(null)
+    const [serverTrainError, setServerTrainError] = useState(null)
+    const wsRef = useRef(null)
+
     // 재접속 시 서버 진행 상태 복원 (폴링)
     const pollRef = useRef(null)
     useEffect(() => {
@@ -139,14 +147,6 @@ export function DeepLearningPanel() {
     const [trainProgress, setTrainProgress] = useState(0)
     const [trainResult, setTrainResult] = useState(null)
     const [modelName, setModelName] = useState("")
-
-    // 서버 사이드 학습 상태 (WebSocket)
-    const [serverTraining, setServerTraining] = useState(false)
-    const [serverCollectProgress, setServerCollectProgress] = useState(0)
-    const [serverTrainProgress, setServerTrainProgress] = useState(0)
-    const [serverTrainResult, setServerTrainResult] = useState(null)
-    const [serverTrainError, setServerTrainError] = useState(null)
-    const wsRef = useRef(null)
 
     // 예측 상태
     const [predTicker, setPredTicker] = useState("BTC-USD")

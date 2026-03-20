@@ -24,7 +24,9 @@
       "Bash(node -e \":*)",
       "Bash(grep -r \"HF_TOKEN\\\\|VITE_HF_TOKEN\" c:/Users/USER/git/bitcoin-simulation/.env*)",
       "Bash(ls c:/Users/USER/git/bitcoin-simulation/.env*)",
-      "Bash(grep \"HF_TOKEN\\\\|VITE_HF\" c:/Users/USER/git/bitcoin-simulation/api/simple/[path].js)"
+      "Bash(grep \"HF_TOKEN\\\\|VITE_HF\" c:/Users/USER/git/bitcoin-simulation/api/simple/[path].js)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(python -c \"import json,sys; p=json.load\\(sys.stdin\\); print\\(''''exports:'''', json.dumps\\(p.get\\(''''exports'''', {}\\), indent=2\\)\\); print\\(''''main:'''', p.get\\(''''main''''\\)\\); print\\(''''module:'''', p.get\\(''''module''''\\)\\)\")"
     ]
   }
 }
