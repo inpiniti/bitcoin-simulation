@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useRef } from "react"
 import { useStore } from "@/store/useStore"
 import { fetchStockHistory } from "@/lib/api"
 import { processStockDataForML, processStockDataForPrediction } from "@/lib/mlProcessor"
@@ -57,6 +57,14 @@ export function DeepLearningPanel() {
     const [trainProgress, setTrainProgress] = useState(0)
     const [trainResult, setTrainResult] = useState(null)
     const [modelName, setModelName] = useState("")
+
+    // 서버 사이드 학습 상태 (WebSocket)
+    const [serverTraining, setServerTraining] = useState(false)
+    const [serverCollectProgress, setServerCollectProgress] = useState(0)
+    const [serverTrainProgress, setServerTrainProgress] = useState(0)
+    const [serverTrainResult, setServerTrainResult] = useState(null)
+    const [serverTrainError, setServerTrainError] = useState(null)
+    const wsRef = useRef(null)
 
     // 예측 상태
     const [predTicker, setPredTicker] = useState("BTC-USD")
@@ -563,6 +571,78 @@ export function DeepLearningPanel() {
         }
     }
 
+    // 서버 사이드 학습 (WebSocket)
+    const handleServerTrain = () => {
+        if (serverTraining) return
+
+        const identifier = trainMode === 'single' ? trainTicker : tickerGroup.toUpperCase()
+        const autoModelName = modelName || `XGB_${identifier}_${new Date().toISOString().slice(0, 10)}`
+        if (!modelName) setModelName(autoModelName)
+
+        setServerTraining(true)
+        setServerCollectProgress(0)
+        setServerTrainProgress(0)
+        setServerTrainResult(null)
+        setServerTrainError(null)
+
+        // WebSocket 연결 (vite proxy: /api/ws → backend /ws)
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+        const wsUrl = `${wsProtocol}//${window.location.host}/api/ws/train`
+        const ws = new WebSocket(wsUrl)
+        wsRef.current = ws
+
+        ws.onopen = () => {
+            ws.send(JSON.stringify({
+                group: trainMode === 'group' ? tickerGroup : undefined,
+                ticker: trainMode === 'single' ? trainTicker : undefined,
+                period: trainPeriod === 'max' ? 3650 : parseInt(trainPeriod),
+                modelName: autoModelName,
+            }))
+        }
+
+        ws.onmessage = (event) => {
+            try {
+                const msg = JSON.parse(event.data)
+                if (msg.type === 'collection') {
+                    setServerCollectProgress(msg.progress)
+                } else if (msg.type === 'training') {
+                    setServerTrainProgress(msg.progress)
+                } else if (msg.type === 'complete') {
+                    setServerCollectProgress(100)
+                    setServerTrainProgress(100)
+                    setServerTrainResult(msg.result)
+                    setServerTraining(false)
+                    fetchModelsFromSupabase()
+                } else if (msg.type === 'error') {
+                    setServerTrainError(msg.message)
+                    setServerTraining(false)
+                }
+            } catch (e) {
+                console.error('[WS] 메시지 파싱 실패:', e)
+            }
+        }
+
+        ws.onerror = (err) => {
+            console.error('[WS] 연결 오류:', err)
+            setServerTrainError('WebSocket 연결 오류가 발생했습니다.')
+            setServerTraining(false)
+        }
+
+        ws.onclose = () => {
+            if (serverTraining) {
+                setServerTraining(false)
+            }
+        }
+    }
+
+    const handleCancelServerTrain = () => {
+        if (wsRef.current) {
+            wsRef.current.close()
+            wsRef.current = null
+        }
+        setServerTraining(false)
+    }
+
     return (
         <div className="h-full bg-[#1e1e1e] text-[#e1e1e1] p-6 overflow-y-auto">
             <div className="flex justify-between items-center mb-6">
@@ -596,13 +676,17 @@ export function DeepLearningPanel() {
                 <TabsContent value="train" className="space-y-6">
                     <Card className="bg-[#252526] border-[#3c3c3c] text-[#e1e1e1]">
                         <CardHeader>
-                            <CardTitle>1. 데이터 수집 및 전처리</CardTitle>
+                            <CardTitle className="flex items-center gap-2">
+                                <Zap className="w-5 h-5 text-[#007acc]" />
+                                서버 학습 설정
+                            </CardTitle>
                             <CardDescription className="text-[#888888]">
-                                학습 데이터를 준비합니다. 단일 종목 또는 특정 그룹 전체를 대상으로 데이터를 수집할 수 있습니다.
+                                서버에서 직접 데이터를 수집하고 학습합니다. 대규모 그룹(6,000+)도 처리 가능합니다.
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            <Tabs value={trainMode} onValueChange={setTrainMode} className="w-full">
+                            {/* 학습 대상 선택 */}
+                            <Tabs value={trainMode} onValueChange={v => { setTrainMode(v); setServerTrainResult(null); setServerTrainError(null); }} className="w-full">
                                 <TabsList className="grid w-full grid-cols-2 bg-[#1e1e1e] border border-[#3c3c3c]">
                                     <TabsTrigger value="single">단일 종목</TabsTrigger>
                                     <TabsTrigger value="group">티커 그룹</TabsTrigger>
@@ -612,14 +696,13 @@ export function DeepLearningPanel() {
                                     {trainMode === 'single' ? (
                                         <div className="space-y-2">
                                             <label className="text-xs text-[#888888]">학습할 티커 (예: AAPL, BTC-USD)</label>
-                                            <div className="flex gap-2">
-                                                <Input
-                                                    value={trainTicker}
-                                                    onChange={e => setTrainTicker(e.target.value)}
-                                                    className="bg-[#252526] border-[#3c3c3c]"
-                                                    placeholder="AAPL"
-                                                />
-                                            </div>
+                                            <Input
+                                                value={trainTicker}
+                                                onChange={e => setTrainTicker(e.target.value)}
+                                                className="bg-[#252526] border-[#3c3c3c]"
+                                                placeholder="AAPL"
+                                                disabled={serverTraining}
+                                            />
                                         </div>
                                     ) : (
                                         <div className="space-y-2">
@@ -628,29 +711,24 @@ export function DeepLearningPanel() {
                                                 className="w-full bg-[#252526] border border-[#3c3c3c] rounded p-2 text-sm"
                                                 value={tickerGroup}
                                                 onChange={e => setTickerGroup(e.target.value)}
+                                                disabled={serverTraining}
                                             >
-                                                <option value="superinvestor">Super Investors (DataRoma)</option>
-                                                <option value="sp500">S&P 500</option>
+                                                <option value="sp500">S&P 500 (~500종목)</option>
                                                 <option value="qqq">Nasdaq 100 (QQQ)</option>
                                                 <option value="usall">🇺🇸 나스닥 + 뉴욕 전체 (6,000+)</option>
                                                 <option value="kospi200">KOSPI 200</option>
-                                                <option value="kosdaq150">KOSDAQ 150</option>
-                                                <option value="myholdings">내 보유 종목</option>
                                             </select>
-                                            <div className="text-xs text-[#888888] flex justify-between">
-                                                <span>로드된 종목 수:</span>
-                                                <span className="text-[#007acc] font-bold">{groupStocks.length}개</span>
-                                            </div>
                                         </div>
                                     )}
 
-                                    {/* 학습 기간 선택 */}
+                                    {/* 학습 기간 */}
                                     <div className="space-y-2">
                                         <label className="text-xs text-[#888888]">학습 데이터 기간</label>
                                         <select
                                             className="w-full bg-[#252526] border border-[#3c3c3c] rounded p-2 text-sm"
                                             value={trainPeriod}
                                             onChange={e => setTrainPeriod(e.target.value)}
+                                            disabled={serverTraining}
                                         >
                                             <option value="30">1개월 (~30일)</option>
                                             <option value="365">1년 (~365일)</option>
@@ -658,72 +736,103 @@ export function DeepLearningPanel() {
                                             <option value="max">MAX (전체 기간)</option>
                                         </select>
                                         <div className="text-xs text-[#888888]">
-                                            {trainPeriod === '30' && '최근 1개월 데이터로 학습합니다. 빠르지만 데이터가 적습니다.'}
+                                            {trainPeriod === '30' && '최근 1개월 데이터로 학습합니다.'}
                                             {trainPeriod === '365' && '최근 1년 데이터로 학습합니다. (기본값)'}
-                                            {trainPeriod === '1825' && '최근 5년 데이터로 학습합니다. 더 많은 패턴을 학습할 수 있습니다.'}
-                                            {trainPeriod === 'max' && 'Yahoo Finance에서 제공하는 전체 기간 데이터로 학습합니다.'}
+                                            {trainPeriod === '1825' && '최근 5년 데이터로 학습합니다.'}
+                                            {trainPeriod === 'max' && '전체 기간 데이터로 학습합니다.'}
                                         </div>
                                     </div>
 
-                                    <Button
-                                        onClick={handleFetchAndProcess}
-                                        disabled={training}
-                                        className="w-full bg-[#3c3c3c] hover:bg-[#4c4c4c]"
-                                    >
-                                        {training ? <Loader2 className="animate-spin mr-2" /> : <Database className="w-4 h-4 mr-2" />}
-                                        데이터 세트 수집 시작
-                                    </Button>
-                                </div>
-                            </Tabs>
-
-                            {training && (
-                                <div className="space-y-2">
-                                    <div className="flex justify-between text-xs text-[#888888]">
-                                        <span>진행률</span>
-                                        <span>{trainProgress}%</span>
-                                    </div>
-                                    <Progress value={trainProgress} className="h-2" />
-                                </div>
-                            )}
-
-                            {trainData && (
-                                <div className="p-4 bg-[#1e1e1e] rounded border border-[#3c3c3c] space-y-3 animate-in fade-in duration-300">
-                                    <div className="flex items-center gap-2 text-sm text-green-500 font-bold mb-1">
-                                        <CheckCircle className="w-4 h-4" /> 데이터 준비 완료
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-2 text-xs">
-                                        <div className="bg-[#252526] p-2 rounded">
-                                            <div className="text-[#888888] mb-1">총 샘플 수</div>
-                                            <div className="text-lg font-bold text-[#007acc]">{trainData.count.toLocaleString()}</div>
-                                        </div>
-                                        <div className="bg-[#252526] p-2 rounded">
-                                            <div className="text-[#888888] mb-1">Feature 차원</div>
-                                            <div className="text-lg font-bold text-[#007acc]">{trainData.features[0].length}</div>
-                                        </div>
-                                    </div>
-                                    <div className="space-y-2 pt-2 border-t border-[#3c3c3c]">
-                                        <label className="text-xs text-[#888888]">모델 이름 지정</label>
+                                    {/* 모델 이름 */}
+                                    <div className="space-y-2">
+                                        <label className="text-xs text-[#888888]">모델 이름 (비워두면 자동 생성)</label>
                                         <Input
                                             value={modelName}
                                             onChange={e => setModelName(e.target.value)}
                                             className="bg-[#252526] border-[#3c3c3c]"
-                                            placeholder="저장할 모델 이름을 입력하세요"
+                                            placeholder={`XGB_${trainMode === 'single' ? trainTicker : tickerGroup.toUpperCase()}_${new Date().toISOString().slice(0, 10)}`}
+                                            disabled={serverTraining}
                                         />
                                     </div>
-
-                                    <Button
-                                        onClick={handleTrain}
-                                        disabled={training || !modelName}
-                                        className="w-full bg-[#007acc] hover:bg-[#0063a5] py-6 text-lg font-bold shadow-lg"
-                                    >
-                                        {training ? "AI 모델 학습 진행 중..." : "AI 모델 학습 시작 (서버 저장)"}
-                                    </Button>
                                 </div>
+                            </Tabs>
+
+                            {/* 진행 상황 표시 */}
+                            {(serverTraining || serverCollectProgress > 0 || serverTrainProgress > 0) && !serverTrainResult && !serverTrainError && (
+                                <div className="p-4 bg-[#1e1e1e] rounded border border-[#3c3c3c] space-y-4">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        {/* 수집 진행률 */}
+                                        <div className="space-y-2">
+                                            <div className="flex justify-between text-xs">
+                                                <span className="text-[#888888] flex items-center gap-1">
+                                                    <Database className="w-3 h-3" /> 수집
+                                                </span>
+                                                <span className={serverCollectProgress === 100 ? "text-green-400" : "text-[#007acc]"}>
+                                                    {serverCollectProgress}%
+                                                </span>
+                                            </div>
+                                            <Progress value={serverCollectProgress} className="h-3" />
+                                            {serverCollectProgress === 100 && (
+                                                <div className="text-xs text-green-400 flex items-center gap-1">
+                                                    <CheckCircle className="w-3 h-3" /> 수집 완료
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* 학습 진행률 */}
+                                        <div className="space-y-2">
+                                            <div className="flex justify-between text-xs">
+                                                <span className="text-[#888888] flex items-center gap-1">
+                                                    <Brain className="w-3 h-3" /> 학습
+                                                </span>
+                                                <span className={serverTrainProgress === 100 ? "text-green-400" : serverTrainProgress > 0 ? "text-[#007acc]" : "text-[#555555]"}>
+                                                    {serverTrainProgress}%
+                                                </span>
+                                            </div>
+                                            <Progress value={serverTrainProgress} className="h-3" />
+                                            {serverTrainProgress > 0 && serverTrainProgress < 100 && (
+                                                <div className="text-xs text-[#888888] flex items-center gap-1">
+                                                    <Loader2 className="w-3 h-3 animate-spin" /> XGBoost 학습 중...
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {serverTraining && (
+                                        <Button
+                                            onClick={handleCancelServerTrain}
+                                            variant="outline"
+                                            className="w-full border-red-800 text-red-400 hover:bg-red-900/20"
+                                        >
+                                            취소
+                                        </Button>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* 오류 표시 */}
+                            {serverTrainError && (
+                                <div className="p-3 bg-red-900/20 border border-red-800 rounded flex items-start gap-2 text-sm text-red-400">
+                                    <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                                    <span>{serverTrainError}</span>
+                                </div>
+                            )}
+
+                            {/* 학습하기 버튼 */}
+                            {!serverTraining && !serverTrainResult && (
+                                <Button
+                                    onClick={handleServerTrain}
+                                    className="w-full bg-[#007acc] hover:bg-[#0063a5] py-6 text-lg font-bold shadow-lg"
+                                >
+                                    <Play className="w-5 h-5 mr-2" />
+                                    학습하기 (서버에서 수집 → 학습)
+                                </Button>
                             )}
                         </CardContent>
                     </Card>
 
-                    {trainResult && (
+                    {/* 완료 결과 카드 */}
+                    {serverTrainResult && (
                         <Card className="bg-[#252526] border-[#3c3c3c] text-[#e1e1e1] animate-in slide-in-from-bottom duration-500">
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2 text-green-500">
@@ -735,22 +844,23 @@ export function DeepLearningPanel() {
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="flex flex-col items-center justify-center p-4 bg-[#1e1e1e] rounded border border-[#3c3c3c]">
                                         <span className="text-xs text-[#888888] mb-1">검증 정확도</span>
-                                        <span className="text-3xl font-bold text-green-500">{(trainResult.accuracy * 100).toFixed(1)}%</span>
+                                        <span className="text-3xl font-bold text-green-500">{(serverTrainResult.accuracy * 100).toFixed(1)}%</span>
                                     </div>
                                     <div className="flex flex-col items-center justify-center p-4 bg-[#1e1e1e] rounded border border-[#3c3c3c]">
                                         <span className="text-xs text-[#888888] mb-1">학습 샘플</span>
-                                        <span className="text-2xl font-bold">{(trainResult.sampleCount || trainData.count).toLocaleString()}</span>
+                                        <span className="text-2xl font-bold">{(serverTrainResult.sampleCount || 0).toLocaleString()}</span>
                                     </div>
                                 </div>
-
-                                <div className="space-y-2 text-center pt-2">
-                                    <div className="text-sm text-green-500 font-bold mb-2">
-                                        모델이 서버({modelName})에 안전하게 저장되었습니다.
-                                    </div>
-                                    <Button onClick={() => { setTrainResult(null); setTrainData(null); }} variant="outline" className="border-[#3c3c3c]">
-                                        새로운 학습 시작하기
-                                    </Button>
+                                <div className="text-sm text-green-500 font-bold text-center">
+                                    모델이 서버에 저장되었습니다.
                                 </div>
+                                <Button
+                                    onClick={() => { setServerTrainResult(null); setServerCollectProgress(0); setServerTrainProgress(0); setServerTrainError(null); }}
+                                    variant="outline"
+                                    className="w-full border-[#3c3c3c]"
+                                >
+                                    새로운 학습 시작하기
+                                </Button>
                             </CardContent>
                         </Card>
                     )}

@@ -1117,6 +1117,13 @@ export default defineConfig(({ mode }) => {
                     },
                 },
                 // '/api/xgb'는 위 configureServer 미들웨어에서 처리 (E2BIG 에러 방지)
+                '/api/ws': {
+                    target: (process.env.BACKEND_URL || 'https://younginpiniti-bitcoin-ai-backend.hf.space').replace(/^https/, 'wss').replace(/^http/, 'ws'),
+                    ws: true,
+                    changeOrigin: true,
+                    secure: false,
+                    rewrite: (path) => path.replace(/^\/api\/ws/, '/ws'),
+                },
                 '/api/yahoo-conversation': {
                     target: 'https://api-v2.spot.im',
                     changeOrigin: true,

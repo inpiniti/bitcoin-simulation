@@ -14,7 +14,13 @@
       "Bash(node -e \"const {DayPicker} = require\\(''c:/Users/USER/git/bitcoin-simulation/node_modules/react-day-picker/dist/cjs/index.js''\\); console.log\\(Object.keys\\(DayPicker\\)\\)\")",
       "Bash(node -e \"const pkg = require\\(''c:/Users/USER/git/bitcoin-simulation/node_modules/react-day-picker/package.json''\\); console.log\\(pkg.exports ? Object.keys\\(pkg.exports\\) : ''no exports''\\)\")",
       "Bash(xargs grep:*)",
-      "Bash(grep -n \"reschedule\" c:/Users/USER/git/bitcoin-simulation/api/simple/[path].js)"
+      "Bash(grep -n \"reschedule\" c:/Users/USER/git/bitcoin-simulation/api/simple/[path].js)",
+      "Bash(grep -n \"simple\" /c/Users/USER/git/bitcoin-simulation/api/simple/[path].js)",
+      "Bash(python -c \"import ast; ast.parse\\(open\\(''services/data_collector.py''\\).read\\(\\)\\); print\\(''data_collector.py OK''\\)\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\(''services/xgb_service.py''\\).read\\(\\)\\); print\\(''xgb_service.py OK''\\)\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\(''routers/train_ws.py''\\).read\\(\\)\\); print\\(''train_ws.py OK''\\)\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\(''main.py''\\).read\\(\\)\\); print\\(''main.py OK''\\)\")",
+      "Bash(python -c \":*)"
     ]
   }
 }
