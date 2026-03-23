@@ -49,6 +49,24 @@ export function DLModelsTab({ serverModels, loadingModels, onDeleteModel, onRefr
                                             <span>정확도:</span>
                                             <span className="text-green-500 font-bold">{(model.accuracy * 100).toFixed(1)}%</span>
                                         </div>
+                                        {model.f1 != null && (
+                                            <div className="flex justify-between">
+                                                <span>F1:</span>
+                                                <span className="text-blue-400 font-bold">{(model.f1 * 100).toFixed(1)}%</span>
+                                            </div>
+                                        )}
+                                        {model.auc != null && (
+                                            <div className="flex justify-between">
+                                                <span>AUC:</span>
+                                                <span className="text-purple-400 font-bold">{model.auc.toFixed(3)}</span>
+                                            </div>
+                                        )}
+                                        {model.precision != null && model.recall != null && (
+                                            <div className="flex justify-between">
+                                                <span>P/R:</span>
+                                                <span className="text-[#e1e1e1]">{(model.precision * 100).toFixed(0)}% / {(model.recall * 100).toFixed(0)}%</span>
+                                            </div>
+                                        )}
                                         <div className="flex justify-between">
                                             <span>샘플 수:</span>
                                             <span className="text-[#e1e1e1]">{model.sample_count || model.sampleCount || '-'}</span>
