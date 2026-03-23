@@ -63,9 +63,11 @@ export function DeepLearningPanel() {
     // 재접속 시 서버 진행 상태 복원 (폴링)
     const pollRef = useRef(null)
     useEffect(() => {
+        const abortController = new AbortController()
+
         const checkStatus = async () => {
             try {
-                const res = await fetch('/api/xgb/train-status')
+                const res = await fetch('/api/xgb/train-status', { signal: abortController.signal })
                 if (!res.ok) return
                 const job = await res.json()
 
@@ -92,50 +94,63 @@ export function DeepLearningPanel() {
                     // idle — 진행 중인 작업 없음
                     clearInterval(pollRef.current)
                 }
-            } catch {
-                // 서버 오류 무시
+            } catch (e) {
+                if (e?.name !== 'AbortError') {
+                    // AbortError는 언마운트 시 정상 취소이므로 무시
+                }
             }
         }
 
         // 마운트 시 즉시 한 번 확인 (폴링은 serverTraining 변경 시 아래 useEffect가 처리)
         checkStatus()
 
-        return () => clearInterval(pollRef.current)
+        return () => {
+            abortController.abort()
+            clearInterval(pollRef.current)
+        }
     }, [])
 
     // serverTraining 변경 시 폴링 시작/중지
     useEffect(() => {
         clearInterval(pollRef.current)
-        if (serverTraining) {
-            pollRef.current = setInterval(async () => {
-                try {
-                    const res = await fetch('/api/xgb/train-status')
-                    if (!res.ok) return
-                    const job = await res.json()
+        if (!serverTraining) return
 
-                    if (job.status === 'collecting') {
-                        setServerCollectProgress(job.collect_progress ?? 0)
-                    } else if (job.status === 'training') {
-                        setServerCollectProgress(100)
-                        setServerTrainProgress(job.train_progress ?? 10)
-                    } else if (job.status === 'complete' && job.result) {
-                        setServerTraining(false)
-                        setServerCollectProgress(100)
-                        setServerTrainProgress(100)
-                        setServerTrainResult(job.result)
-                        fetchModelsFromSupabase()
-                        clearInterval(pollRef.current)
-                    } else if (job.status === 'error') {
-                        setServerTraining(false)
-                        setServerTrainError(job.error)
-                        clearInterval(pollRef.current)
-                    }
-                } catch {
-                    // 무시
+        const abortController = new AbortController()
+
+        pollRef.current = setInterval(async () => {
+            try {
+                const res = await fetch('/api/xgb/train-status', { signal: abortController.signal })
+                if (!res.ok) return
+                const job = await res.json()
+
+                if (job.status === 'collecting') {
+                    setServerCollectProgress(job.collect_progress ?? 0)
+                } else if (job.status === 'training') {
+                    setServerCollectProgress(100)
+                    setServerTrainProgress(job.train_progress ?? 10)
+                } else if (job.status === 'complete' && job.result) {
+                    setServerTraining(false)
+                    setServerCollectProgress(100)
+                    setServerTrainProgress(100)
+                    setServerTrainResult(job.result)
+                    fetchModelsFromSupabase()
+                    clearInterval(pollRef.current)
+                } else if (job.status === 'error') {
+                    setServerTraining(false)
+                    setServerTrainError(job.error)
+                    clearInterval(pollRef.current)
                 }
-            }, 5000)
+            } catch (e) {
+                if (e?.name !== 'AbortError') {
+                    // AbortError는 언마운트 시 정상 취소이므로 무시
+                }
+            }
+        }, 5000)
+
+        return () => {
+            abortController.abort()
+            clearInterval(pollRef.current)
         }
-        return () => clearInterval(pollRef.current)
     }, [serverTraining])
 
     // 컴포넌트 언마운트 시 WebSocket 정리
