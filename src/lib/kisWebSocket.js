@@ -126,6 +126,7 @@ class KISWebSocketManager {
         }
         this.stopPing();
         this.stopFlushTimer();
+        this.updateBatch = {}; // 연결 종료 시 미처리 배치 명시적 초기화
         if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     }
 
@@ -496,8 +497,8 @@ class KISWebSocketManager {
             clearInterval(this.flushTimer);
             this.flushTimer = null;
         }
-        // 배치 데이터도 정리
-        this.updateBatch = {};
+        // 남은 배치 데이터는 유지 — startFlushTimer() 재호출 시 유실 방지
+        // 명시적 초기화가 필요한 경우(연결 종료 등)는 호출자가 this.updateBatch = {} 직접 처리
     }
 }
 
