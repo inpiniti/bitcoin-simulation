@@ -196,7 +196,7 @@ export function AutomationSettingsPanel() {
                         자동 매매 봇 설정
                     </h2>
                     <p className="text-[#858585] text-sm mt-1">
-                        Git Action 봇이 실행할 매매 시나리오를 관리합니다. (Supabase 저장)
+                        HuggingFace 서버 스케줄러(APScheduler)가 실행할 매매 설정을 관리합니다. (Supabase 저장)
                     </p>
                 </div>
             </div>
