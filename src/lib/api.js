@@ -423,7 +423,8 @@ export async function fetchStockOverview(ticker) {
                 currentPrice: fmt(quoteData?.regularMarketPrice),
                 targetMeanPrice: fmt('-'),
                 recommendationKey: '-', // 스크래핑 복잡도 높음
-                returnOnAssets: fmt(quoteData?.eps ? `EPS: ${quoteData.eps}` : '-'), // EPS를 임시로 보여줌
+                eps: fmt(quoteData?.eps ?? '-'),
+                returnOnAssets: fmt('-'),
                 returnOnEquity: fmt('-'),
             },
             stats: {
