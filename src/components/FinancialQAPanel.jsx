@@ -197,7 +197,7 @@ export function FinancialQAPanel() {
     // 시장 컨텍스트를 메모이제이션
     const marketContext = useMemo(
         () => buildMarketContext(ticker, hist1d, simul, selectedResult, autoPredictions),
-        [ticker, hist1d?.length, selectedResult, simul, autoPredictions]
+        [ticker, hist1d, selectedResult, simul, autoPredictions]
     )
 
     useEffect(() => {
