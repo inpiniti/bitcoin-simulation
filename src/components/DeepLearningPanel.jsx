@@ -68,7 +68,7 @@ export function DeepLearningPanel() {
         const checkStatus = async () => {
             try {
                 const res = await fetch('/api/xgb/train-status', { signal: abortController.signal })
-                if (!res.ok) return
+                if (!res.ok) { clearInterval(pollRef.current); return }
                 const job = await res.json()
 
                 if (job.status === 'collecting') {
@@ -120,7 +120,7 @@ export function DeepLearningPanel() {
         pollRef.current = setInterval(async () => {
             try {
                 const res = await fetch('/api/xgb/train-status', { signal: abortController.signal })
-                if (!res.ok) return
+                if (!res.ok) { clearInterval(pollRef.current); return }
                 const job = await res.json()
 
                 if (job.status === 'collecting') {
