@@ -63,7 +63,7 @@ export async function fetchStockData(ticker, interval = '1d', range = '365d', in
     }
 
     const json = await response.json();
-    const result = json.chart.result[0];
+    const result = json?.chart?.result?.[0];
 
     if (!result) {
         throw new Error("No data found");
