@@ -172,8 +172,10 @@ export function AutomationSettingsPanel() {
         if (result.success) {
             setIsDialogOpen(false);
             resetForm();
-            // 백엔드 스케줄 즉시 반영 (비동기, 실패해도 무시)
-            fetch('/api/reschedule', { method: 'POST' }).catch(() => {});
+            // 백엔드 스케줄 즉시 반영 (비동기, 실패 시 콘솔 경고만 출력 — 설정은 이미 Supabase에 저장됨)
+            fetch('/api/reschedule', { method: 'POST' })
+                .then(res => { if (!res.ok) console.warn('[Reschedule] 스케줄 반영 실패 (다음 서버 재시작 시 자동 반영됨)') })
+                .catch(err => console.warn('[Reschedule] 백엔드 연결 실패:', err.message));
         } else {
             alert('저장 실패: ' + result.error);
         }
