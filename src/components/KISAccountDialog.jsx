@@ -32,7 +32,7 @@ export function KISAccountDialog({ open, onOpenChange, kisAuth, onLogout, onRelo
         if (open && kisAuth.isLoggedIn) {
             loadData()
         }
-    }, [open, activeMenu])
+    }, [open, activeMenu, kisAuth])
 
     const loadData = async () => {
         setLoading(true)
