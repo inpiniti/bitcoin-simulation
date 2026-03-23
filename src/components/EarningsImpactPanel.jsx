@@ -243,7 +243,7 @@ export function EarningsImpactPanel() {
                                                 "p-3 text-right font-medium",
                                                 isBeat ? "text-[#4ec9b0]" : "text-[#f48771]"
                                             )}>
-                                                {isBeat ? "+" : ""}{(Math.random() * 5).toFixed(2)}%
+                                                {isBeat ? "+" : ""}{Math.abs(h.surprisePercent?.raw != null ? (h.surprisePercent.raw * 0.3) : 0).toFixed(2)}%
                                             </td>
                                         </tr>
                                     );
