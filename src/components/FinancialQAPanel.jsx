@@ -192,7 +192,7 @@ export function FinancialQAPanel() {
         }
 
         runAutoPrediction()
-    }, [ticker, hist1d.length])
+    }, [ticker, hist1d.length, aiModels, fetchAiModels])
 
     // 시장 컨텍스트를 메모이제이션
     const marketContext = useMemo(
