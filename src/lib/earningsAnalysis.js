@@ -40,7 +40,9 @@ export async function analyzeEarningsImpact(ticker, earningsHistory) {
             actual: h.actual.fmt,
             estimate: h.estimate.fmt,
             surprise: h.surprisePercent?.fmt || '0%',
-            priceImpact: (Math.random() * 10 - 5).toFixed(2) // 주가 영향 (나중에 실제 계산 로직으로 교체)
+            priceImpact: h.surprisePercent?.raw != null
+                ? (h.surprisePercent.raw * 0.3).toFixed(2)  // EPS surprise의 약 30%를 주가 반응 추정치로 사용
+                : null
         }))
     };
 }
