@@ -138,6 +138,16 @@ export function DeepLearningPanel() {
         return () => clearInterval(pollRef.current)
     }, [serverTraining])
 
+    // 컴포넌트 언마운트 시 WebSocket 정리
+    useEffect(() => {
+        return () => {
+            if (wsRef.current) {
+                wsRef.current.close()
+                wsRef.current = null
+            }
+        }
+    }, [])
+
     // 학습 상태
     const [trainMode, setTrainMode] = useState("single") // "single" | "group"
     const [trainTicker, setTrainTicker] = useState("AAPL")
@@ -512,9 +522,7 @@ export function DeepLearningPanel() {
         }
 
         ws.onclose = () => {
-            if (serverTraining) {
-                setServerTraining(false)
-            }
+            setServerTraining(prev => prev ? false : prev)
         }
     }
 
