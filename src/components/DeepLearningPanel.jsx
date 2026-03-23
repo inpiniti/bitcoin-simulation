@@ -286,7 +286,7 @@ export function DeepLearningPanel() {
         if (trainMode === 'group' || predTargetType === 'group') {
             fetchGroupStocks()
         }
-    }, [trainMode, predTargetType, tickerGroup])
+    }, [trainMode, predTargetType, tickerGroup, fetchGroupStocks])
 
 
     // 3. 모델 삭제 (Supabase)
