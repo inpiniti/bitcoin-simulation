@@ -19,6 +19,7 @@ const MENU_ITEMS = [
 export function KISAccountDialog({ open, onOpenChange, kisAuth, onLogout, onRelogin }) {
     const [activeMenu, setActiveMenu] = useState('account')
     const [loading, setLoading] = useState(false)
+    const [error, setError] = useState(null)
     const [data, setData] = useState({
         balance: null,
         orders: null,
@@ -79,6 +80,7 @@ export function KISAccountDialog({ open, onOpenChange, kisAuth, onLogout, onRelo
             }
         } catch (error) {
             console.error('데이터 로드 오류:', error)
+            setError('데이터를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.')
         } finally {
             setLoading(false)
         }
@@ -100,13 +102,15 @@ export function KISAccountDialog({ open, onOpenChange, kisAuth, onLogout, onRelo
             try {
                 const result = await onRelogin()
                 if (result.success) {
-                    // 재로그인 성공 시 데이터 다시 로드
+                    setError(null)
                     await loadData()
                 } else {
                     console.error('재로그인 실패:', result.error)
+                    setError('재로그인에 실패했습니다: ' + (result.error || '알 수 없는 오류'))
                 }
             } catch (error) {
                 console.error('재로그인 오류:', error)
+                setError('재로그인 중 오류가 발생했습니다.')
             } finally {
                 setReloginLoading(false)
             }
@@ -494,6 +498,14 @@ export function KISAccountDialog({ open, onOpenChange, kisAuth, onLogout, onRelo
                         className="w-[900px] h-[600px] bg-[#252526] border border-[#3c3c3c] shadow-2xl flex flex-col pointer-events-auto"
                         onClick={(e) => e.stopPropagation()}
                     >
+                        {/* 에러 배너 */}
+                        {error && (
+                            <div className="px-4 py-2 bg-[#5a1d1d] border-b border-[#f48771] text-[#f48771] text-xs flex items-center justify-between">
+                                <span>{error}</span>
+                                <button onClick={() => setError(null)} className="ml-2 hover:text-white">✕</button>
+                            </div>
+                        )}
+
                         {/* Header */}
                         <div className="flex items-center justify-between px-4 py-2 border-b border-[#3c3c3c] bg-[#2d2d2d]">
                             <div className="text-xs text-[#cccccc] font-medium">한국투자증권 계좌</div>

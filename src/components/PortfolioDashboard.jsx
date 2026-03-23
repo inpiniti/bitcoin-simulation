@@ -45,6 +45,7 @@ export function PortfolioDashboard() {
     })))
     const [loading, setLoading] = useState(true)
     const [refreshing, setRefreshing] = useState(false)
+    const [loadError, setLoadError] = useState(null)
     const [holdings, setHoldings] = useState([])
     const [summary, setSummary] = useState({})
     const [riskMetrics, setRiskMetrics] = useState({
@@ -77,6 +78,7 @@ export function PortfolioDashboard() {
             }
         } catch (error) {
             console.error("포트폴리오 데이터 로드 오류:", error)
+            setLoadError('포트폴리오 데이터를 불러오지 못했습니다. KIS 연결을 확인해주세요.')
         } finally {
             setLoading(false)
             setRefreshing(false)
@@ -224,6 +226,14 @@ export function PortfolioDashboard() {
 
     return (
         <div className="flex-1 flex flex-col bg-[#1e1e1e] overflow-hidden">
+            {/* 에러 배너 */}
+            {loadError && (
+                <div className="px-4 py-2 bg-[#5a1d1d] border-b border-[#f48771] text-[#f48771] text-xs flex items-center justify-between">
+                    <span>{loadError}</span>
+                    <button onClick={() => setLoadError(null)} className="ml-2 hover:text-white">✕</button>
+                </div>
+            )}
+
             {/* 헤더 */}
             <div className="flex items-center justify-between px-4 py-2 border-b border-[#3c3c3c] bg-[#252526]">
                 <div className="flex items-center gap-2">
