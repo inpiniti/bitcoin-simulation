@@ -389,6 +389,10 @@ export function OverviewPanel() {
                                     <span className="text-[#e1e1e1] font-mono">{fmtNum(stats.operatingMargins)}</span>
                                 </div>
                                 <div className="flex justify-between text-sm">
+                                    <span className="text-[#888888]">EPS</span>
+                                    <span className="text-[#e1e1e1] font-mono">{fmtNum(financials.eps)}</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
                                     <span className="text-[#888888]">ROA</span>
                                     <span className="text-[#e1e1e1] font-mono">{fmtNum(financials.returnOnAssets)}</span>
                                 </div>
