@@ -46,6 +46,11 @@
       "sourceType": "github",
       "computedHash": "bd925a368e3eef9f0a4806032ae27a457682a4432e66ce73b9629af731f6835d"
     },
+    "react-native-best-practices": {
+      "source": "callstackincubator/agent-skills",
+      "sourceType": "github",
+      "computedHash": "fc57fcd60cf312bccc3d9a8face658517aa912d7d5f8709b45e93fd4a51ecc62"
+    },
     "react-pdf": {
       "source": "vercel-labs/json-render",
       "sourceType": "github",
