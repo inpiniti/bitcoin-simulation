@@ -23,6 +23,7 @@ const AnalysisPanel = lazy(() => import("../AnalysisPanel").then(m => ({ default
 const StockDiscussionPanel = lazy(() => import("../StockDiscussionPanel").then(m => ({ default: m.StockDiscussionPanel })))
 const OverviewPanel = lazy(() => import("../OverviewPanel").then(m => ({ default: m.OverviewPanel })))
 const NewsPanel = lazy(() => import("../NewsPanel").then(m => ({ default: m.NewsPanel })))
+const GlobalNewsPanel = lazy(() => import("../GlobalNewsPanel").then(m => ({ default: m.GlobalNewsPanel })))
 const FinancialQAPanel = lazy(() => import("../FinancialQAPanel").then(m => ({ default: m.FinancialQAPanel })))
 const PortfolioDashboard = lazy(() => import("../PortfolioDashboard").then(m => ({ default: m.PortfolioDashboard })))
 const EarningsImpactPanel = lazy(() => import("../EarningsImpactPanel").then(m => ({ default: m.EarningsImpactPanel })))
@@ -91,7 +92,7 @@ export function EditorArea() {
 
     const renderContent = () => {
         // 탭이 하나도 없으면 소개 화면 표시 (단, 티커와 무관한 독립 패널 모드는 제외)
-        const independentModes = ['docs', 'portfolio', 'analyze', 'deepLearning', 'automation']
+        const independentModes = ['docs', 'portfolio', 'analyze', 'deepLearning', 'automation', 'news']
         if ((!activeTickers || activeTickers.length === 0) && !independentModes.includes(viewMode)) {
             return <IntroScreen />
         }
@@ -101,8 +102,13 @@ export function EditorArea() {
             return <OverviewPanel />
         }
 
-        // News Mode
+        // News Mode — global backend news feed (ticker-independent)
         if (viewMode === 'news') {
+            return <GlobalNewsPanel />
+        }
+
+        // Stock News Mode — Yahoo Finance stock-specific news
+        if (viewMode === 'stockNews') {
             return <NewsPanel />
         }
 
