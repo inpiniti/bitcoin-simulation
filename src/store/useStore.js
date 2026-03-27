@@ -255,6 +255,16 @@ export const useStore = create(
                 selectedDoc: null, // key of DOCS_DATA
                 setSelectedDoc: (docKey) => set({ selectedDoc: docKey }),
 
+                // News State (#67)
+                newsItems: [],
+                newsSelectedDate: null, // null = today (KST)
+                newsIsLoading: false,
+                newsError: null,
+                setNewsSelectedDate: (date) => set({ newsSelectedDate: date }),
+                setNewsItems: (items) => set({ newsItems: items }),
+                setNewsIsLoading: (loading) => set({ newsIsLoading: loading }),
+                setNewsError: (error) => set({ newsError: error }),
+
                 // Actions
                 setViewMode: (viewMode) => set({ viewMode }),
                 setGlobalError: (error) => set({ globalError: error }),
