@@ -107,6 +107,7 @@ export function AutomationSettingsPanel() {
         sell_profit_condition: 20,
         buy_condition: 60,
         prevent_loss_sell: false,
+        allow_loss_sell_for_buy: true,
         ai_model_key: '',
         ticker_group_key: 'superinvestor',
         is_active: true,
@@ -125,6 +126,7 @@ export function AutomationSettingsPanel() {
             sell_profit_condition: 20,
             buy_condition: 60,
             prevent_loss_sell: false,
+            allow_loss_sell_for_buy: true,
             ai_model_key: '',
             ticker_group_key: 'superinvestor',
             is_active: true,
@@ -149,6 +151,9 @@ export function AutomationSettingsPanel() {
                 sell_profit_condition: config.sell_profit_condition ?? 20,
                 buy_condition: config.buy_condition || 60,
                 prevent_loss_sell: !!config.prevent_loss_sell,
+                allow_loss_sell_for_buy: config.prevent_loss_sell
+                    ? !!config.allow_loss_sell_for_buy
+                    : true,
                 ai_model_key: config.ai_model_key || '',
                 ticker_group_key: config.ticker_group_key || 'superinvestor',
                 is_active: config.is_active !== false,
@@ -165,7 +170,13 @@ export function AutomationSettingsPanel() {
         if (!formData.name) return alert('설정 이름을 입력해주세요.');
         if (!formData.kis_appkey || !formData.kis_secret) return alert('KIS API 키를 입력해주세요.');
 
-        const payload = { ...formData };
+        const payload = {
+            ...formData,
+            // 손실매도방지를 끄면 이 옵션은 항상 true(자동 체크)로 저장
+            allow_loss_sell_for_buy: formData.prevent_loss_sell
+                ? !!formData.allow_loss_sell_for_buy
+                : true,
+        };
         if (editingId) payload.id = editingId;
 
         const result = await saveAutomationConfig(payload);
@@ -273,6 +284,9 @@ export function AutomationSettingsPanel() {
                                                             <span>확률 ≤ {config.sell_condition ?? 20}%</span>
                                                             <span>수익 ≥ {config.sell_profit_condition ?? 20}%</span>
                                                             {config.prevent_loss_sell && <span className="text-[#569cd6]">🛡️ 손실매도방지</span>}
+                                                            {config.prevent_loss_sell && config.allow_loss_sell_for_buy && (
+                                                                <span className="text-[#ce9178]">♻️ 매수자금용 손실종목 10% 매도</span>
+                                                            )}
                                                         </div>
                                                     </TableCell>
                                                     <TableCell>
@@ -624,7 +638,23 @@ export function AutomationSettingsPanel() {
                                 </div>
                                 <Switch
                                     checked={formData.prevent_loss_sell}
-                                    onCheckedChange={(val) => setFormData({ ...formData, prevent_loss_sell: val })}
+                                    onCheckedChange={(val) => setFormData({
+                                        ...formData,
+                                        prevent_loss_sell: val,
+                                        allow_loss_sell_for_buy: val ? formData.allow_loss_sell_for_buy : true,
+                                    })}
+                                />
+                            </div>
+
+                            <div className="flex items-center justify-between pt-2 border-t border-[#3c3c3c]">
+                                <div className="space-y-0.5">
+                                    <Label className="text-[#ce9178] text-sm">♻️ 매수 자금 확보용 손실 종목 10% 매도</Label>
+                                    <p className="text-xs text-[#666]">매수 신호(보유 중인 종목 제외)가 있을 때만, 손실 종목별로 약 10%를 먼저 매도해 매수 자금을 확보합니다.</p>
+                                </div>
+                                <Switch
+                                    checked={formData.prevent_loss_sell ? formData.allow_loss_sell_for_buy : true}
+                                    disabled={!formData.prevent_loss_sell}
+                                    onCheckedChange={(val) => setFormData({ ...formData, allow_loss_sell_for_buy: val })}
                                 />
                             </div>
                         </div>
