@@ -4,7 +4,6 @@ import { get as idbGet, set as idbSet, del as idbDel } from 'idb-keyval'
 import { getSupabaseClient } from '@/lib/supabaseClient'
 import { fetchCoinDailyData, fetchStockHistory, fetchStockNews, getSentimentScore } from '@/lib/api'
 import { addDerivedData, generateIntegratedTrades, generateAiTrades, calculateFixedQuantityResult, calculateCumulativeResult, calculateMartingaleResult, analyzeSignal } from '@/lib/dataProcessor'
-import { processStockDataForPrediction } from '@/lib/mlProcessor'
 import { processTickerRealtime } from './realtimeHelpers'
 
 // IndexedDB 스토리지 어댑터
@@ -1308,58 +1307,23 @@ export const useStore = create(
                             return;
                         }
 
-                        // 1. Feature 추출
-                        const { features, dates, rawFeatures } = processStockDataForPrediction(data, true); // true = allHistory
-
-                        if (features.length === 0) {
-                            get().setGlobalError('데이터 부족으로 Feature를 생성할 수 없습니다.');
-                            return;
-                        }
-
-                        // 2. Predict API 호출
-                        // Vercel 환경에선 /api/xgb/predict, 로컬에선 vite proxy
+                        // 백엔드에서 ticker로 직접 데이터 수집 → 피처 추출 → 예측
                         try {
-                            // 로딩 상태 표시 (간이)
-                            // 실제로는 loadingSimul을 사용하는 게 좋음. UI Blocking은 아님.
-
-                            // 선택된 모델 정보 가져오기 (이름 조회용)
                             if (!options.aiModelId) {
                                 throw new Error('AI 모델이 선택되지 않았습니다. 사이드바에서 모델을 선택해주세요.');
                             }
 
-                            if (!features || features.length === 0) {
-                                throw new Error('예측을 위한 데이터가 부족합니다 (최소 30봉 필요)');
+                            const ticker = get().ticker;
+                            if (!ticker) {
+                                throw new Error('ticker가 설정되지 않았습니다.');
                             }
 
-                            let payload = { modelId: options.aiModelId };
-
-                            if (features.length > 50) {
-                                console.log('[AI Sim] Large dataset detected, uploading to Supabase...', features.length);
-                                const supabase = getSupabaseClient();
-                                if (!supabase) throw new Error('Supabase client unavailable');
-
-                                const { data: dsData, error: dsError } = await supabase
-                                    .from('training_datasets')
-                                    .insert([{ features: features, labels: [] }])
-                                    .select();
-
-                                if (dsError) {
-                                    console.error('[AI Sim] Supabase Upload Error:', dsError);
-                                    throw new Error(`Data upload failed: ${dsError.message}`);
-                                }
-                                if (!dsData || dsData.length === 0) throw new Error('Data upload returned no ID');
-
-                                payload.datasetId = dsData[0].id;
-                                console.log('[AI Sim] Using datasetId:', payload.datasetId);
-                            } else {
-                                payload.features = features;
-                                console.log('[AI Sim] Using inline features:', features.length);
-                            }
+                            console.log(`[AI Sim] 백엔드 예측 요청: ticker=${ticker}, modelId=${options.aiModelId}`);
 
                             const response = await fetch('/api/xgb/predict', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify(payload)
+                                body: JSON.stringify({ modelId: options.aiModelId, ticker })
                             });
 
                             if (!response.ok) {
@@ -1373,21 +1337,11 @@ export const useStore = create(
                                 throw new Error('서버로부터 올바른 예측 데이터를 받지 못했습니다.');
                             }
 
-                            // 중요: 서버 응답에는 날짜 정보가 없으므로 dates와 매핑해야 generateAiTrades에서 인식 가능
-                            // 중요: 서버 응답에는 날짜 정보가 없으므로 dates와 매핑해야 generateAiTrades에서 인식 가능
-                            const predictions = resultData.predictions.map((p, idx) => {
-                                // 다양한 서버 응답 형식 대응 (XGBoost는 보통 [prob_0, prob_1] 또는 {probability: p} 반환)
-                                let prob = 0;
-                                if (typeof p === 'number') prob = p;
-                                else if (Array.isArray(p)) prob = p[1] !== undefined ? p[1] : p[0];
-                                else if (p && typeof p === 'object') prob = p.probability !== undefined ? p.probability : (p[1] !== undefined ? p[1] : (p.prob || 0));
-
-                                return {
-                                    ...(typeof p === 'object' && !Array.isArray(p) ? p : {}),
-                                    probability: prob,
-                                    date: dates[idx]
-                                };
-                            });
+                            // 백엔드가 date, rawFeatures(consecutiveDays 등)를 포함해 반환
+                            const predictions = resultData.predictions.map((p) => ({
+                                ...p,
+                                probability: p.probability ?? 0,
+                            }));
 
                             const maxProb = Math.max(...predictions.map(p => p.probability));
                             const minProb = Math.min(...predictions.map(p => p.probability));
@@ -1405,11 +1359,14 @@ export const useStore = create(
                                 trailingStopPcnt: options.trailingStopPcnt
                             });
 
-                            // [유저 요청] 데이터 뷰를 위한 상세 데이터 구성
-                            const aiData = predictions.map((p, idx) => ({
-                                date: dates[idx],
+                            // [유저 요청] 데이터 뷰를 위한 상세 데이터 구성 (백엔드가 date, rawFeatures 포함 반환)
+                            const aiData = predictions.map((p) => ({
+                                date: p.date,
                                 probability: p.probability,
-                                ...(rawFeatures[idx] || {})
+                                consecutiveDays: p.consecutiveDays,
+                                change1d: p.change1d,
+                                change7d: p.change7d,
+                                change30d: p.change30d,
                             })).sort((a, b) => new Date(b.date) - new Date(a.date));
 
                             const resultObj = {
