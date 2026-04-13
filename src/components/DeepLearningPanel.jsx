@@ -166,6 +166,7 @@ export function DeepLearningPanel() {
     // 학습 상태
     const [trainMode, setTrainMode] = useState("single") // "single" | "group"
     const [trainTicker, setTrainTicker] = useState("AAPL")
+    const [trainGroup, setTrainGroup] = useState("sp500") // 학습 전용 그룹 키
     const [trainPeriod, setTrainPeriod] = useState("365") // "30" | "365" | "1825" | "max"
     const [modelName, setModelName] = useState("")
 
@@ -483,7 +484,7 @@ export function DeepLearningPanel() {
     const handleServerTrain = () => {
         if (serverTraining) return
 
-        const identifier = trainMode === 'single' ? trainTicker : tickerGroup.toUpperCase()
+        const identifier = trainMode === 'single' ? trainTicker : trainGroup.toUpperCase()
         const autoModelName = modelName || `XGB_${identifier}_${new Date().toISOString().slice(0, 10)}`
         if (!modelName) setModelName(autoModelName)
 
@@ -501,7 +502,7 @@ export function DeepLearningPanel() {
 
         ws.onopen = () => {
             ws.send(JSON.stringify({
-                group: trainMode === 'group' ? tickerGroup : undefined,
+                group: trainMode === 'group' ? trainGroup : undefined,
                 ticker: trainMode === 'single' ? trainTicker : undefined,
                 period: trainPeriod === 'max' ? 3650 : parseInt(trainPeriod),
                 modelName: autoModelName,
@@ -585,8 +586,8 @@ export function DeepLearningPanel() {
                         setTrainMode={setTrainMode}
                         trainTicker={trainTicker}
                         setTrainTicker={setTrainTicker}
-                        tickerGroup={tickerGroup}
-                        setTickerGroup={setTickerGroup}
+                        tickerGroup={trainGroup}
+                        setTickerGroup={setTrainGroup}
                         trainPeriod={trainPeriod}
                         setTrainPeriod={setTrainPeriod}
                         modelName={modelName}
