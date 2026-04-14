@@ -79,6 +79,7 @@ export const useStore = create(
 
                 // History data - 일봉 또는 분봉 사용
                 interval: '1d', // '1d' | '1m'
+                dataPeriod: 365, // 데이터 로드 기간 (일)
                 hist: {
                     '1d': [],
                     '1m': [],
@@ -308,6 +309,11 @@ export const useStore = create(
                         set({ interval, hist: { ...get().hist, [interval]: [] } });
                         get().loadDailyData();
                     }
+                },
+
+                setDataPeriod: (days) => {
+                    set({ dataPeriod: days, hist: { ...get().hist, '1d': [] }, dataCache: {} });
+                    get().loadDailyData();
                 },
 
                 // Ticker Group Selection
@@ -1248,7 +1254,7 @@ export const useStore = create(
                                     rawData = await fetchStockMinuteData(ticker);
                                 } else {
                                     const { fetchStockHistory } = await import('@/lib/api');
-                                    rawData = await fetchStockHistory(ticker);
+                                    rawData = await fetchStockHistory(ticker, get().dataPeriod || 365);
                                 }
                             }
 
@@ -1320,7 +1326,7 @@ export const useStore = create(
                             }
 
                             // 로드된 데이터 일수 기준으로 백엔드에 요청 (불필요한 과거 데이터 방지)
-                            const days = Math.min(data.length + 30, 730);
+                            const days = get().dataPeriod || 365;
 
                             console.log(`[AI Sim] 백엔드 예측 요청: ticker=${ticker}, modelId=${options.aiModelId}, days=${days}`);
 
@@ -1482,6 +1488,7 @@ export const useStore = create(
                     simul: state.simul,
                     viewMode: state.viewMode,
                     interval: state.interval,
+                    dataPeriod: state.dataPeriod,
                     recommendedStocks: state.recommendedStocks,
                     lastRecommendedFetch: state.lastRecommendedFetch,
                     dataCache: state.dataCache,

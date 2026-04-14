@@ -25,7 +25,10 @@ export function Sidebar() {
         setGlobalError,
         aiModels,
         loadingAiModels,
-        fetchAiModels
+        fetchAiModels,
+        dataPeriod,
+        setDataPeriod,
+        loadingInterval
     } = useStore()
 
     useEffect(() => {
@@ -98,6 +101,39 @@ export function Sidebar() {
                 <div className="flex-1 overflow-hidden flex flex-col relative">
                     {activeTab === 'strategy' ? (
                         <div className="flex-1 overflow-auto p-4 space-y-6">
+                            {/* 0. 데이터 기간 */}
+                            <section className="space-y-2">
+                                <h3 className="text-[12px] font-bold text-[#cccccc] flex items-center gap-2">
+                                    <BarChart3 className="w-3.5 h-3.5" /> 데이터 기간
+                                </h3>
+                                <div className="grid grid-cols-4 gap-1">
+                                    {[
+                                        { days: 365, label: '1년' },
+                                        { days: 730, label: '2년' },
+                                        { days: 1825, label: '5년' },
+                                        { days: 3650, label: '10년' },
+                                    ].map(({ days, label }) => (
+                                        <button
+                                            key={days}
+                                            disabled={loadingInterval['1d']}
+                                            onClick={() => setDataPeriod(days)}
+                                            className={cn(
+                                                "py-1.5 text-[11px] rounded border transition-colors",
+                                                dataPeriod === days
+                                                    ? "bg-[#0e639c] border-[#1177bb] text-white"
+                                                    : "bg-[#333333] border-[#444444] text-[#aaaaaa] hover:bg-[#3c3c3c]",
+                                                loadingInterval['1d'] && "opacity-50 cursor-not-allowed"
+                                            )}
+                                        >
+                                            {loadingInterval['1d'] && dataPeriod === days
+                                                ? <Loader2 className="w-3 h-3 animate-spin mx-auto" />
+                                                : label
+                                            }
+                                        </button>
+                                    ))}
+                                </div>
+                            </section>
+
                             {/* 1. 수량 & 자산관리 */}
                             <section className="space-y-2">
                                 <h3 className="text-[12px] font-bold text-[#cccccc] flex items-center gap-2">
