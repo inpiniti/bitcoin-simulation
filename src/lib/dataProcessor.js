@@ -542,7 +542,14 @@ export function generateAiTrades(data, predictions, options = {}) {
 
     console.log(`[AI Trade] Summary - Total candles: ${data.length}, Matched: ${matchedCount}, Buys: ${buyCount}, Sells: ${sellCount}, Closed trades: ${trades.length}`);
     if (trades.length === 0 && matchedCount > 0) {
-        console.warn('[AI Trade] WARNING: 날짜는 매칭되었지만 거래가 발생하지 않았습니다. 임계값을 확인하세요.');
+        const probs = Array.from(predMap.values());
+        const maxProb = Math.max(...probs);
+        const aboveBuy = probs.filter(p => p >= buyThreshold).length;
+        console.warn(`[AI Trade] WARNING: 날짜는 매칭되었지만 거래가 발생하지 않았습니다.`);
+        console.warn(`[AI Trade] 매칭된 ${matchedCount}개 중 매수 조건(≥${(buyThreshold*100).toFixed(0)}%) 충족: ${aboveBuy}개, 최대 확률: ${(maxProb*100).toFixed(1)}%`);
+        if (aboveBuy === 0) {
+            console.warn(`[AI Trade] 💡 매수 임계값을 ${Math.floor(maxProb * 100)}% 이하로 낮춰보세요.`);
+        }
     } else if (matchedCount === 0) {
         console.error('[AI Trade] ERROR: 예측 데이터와 캔들 데이터의 날짜가 하나도 매칭되지 않았습니다!');
         console.error('[AI Trade] First candle date:', data[0] ? new Date(toDate(data[0].timestamp || data[0].date).setHours(0, 0, 0, 0)).toISOString() : 'N/A');

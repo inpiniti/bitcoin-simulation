@@ -1418,7 +1418,14 @@ export const useStore = create(
                     }
 
                     if (trades.length === 0) {
-                        get().setGlobalError('해당 조건으로 발생한 매매 내역이 없습니다.');
+                        if (options.strategyMode === 'ai') {
+                            get().setGlobalError({
+                                title: '매매 내역 없음',
+                                description: `AI 모델의 예측 확률이 매수 임계값(${Math.round(options.aiBuyThreshold * 100)}%)을 충족하지 못했습니다.\n\n사이드바에서 "매수 조건(이상)" 슬라이더를 낮춰보세요.`
+                            });
+                        } else {
+                            get().setGlobalError('해당 조건으로 발생한 매매 내역이 없습니다.');
+                        }
                         return;
                     }
 
