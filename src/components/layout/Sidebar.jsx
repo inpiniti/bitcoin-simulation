@@ -15,6 +15,7 @@ export function Sidebar() {
         viewMode,
         runMarketAnalysis,
         isAnalyzing,
+        isSimulating,
         stopAnalysis,
         startRealtimeAnalysis,
         stopRealtimeAnalysis,
@@ -461,7 +462,7 @@ export function Sidebar() {
                 {/* Footer (Always visible in Sim/Analyze mode) */}
                 <div className="p-4 border-t border-[#3c3c3c] flex flex-col gap-2 bg-[#252526]">
                     <button
-                        disabled={!hasData}
+                        disabled={!hasData || isSimulating}
                         onClick={() => {
                             if (isAnalyzing) {
                                 stopAnalysis()
@@ -476,19 +477,19 @@ export function Sidebar() {
                         }}
                         className={cn(
                             "w-full py-2.5 text-[13px] font-bold rounded flex items-center justify-center gap-2 transition-all",
-                            !hasData
+                            (!hasData || isSimulating)
                                 ? "bg-[#333333] text-[#666666] cursor-not-allowed"
                                 : isAnalyzing
                                     ? "bg-[#c72e2e] hover:bg-[#f44336] text-white shadow-lg active:scale-95"
                                     : (isAnalyzeMode ? "bg-[#094771] hover:bg-[#007acc]" : "bg-[#0e639c] hover:bg-[#1177bb]") + " text-white shadow-lg active:scale-95"
                         )}
                     >
-                        {isAnalyzing ? (
+                        {(isAnalyzing || isSimulating) ? (
                             <Loader2 className="w-4 h-4 animate-spin" />
                         ) : (
                             <Zap className={cn("w-4 h-4", isAnalyzeMode ? "text-[#9cdcfe]" : "fill-white")} />
                         )}
-                        {isAnalyzing ? "분석 중지 (취소)" : (isAnalyzeMode ? "전체 시장 분석 실행" : "시뮬레이션 실행")}
+                        {isAnalyzing ? "분석 중지 (취소)" : isSimulating ? "예측 중..." : (isAnalyzeMode ? "전체 시장 분석 실행" : "시뮬레이션 실행")}
                     </button>
 
                     {/* 실시간 분석 버튼 (Analyze 모드 전용) */}

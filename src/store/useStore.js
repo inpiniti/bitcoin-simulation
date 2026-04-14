@@ -245,6 +245,9 @@ export const useStore = create(
                     mlModels: state.mlModels.filter(m => m.id !== id)
                 })),
 
+                // Simulation Running State
+                isSimulating: false,
+
                 // Market Analysis State & Actions
                 analysisResult: [],
                 isAnalyzing: false,
@@ -1299,31 +1302,32 @@ export const useStore = create(
 
                     let trades = [];
 
+                    set({ isSimulating: true });
+                    try {
+
                     if (options.strategyMode === 'ai') {
                         // AI 딥러닝 시뮬레이션
                         if (!options.aiModelId) {
-                            get().setGlobalError('선택된 AI 모델이 없습니다.');
-                            set({ loadingSimul: { ...state.loadingSimul, [key]: false } }); // 로딩 해제 필요 (여기선 key 생성 전이라 애매하지만 runSimulation 상단에 isLoading 넣어야 함. 일단 패스)
+                            get().setGlobalError('선택된 AI 모델이 없습니다. 사이드바에서 모델을 선택해주세요.');
                             return;
                         }
 
                         // 백엔드에서 ticker로 직접 데이터 수집 → 피처 추출 → 예측
                         try {
-                            if (!options.aiModelId) {
-                                throw new Error('AI 모델이 선택되지 않았습니다. 사이드바에서 모델을 선택해주세요.');
-                            }
-
                             const ticker = get().ticker;
                             if (!ticker) {
                                 throw new Error('ticker가 설정되지 않았습니다.');
                             }
 
-                            console.log(`[AI Sim] 백엔드 예측 요청: ticker=${ticker}, modelId=${options.aiModelId}`);
+                            // 로드된 데이터 일수 기준으로 백엔드에 요청 (불필요한 과거 데이터 방지)
+                            const days = Math.min(data.length + 30, 730);
+
+                            console.log(`[AI Sim] 백엔드 예측 요청: ticker=${ticker}, modelId=${options.aiModelId}, days=${days}`);
 
                             const response = await fetch('/api/xgb/predict', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ modelId: options.aiModelId, ticker })
+                                body: JSON.stringify({ modelId: options.aiModelId, ticker, days })
                             });
 
                             if (!response.ok) {
@@ -1441,6 +1445,10 @@ export const useStore = create(
                         selectedResult: { key, ...resultWithMeta },
                         viewMode: 'simulation' // 시뮬레이션 실행 후 뷰 전환
                     }));
+
+                    } finally {
+                        set({ isSimulating: false });
+                    }
                 },
 
                 setSelectedResult: (result) => set({ selectedResult: result }),
