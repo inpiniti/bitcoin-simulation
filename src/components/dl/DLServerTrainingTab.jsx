@@ -5,6 +5,27 @@ import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
 import { Brain, Database, Play, CheckCircle, Loader2, AlertCircle, Zap } from "lucide-react"
 
+const STAGE_OPTIONS = [
+    { key: 1,  label: '1단계',  desc: 'lookback: 1일' },
+    { key: 2,  label: '2단계',  desc: 'lookback: 1~2일' },
+    { key: 3,  label: '3단계',  desc: 'lookback: ~4일' },
+    { key: 4,  label: '4단계',  desc: 'lookback: ~8일' },
+    { key: 5,  label: '5단계',  desc: 'lookback: ~16일' },
+    { key: 6,  label: '6단계',  desc: 'lookback: ~32일' },
+    { key: 7,  label: '7단계',  desc: 'lookback: ~64일' },
+    { key: 8,  label: '8단계',  desc: 'lookback: ~128일' },
+    { key: 9,  label: '9단계',  desc: 'lookback: ~256일' },
+    { key: 10, label: '10단계', desc: 'lookback: ~512일' },
+    { key: 11, label: '11단계', desc: 'lookback: ~1024일' },
+]
+
+const ALL_PERIODS = [
+    { value: '365',  label: '1년' },
+    { value: '730',  label: '2년' },
+    { value: '1825', label: '5년' },
+    { value: 'max',  label: 'Max' },
+]
+
 export function DLServerTrainingTab({
     // training target
     trainMode,
@@ -15,6 +36,9 @@ export function DLServerTrainingTab({
     setTickerGroup,
     trainPeriod,
     setTrainPeriod,
+    trainStage,
+    setTrainStage,
+    stageMinPeriod,
     modelName,
     setModelName,
     // server training state
@@ -27,6 +51,7 @@ export function DLServerTrainingTab({
     onStartTrain,
     onResetResult,
 }) {
+    const availablePeriods = ALL_PERIODS.filter(p => p.value === 'max' || parseInt(p.value) >= (stageMinPeriod?.[trainStage] ?? 365))
     return (
         <div className="space-y-6">
             <Card className="bg-[#252526] border-[#3c3c3c] text-[#e1e1e1]">
@@ -76,6 +101,34 @@ export function DLServerTrainingTab({
                                 </div>
                             )}
 
+                            {/* 피처 단계 */}
+                            <div className="space-y-2">
+                                <label className="text-xs text-[#888888]">피처 단계 (lookback)</label>
+                                <div className="flex flex-wrap gap-1">
+                                    {STAGE_OPTIONS.map(s => (
+                                        <button
+                                            key={s.key}
+                                            onClick={() => !serverTraining && setTrainStage(s.key)}
+                                            disabled={serverTraining}
+                                            title={s.desc}
+                                            className={`px-2 py-1 text-xs rounded border transition-colors ${
+                                                trainStage === s.key
+                                                    ? 'bg-[#007acc] border-[#007acc] text-white'
+                                                    : 'bg-[#1e1e1e] border-[#3c3c3c] text-[#888888] hover:border-[#007acc]'
+                                            }`}
+                                        >
+                                            {s.label}
+                                        </button>
+                                    ))}
+                                </div>
+                                <div className="text-xs text-[#888888]">
+                                    {STAGE_OPTIONS.find(s => s.key === trainStage)?.desc}
+                                    {(stageMinPeriod?.[trainStage] ?? 365) > 365 && (
+                                        <span className="ml-2 text-yellow-500">※ 최소 {stageMinPeriod[trainStage] >= 1825 ? '5년' : '2년'} 이상 필요</span>
+                                    )}
+                                </div>
+                            </div>
+
                             {/* 학습 기간 */}
                             <div className="space-y-2">
                                 <label className="text-xs text-[#888888]">학습 데이터 기간</label>
@@ -85,14 +138,13 @@ export function DLServerTrainingTab({
                                     onChange={e => setTrainPeriod(e.target.value)}
                                     disabled={serverTraining}
                                 >
-                                    <option value="30">1개월 (~30일)</option>
-                                    <option value="365">1년 (~365일)</option>
-                                    <option value="1825">5년 (~1,825일)</option>
-                                    <option value="max">MAX (전체 기간)</option>
+                                    {availablePeriods.map(p => (
+                                        <option key={p.value} value={p.value}>{p.label}</option>
+                                    ))}
                                 </select>
                                 <div className="text-xs text-[#888888]">
-                                    {trainPeriod === '30' && '최근 1개월 데이터로 학습합니다.'}
-                                    {trainPeriod === '365' && '최근 1년 데이터로 학습합니다. (기본값)'}
+                                    {trainPeriod === '365' && '최근 1년 데이터로 학습합니다.'}
+                                    {trainPeriod === '730' && '최근 2년 데이터로 학습합니다.'}
                                     {trainPeriod === '1825' && '최근 5년 데이터로 학습합니다.'}
                                     {trainPeriod === 'max' && '전체 기간 데이터로 학습합니다.'}
                                 </div>

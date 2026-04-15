@@ -349,7 +349,7 @@ export function DLPredictionTab({
                                         <th className="p-2 text-[#888888]">날짜</th>
                                         <th className="p-2 text-[#888888]">티커</th>
                                         <th className="p-2 text-[#888888] text-center">연속일</th>
-                                        <th className="p-2 text-[#888888] text-right">30일%</th>
+                                        <th className="p-2 text-[#888888] text-right">최대구간%</th>
                                         <th className="p-2 text-[#888888] text-right">7일%</th>
                                         <th className="p-2 text-[#888888] text-right">1일%</th>
                                         <th className="p-2 text-[#888888] text-right">예측확률</th>
@@ -359,10 +359,13 @@ export function DLPredictionTab({
                                 </thead>
                                 <tbody>
                                     {allPredResults.slice(0, 500).map((r, idx) => {
-                                        const isHit = r.actual !== null && (
-                                            (r.prediction === 1 && r.actual >= 2) ||
-                                            (r.prediction === 0 && r.actual < 2)
+                                        const isHit = r.actual != null && (
+                                            (r.prediction === 1 && r.actual > 0) ||
+                                            (r.prediction === 0 && r.actual <= 0)
                                         )
+                                        const MAX_LB_KEYS = [1024, 512, 256, 128, 64, 32, 16, 8, 4, 2, 1]
+                                        const maxLbKey = MAX_LB_KEYS.map(n => `change${n}d`).find(k => r.rawFeature?.[k] != null)
+                                        const maxLbVal = maxLbKey != null ? r.rawFeature[maxLbKey] : null
                                         return (
                                             <tr key={idx} className="border-b border-[#2c2c2c] hover:bg-[#2a2a2a]">
                                                 <td className="p-2 text-[#e1e1e1]">{new Date(r.date).toLocaleDateString()}</td>
@@ -370,8 +373,8 @@ export function DLPredictionTab({
                                                 <td className={`p-2 text-center ${r.rawFeature?.consecutiveDays > 0 ? 'text-green-400' : r.rawFeature?.consecutiveDays < 0 ? 'text-red-400' : ''}`}>
                                                     {r.rawFeature?.consecutiveDays || 0}
                                                 </td>
-                                                <td className={`p-2 text-right ${r.rawFeature?.change30d > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                                    {r.rawFeature?.change30d?.toFixed(1) || '0.0'}%
+                                                <td className={`p-2 text-right ${maxLbVal > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                                    {maxLbVal != null ? `${maxLbVal.toFixed(1)}%` : '-'}
                                                 </td>
                                                 <td className={`p-2 text-right ${r.rawFeature?.change7d > 0 ? 'text-green-400' : 'text-red-400'}`}>
                                                     {r.rawFeature?.change7d?.toFixed(1) || '0.0'}%
@@ -382,11 +385,11 @@ export function DLPredictionTab({
                                                 <td className={`p-2 text-right font-bold ${r.probability > 0.5 ? 'text-green-400' : 'text-red-400'}`}>
                                                     {(r.probability * 100).toFixed(1)}%
                                                 </td>
-                                                <td className={`p-2 text-right font-bold ${r.actual >= 2 ? 'text-green-400' : r.actual !== null ? 'text-red-400' : 'text-[#666]'}`}>
-                                                    {r.actual !== null ? `${r.actual >= 0 ? '+' : ''}${r.actual.toFixed(1)}%` : '-'}
+                                                <td className={`p-2 text-right font-bold ${r.actual > 0 ? 'text-green-400' : r.actual != null ? 'text-red-400' : 'text-[#666]'}`}>
+                                                    {r.actual != null ? `${r.actual >= 0 ? '+' : ''}${r.actual.toFixed(1)}%` : '-'}
                                                 </td>
                                                 <td className="p-2 text-center">
-                                                    {r.actual !== null ? (
+                                                    {r.actual != null ? (
                                                         isHit ? <span className="text-green-400">✓</span> : <span className="text-red-400">✗</span>
                                                     ) : '-'}
                                                 </td>

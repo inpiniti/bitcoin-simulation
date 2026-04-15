@@ -167,8 +167,19 @@ export function DeepLearningPanel() {
     const [trainMode, setTrainMode] = useState("single") // "single" | "group"
     const [trainTicker, setTrainTicker] = useState("AAPL")
     const [trainGroup, setTrainGroup] = useState("sp500") // 학습 전용 그룹 키
-    const [trainPeriod, setTrainPeriod] = useState("365") // "30" | "365" | "1825" | "max"
+    const [trainStage, setTrainStage] = useState(6) // 피처 단계 1~11
+    const [trainPeriod, setTrainPeriod] = useState("365") // "365" | "730" | "1825" | "max"
     const [modelName, setModelName] = useState("")
+
+    // stage별 최소 필요 기간
+    const STAGE_MIN_PERIOD = { 1:365,2:365,3:365,4:365,5:365,6:365, 7:730,8:730,9:730, 10:1825,11:1825 }
+    const handleTrainStageChange = (s) => {
+        setTrainStage(s)
+        const minP = String(STAGE_MIN_PERIOD[s] ?? 365)
+        if (parseInt(trainPeriod) < parseInt(minP) && trainPeriod !== 'max') {
+            setTrainPeriod(minP)
+        }
+    }
 
     // 예측 상태
     const [predTicker, setPredTicker] = useState("BTC-USD")
@@ -485,7 +496,8 @@ export function DeepLearningPanel() {
         if (serverTraining) return
 
         const identifier = trainMode === 'single' ? trainTicker : trainGroup.toUpperCase()
-        const autoModelName = modelName || `XGB_${identifier}_${new Date().toISOString().slice(0, 10)}`
+        const periodLabel = trainPeriod === 'max' ? 'max' : `${trainPeriod}d`
+        const autoModelName = modelName || `XGB_${identifier}_s${trainStage}_${periodLabel}`
         if (!modelName) setModelName(autoModelName)
 
         setServerTraining(true)
@@ -504,7 +516,8 @@ export function DeepLearningPanel() {
             ws.send(JSON.stringify({
                 group: trainMode === 'group' ? trainGroup : undefined,
                 ticker: trainMode === 'single' ? trainTicker : undefined,
-                period: trainPeriod === 'max' ? 3650 : parseInt(trainPeriod),
+                period: trainPeriod === 'max' ? 36500 : parseInt(trainPeriod),
+                stage: trainStage,
                 modelName: autoModelName,
             }))
         }
@@ -522,6 +535,10 @@ export function DeepLearningPanel() {
                     setServerTrainResult(msg.result)
                     setServerTraining(false)
                     fetchModelsFromSupabase()
+                } else if (msg.type === 'notice') {
+                    setServerTrainError(null)
+                    // notice는 에러가 아닌 정보 메시지 — result 카드에 표시
+                    console.info('[WS] 알림:', msg.message)
                 } else if (msg.type === 'error') {
                     setServerTrainError(msg.message)
                     setServerTraining(false)
@@ -588,6 +605,9 @@ export function DeepLearningPanel() {
                         setTrainTicker={setTrainTicker}
                         tickerGroup={trainGroup}
                         setTickerGroup={setTrainGroup}
+                        trainStage={trainStage}
+                        setTrainStage={handleTrainStageChange}
+                        stageMinPeriod={STAGE_MIN_PERIOD}
                         trainPeriod={trainPeriod}
                         setTrainPeriod={setTrainPeriod}
                         modelName={modelName}
