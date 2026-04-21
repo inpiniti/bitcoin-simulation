@@ -43,27 +43,42 @@ export default async function handler(req) {
     const idx = Math.floor(Math.random() * apiKeys.length);
     const orderedKeys = [...apiKeys.slice(idx), ...apiKeys.slice(0, idx)];
 
+    const MODELS = [
+        'gemini-flash-lite-latest',
+        'gemini-flash-latest',
+        'gemini-3.1-flash-lite-preview',
+        'gemini-3-flash-preview',
+        'gemini-3.1-pro-preview',
+        'gemini-2.0-flash',
+    ];
+
     for (const apiKey of orderedKeys) {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
-        const apiResponse = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: bodyText,
-        });
+        for (const model of MODELS) {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+            const apiResponse = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: bodyText,
+            });
 
-        if (apiResponse.status === 429) {
-            console.log(`[Gemini Proxy] 429 Rate Limit for key [...${apiKey.slice(-6)}]`);
-            continue; // 다음 키로 시도
+            if (!apiResponse.ok) {
+                const status = apiResponse.status;
+                console.log(`[Gemini Proxy] key[...${apiKey.slice(-6)}] ${model} → ${status}`);
+                // 429(할당량) or 403(권한) → 다음 키로 건너뜀 (모델 계속 시도할 필요 없음)
+                if (status === 429 || status === 403) break;
+                // 404(모델 없음) 등 기타 에러 → 같은 키, 다음 모델 시도
+                continue;
+            }
+
+            console.log(`[Gemini Proxy] OK key [...${apiKey.slice(-6)}] model: ${model}`);
+            return new Response(apiResponse.body, {
+                status: 200,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*',
+                },
+            });
         }
-
-        console.log(`[Gemini Proxy] OK key [...${apiKey.slice(-6)}]`);
-        return new Response(apiResponse.body, {
-            status: apiResponse.status,
-            headers: {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*',
-            },
-        });
     }
 
     return new Response(JSON.stringify({ error: '모든 Gemini 키가 429 에러 상태입니다.' }), { 
