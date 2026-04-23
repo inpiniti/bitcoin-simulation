@@ -12,7 +12,7 @@ const STEPS = [
   { id: 'analyze_rumors', name: '소문 분석' },
 ];
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
 
 export default function PipelinePanel() {
   const [runId, setRunId] = useState(null);
