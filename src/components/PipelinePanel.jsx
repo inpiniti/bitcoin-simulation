@@ -32,9 +32,12 @@ export default function PipelinePanel() {
       try {
         const res = await fetch(`${API_URL}/sp500/pipeline/models`);
         const data = await res.json();
+        console.log('[Pipeline] 모델 API 응답:', data);
         setActiveModels(data.active);
         setXgbModels(data.xgboost_models || []);
         setRlModels(data.rl_models || []);
+        console.log('[Pipeline] XGBoost 모델:', data.xgboost_models?.length || 0, '개');
+        console.log('[Pipeline] RL 모델:', data.rl_models?.length || 0, '개');
       } catch (error) {
         console.error('모델 조회 실패:', error);
       }
