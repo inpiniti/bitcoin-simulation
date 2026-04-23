@@ -22,22 +22,40 @@ export default function PipelinePanel() {
   const [xgbModelId, setXgbModelId] = useState('');
   const [rlModelId, setRlModelId] = useState('');
   const [showModelInput, setShowModelInput] = useState(false);
-  const [activeModels, setActiveModels] = useState(null);
   const [xgbModels, setXgbModels] = useState([]);
   const [rlModels, setRlModels] = useState([]);
 
-  // 모델 목록 로드
+  // Supabase에서 직접 모델 목록 로드
   useEffect(() => {
     const loadModels = async () => {
       try {
-        const res = await fetch(`${API_URL}/sp500/pipeline/models`);
-        const data = await res.json();
-        console.log('[Pipeline] 모델 API 응답:', data);
-        setActiveModels(data.active);
-        setXgbModels(data.xgboost_models || []);
-        setRlModels(data.rl_models || []);
-        console.log('[Pipeline] XGBoost 모델:', data.xgboost_models?.length || 0, '개');
-        console.log('[Pipeline] RL 모델:', data.rl_models?.length || 0, '개');
+        // Supabase REST API 직접 호출 (이미 사용 중인 것과 동일)
+        const supabaseUrl = 'https://younginpiniti-bitcoin-ai-backend.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlvdW5naW5waW5pdGktYml0Y29pbi1haS1iYWNrZW5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTI0Njc1NzksImV4cCI6MTczNDQyMzU3OX0.wyqFyp0qPq3NqPHhKcY2WyDpM0e1LFp99Hm5pI1pVVs';
+
+        const res = await fetch(
+          `${supabaseUrl}/rest/v1/ml_models?select=id,name`,
+          {
+            headers: {
+              'apikey': supabaseKey,
+              'Authorization': `Bearer ${supabaseKey}`,
+            },
+          }
+        );
+
+        const models = await res.json();
+
+        // 모델 이름으로 타입 구분
+        const xgb = models.filter(m =>
+          /XGB_|XGB-|USALL/.test(m.name?.toUpperCase() || '')
+        );
+        const rl = models.filter(m =>
+          /RL_|RL-|PPO/.test(m.name?.toUpperCase() || '')
+        );
+
+        setXgbModels(xgb);
+        setRlModels(rl);
+        console.log('[Pipeline] XGBoost 모델:', xgb.length, '개, RL 모델:', rl.length, '개');
       } catch (error) {
         console.error('모델 조회 실패:', error);
       }
@@ -179,7 +197,7 @@ export default function PipelinePanel() {
               {/* XGBoost 모델 선택 */}
               <div>
                 <label style={{ display: 'block', fontSize: '11px', color: '#666', marginBottom: '4px', fontWeight: 'bold' }}>
-                  XGBoost 모델
+                  XGBoost 모델 ({xgbModels.length}개)
                 </label>
                 <select
                   value={xgbModelId}
@@ -194,12 +212,10 @@ export default function PipelinePanel() {
                     boxSizing: 'border-box',
                   }}
                 >
-                  <option value="">
-                    자동 선택 (활성 모델: {activeModels?.xgb_model_id ? activeModels.xgb_model_id.substring(0, 8) + '...' : '없음'})
-                  </option>
+                  <option value="">자동 선택</option>
                   {xgbModels.map((model) => (
                     <option key={model.id} value={model.id}>
-                      {model.name} ({model.id.substring(0, 8)}...)
+                      {model.name}
                     </option>
                   ))}
                 </select>
@@ -208,7 +224,7 @@ export default function PipelinePanel() {
               {/* RL 모델 선택 */}
               <div>
                 <label style={{ display: 'block', fontSize: '11px', color: '#666', marginBottom: '4px', fontWeight: 'bold' }}>
-                  RL 모델
+                  RL 모델 ({rlModels.length}개)
                 </label>
                 <select
                   value={rlModelId}
@@ -223,12 +239,10 @@ export default function PipelinePanel() {
                     boxSizing: 'border-box',
                   }}
                 >
-                  <option value="">
-                    자동 선택 (활성 모델: {activeModels?.rl_model_id ? activeModels.rl_model_id.substring(0, 8) + '...' : '없음'})
-                  </option>
+                  <option value="">자동 선택</option>
                   {rlModels.map((model) => (
                     <option key={model.id} value={model.id}>
-                      {model.name} ({model.id.substring(0, 8)}...)
+                      {model.name}
                     </option>
                   ))}
                 </select>
