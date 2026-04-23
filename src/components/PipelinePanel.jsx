@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
-import { Alert, AlertDescription } from './ui/alert';
 import { AlertCircle, CheckCircle2, Clock, Loader2 } from 'lucide-react';
 
 const STEPS = [
@@ -203,11 +202,9 @@ export default function PipelinePanel() {
 
                     {/* Error 표시 */}
                     {stepStatus?.error && (
-                      <Alert variant="destructive" className="mt-3">
-                        <AlertDescription className="text-xs">
-                          {stepStatus.error}
-                        </AlertDescription>
-                      </Alert>
+                      <div className="mt-3 p-2 bg-red-50 rounded border border-red-200">
+                        <p className="text-xs text-red-700">{stepStatus.error}</p>
+                      </div>
                     )}
                   </div>
 
