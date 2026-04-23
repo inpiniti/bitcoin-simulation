@@ -22,6 +22,21 @@ export default function PipelinePanel() {
   const [xgbModelId, setXgbModelId] = useState('');
   const [rlModelId, setRlModelId] = useState('');
   const [showModelInput, setShowModelInput] = useState(false);
+  const [activeModels, setActiveModels] = useState(null);
+
+  // 활성 모델 로드
+  useEffect(() => {
+    const loadModels = async () => {
+      try {
+        const res = await fetch(`${API_URL}/sp500/pipeline/models`);
+        const data = await res.json();
+        setActiveModels(data.active);
+      } catch (error) {
+        console.error('모델 조회 실패:', error);
+      }
+    };
+    loadModels();
+  }, []);
 
   // 파이프라인 시작
   const startPipeline = async () => {
@@ -154,32 +169,56 @@ export default function PipelinePanel() {
 
           {showModelInput && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <input
-                type="text"
-                placeholder="XGBoost 모델 ID (선택)"
-                value={xgbModelId}
-                onChange={(e) => setXgbModelId(e.target.value)}
-                style={{
-                  padding: '8px',
-                  fontSize: '12px',
-                  border: '1px solid #ccc',
-                  borderRadius: '4px',
-                  fontFamily: 'monospace',
-                }}
-              />
-              <input
-                type="text"
-                placeholder="RL 모델 ID (선택)"
-                value={rlModelId}
-                onChange={(e) => setRlModelId(e.target.value)}
-                style={{
-                  padding: '8px',
-                  fontSize: '12px',
-                  border: '1px solid #ccc',
-                  borderRadius: '4px',
-                  fontFamily: 'monospace',
-                }}
-              />
+              {/* XGBoost 모델 선택 */}
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', color: '#666', marginBottom: '4px', fontWeight: 'bold' }}>
+                  XGBoost 모델
+                </label>
+                <select
+                  value={xgbModelId}
+                  onChange={(e) => setXgbModelId(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px',
+                    fontSize: '12px',
+                    border: '1px solid #ccc',
+                    borderRadius: '4px',
+                    fontFamily: 'monospace',
+                    boxSizing: 'border-box',
+                  }}
+                >
+                  <option value="">자동 선택 (활성 모델: {activeModels?.xgb_model_id ? activeModels.xgb_model_id.substring(0, 8) + '...' : '없음'})</option>
+                  {activeModels?.xgb_model_id && (
+                    <option value={activeModels.xgb_model_id}>{activeModels.xgb_model_id}</option>
+                  )}
+                </select>
+              </div>
+
+              {/* RL 모델 선택 */}
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', color: '#666', marginBottom: '4px', fontWeight: 'bold' }}>
+                  RL 모델
+                </label>
+                <select
+                  value={rlModelId}
+                  onChange={(e) => setRlModelId(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px',
+                    fontSize: '12px',
+                    border: '1px solid #ccc',
+                    borderRadius: '4px',
+                    fontFamily: 'monospace',
+                    boxSizing: 'border-box',
+                  }}
+                >
+                  <option value="">자동 선택 (활성 모델: {activeModels?.rl_model_id ? activeModels.rl_model_id.substring(0, 8) + '...' : '없음'})</option>
+                  {activeModels?.rl_model_id && (
+                    <option value={activeModels.rl_model_id}>{activeModels.rl_model_id}</option>
+                  )}
+                </select>
+              </div>
+
               <p style={{ fontSize: '11px', color: '#999', margin: '4px 0 0 0' }}>
                 미지정 시 활성 모델이 자동 사용됩니다
               </p>
