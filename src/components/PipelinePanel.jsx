@@ -148,7 +148,14 @@ export default function PipelinePanel() {
   }
 
   return (
-    <div style={{ padding: '32px', maxWidth: '600px', margin: '0 auto' }}>
+    <div style={{
+      padding: '32px',
+      maxWidth: '600px',
+      margin: '0 auto',
+      height: '100vh',
+      overflowY: 'auto',
+      boxSizing: 'border-box'
+    }}>
       <div style={{ marginBottom: '24px' }}>
         <h1 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '8px' }}>SP500 파이프라인</h1>
         <p style={{ fontSize: '12px', color: '#999' }}>Run ID: {runId}</p>
