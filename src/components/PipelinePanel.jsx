@@ -19,15 +19,22 @@ export default function PipelinePanel() {
   const [pipelineStatus, setPipelineStatus] = useState(null);
   const [loading, setLoading] = useState(false);
   const [executing, setExecuting] = useState(null);
+  const [xgbModelId, setXgbModelId] = useState('');
+  const [rlModelId, setRlModelId] = useState('');
+  const [showModelInput, setShowModelInput] = useState(false);
 
   // 파이프라인 시작
   const startPipeline = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`${API_URL}/sp500/pipeline/start`, {
+      const params = new URLSearchParams();
+      params.append('ticker', 'AAPL');
+      if (xgbModelId.trim()) params.append('xgb_model_id', xgbModelId.trim());
+      if (rlModelId.trim()) params.append('rl_model_id', rlModelId.trim());
+
+      const res = await fetch(`${API_URL}/sp500/pipeline/start?${params}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ticker: 'AAPL' }),
       });
       const data = await res.json();
       setRunId(data.run_id);
@@ -125,6 +132,61 @@ export default function PipelinePanel() {
           <h1 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '8px' }}>SP500 파이프라인</h1>
           <p style={{ fontSize: '14px', color: '#666' }}>AAPL 단계별 분석 테스트</p>
         </div>
+
+        {/* 모델 선택 섹션 */}
+        <div style={{ marginBottom: '16px', padding: '16px', backgroundColor: '#f5f5f5', borderRadius: '8px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <h3 style={{ margin: '0', fontSize: '14px', fontWeight: 'bold' }}>모델 선택 (선택사항)</h3>
+            <button
+              onClick={() => setShowModelInput(!showModelInput)}
+              style={{
+                padding: '4px 8px',
+                fontSize: '12px',
+                backgroundColor: '#e0e0e0',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+              }}
+            >
+              {showModelInput ? '접기' : '펼치기'}
+            </button>
+          </div>
+
+          {showModelInput && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <input
+                type="text"
+                placeholder="XGBoost 모델 ID (선택)"
+                value={xgbModelId}
+                onChange={(e) => setXgbModelId(e.target.value)}
+                style={{
+                  padding: '8px',
+                  fontSize: '12px',
+                  border: '1px solid #ccc',
+                  borderRadius: '4px',
+                  fontFamily: 'monospace',
+                }}
+              />
+              <input
+                type="text"
+                placeholder="RL 모델 ID (선택)"
+                value={rlModelId}
+                onChange={(e) => setRlModelId(e.target.value)}
+                style={{
+                  padding: '8px',
+                  fontSize: '12px',
+                  border: '1px solid #ccc',
+                  borderRadius: '4px',
+                  fontFamily: 'monospace',
+                }}
+              />
+              <p style={{ fontSize: '11px', color: '#999', margin: '4px 0 0 0' }}>
+                미지정 시 활성 모델이 자동 사용됩니다
+              </p>
+            </div>
+          )}
+        </div>
+
         <button
           onClick={startPipeline}
           disabled={loading}
