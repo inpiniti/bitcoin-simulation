@@ -23,14 +23,18 @@ export default function PipelinePanel() {
   const [rlModelId, setRlModelId] = useState('');
   const [showModelInput, setShowModelInput] = useState(false);
   const [activeModels, setActiveModels] = useState(null);
+  const [xgbModels, setXgbModels] = useState([]);
+  const [rlModels, setRlModels] = useState([]);
 
-  // 활성 모델 로드
+  // 모델 목록 로드
   useEffect(() => {
     const loadModels = async () => {
       try {
         const res = await fetch(`${API_URL}/sp500/pipeline/models`);
         const data = await res.json();
         setActiveModels(data.active);
+        setXgbModels(data.xgboost_models || []);
+        setRlModels(data.rl_models || []);
       } catch (error) {
         console.error('모델 조회 실패:', error);
       }
@@ -187,10 +191,14 @@ export default function PipelinePanel() {
                     boxSizing: 'border-box',
                   }}
                 >
-                  <option value="">자동 선택 (활성 모델: {activeModels?.xgb_model_id ? activeModels.xgb_model_id.substring(0, 8) + '...' : '없음'})</option>
-                  {activeModels?.xgb_model_id && (
-                    <option value={activeModels.xgb_model_id}>{activeModels.xgb_model_id}</option>
-                  )}
+                  <option value="">
+                    자동 선택 (활성 모델: {activeModels?.xgb_model_id ? activeModels.xgb_model_id.substring(0, 8) + '...' : '없음'})
+                  </option>
+                  {xgbModels.map((model) => (
+                    <option key={model.id} value={model.id}>
+                      {model.name} ({model.id.substring(0, 8)}...)
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -212,10 +220,14 @@ export default function PipelinePanel() {
                     boxSizing: 'border-box',
                   }}
                 >
-                  <option value="">자동 선택 (활성 모델: {activeModels?.rl_model_id ? activeModels.rl_model_id.substring(0, 8) + '...' : '없음'})</option>
-                  {activeModels?.rl_model_id && (
-                    <option value={activeModels.rl_model_id}>{activeModels.rl_model_id}</option>
-                  )}
+                  <option value="">
+                    자동 선택 (활성 모델: {activeModels?.rl_model_id ? activeModels.rl_model_id.substring(0, 8) + '...' : '없음'})
+                  </option>
+                  {rlModels.map((model) => (
+                    <option key={model.id} value={model.id}>
+                      {model.name} ({model.id.substring(0, 8)}...)
+                    </option>
+                  ))}
                 </select>
               </div>
 
