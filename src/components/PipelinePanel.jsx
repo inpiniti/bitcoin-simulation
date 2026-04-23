@@ -1,8 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { Button } from './ui/button';
-import { Badge } from './ui/badge';
-import { AlertCircle, CheckCircle2, Clock, Loader2 } from 'lucide-react';
 
 const STEPS = [
   { id: 'stock_data', name: 'AAPL 데이터 수집' },
@@ -124,37 +120,41 @@ export default function PipelinePanel() {
 
   if (!runId) {
     return (
-      <Card className="w-full h-full">
-        <CardHeader>
-          <CardTitle>SP500 파이프라인</CardTitle>
-          <CardDescription>AAPL 단계별 분석 테스트</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button onClick={startPipeline} disabled={loading} size="lg" className="w-full">
-            {loading ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                시작 중...
-              </>
-            ) : (
-              '파이프라인 시작'
-            )}
-          </Button>
-        </CardContent>
-      </Card>
+      <div style={{ padding: '32px', maxWidth: '600px', margin: '0 auto' }}>
+        <div style={{ marginBottom: '24px' }}>
+          <h1 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '8px' }}>SP500 파이프라인</h1>
+          <p style={{ fontSize: '14px', color: '#666' }}>AAPL 단계별 분석 테스트</p>
+        </div>
+        <button
+          onClick={startPipeline}
+          disabled={loading}
+          style={{
+            width: '100%',
+            padding: '16px',
+            fontSize: '16px',
+            fontWeight: 'bold',
+            backgroundColor: '#007AFF',
+            color: 'white',
+            border: 'none',
+            borderRadius: '8px',
+            cursor: loading ? 'wait' : 'pointer',
+            opacity: loading ? 0.7 : 1,
+          }}
+        >
+          {loading ? '시작 중...' : '파이프라인 시작'}
+        </button>
+      </div>
     );
   }
 
   return (
-    <div className="w-full space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle>SP500 파이프라인</CardTitle>
-          <CardDescription>Run ID: {runId}</CardDescription>
-        </CardHeader>
-      </Card>
+    <div style={{ padding: '32px', maxWidth: '600px', margin: '0 auto' }}>
+      <div style={{ marginBottom: '24px' }}>
+        <h1 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '8px' }}>SP500 파이프라인</h1>
+        <p style={{ fontSize: '12px', color: '#999' }}>Run ID: {runId}</p>
+      </div>
 
-      <div className="space-y-3">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
         {STEPS.map((step) => {
           const stepStatus = pipelineStatus?.steps?.[step.id];
           const status = stepStatus?.status || 'pending';
@@ -162,71 +162,126 @@ export default function PipelinePanel() {
           const isFailed = status === 'failed';
           const isRunning = executing === step.id;
 
+          const bgColor = isCompleted ? '#f0f0f0' : isFailed ? '#ffe8e8' : '#e8e8e8';
+
           return (
-            <Card
+            <div
               key={step.id}
-              className={`transition-all ${
-                isCompleted ? 'bg-white border-green-200' : isFailed ? 'bg-red-50' : 'bg-gray-50'
-              }`}
+              style={{
+                padding: '16px',
+                backgroundColor: bgColor,
+                borderRadius: '12px',
+                border: '1px solid #ccc',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                gap: '16px',
+              }}
             >
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between">
-                  {/* 왼쪽: 단계 정보 */}
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3">
-                      {isCompleted && <CheckCircle2 className="w-5 h-5 text-green-600" />}
-                      {isFailed && <AlertCircle className="w-5 h-5 text-red-600" />}
-                      {status === 'pending' || status === 'running' ? (
-                        <Clock className="w-5 h-5 text-gray-400" />
-                      ) : null}
+              {/* 왼쪽: 텍스트 정보 */}
+              <div style={{ flex: 1 }}>
+                <p style={{ fontSize: '16px', fontWeight: '600', marginBottom: '4px' }}>
+                  {step.name}
+                </p>
+                <p style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>
+                  {isCompleted && '✓ 완료'}
+                  {isFailed && '✗ 실패'}
+                  {status === 'running' && '실행 중...'}
+                  {status === 'pending' && '대기 중'}
+                </p>
 
-                      <div>
-                        <p className="font-semibold text-sm">{step.name}</p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          {isCompleted && '✓ 완료'}
-                          {isFailed && '✗ 실패'}
-                          {status === 'running' && '실행 중...'}
-                          {status === 'pending' && '대기 중'}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Result 표시 */}
-                    {stepStatus?.result && (
-                      <div className="mt-3 p-2 bg-green-50 rounded border border-green-200">
-                        <p className="text-xs font-mono text-green-700">
-                          {JSON.stringify(stepStatus.result, null, 2)}
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Error 표시 */}
-                    {stepStatus?.error && (
-                      <div className="mt-3 p-2 bg-red-50 rounded border border-red-200">
-                        <p className="text-xs text-red-700">{stepStatus.error}</p>
-                      </div>
-                    )}
+                {/* Result 표시 */}
+                {stepStatus?.result && (
+                  <div
+                    style={{
+                      marginTop: '8px',
+                      padding: '8px',
+                      backgroundColor: '#f9f9f9',
+                      borderLeft: '3px solid #4CAF50',
+                      borderRadius: '4px',
+                      fontSize: '11px',
+                      fontFamily: 'monospace',
+                      color: '#333',
+                      wordBreak: 'break-word',
+                    }}
+                  >
+                    {JSON.stringify(stepStatus.result, null, 2)}
                   </div>
+                )}
 
-                  {/* 오른쪽: 버튼 */}
-                  <div className="ml-4">
-                    {isCompleted && <Badge className="bg-green-600">완료</Badge>}
-                    {isFailed && <Badge variant="destructive">실패</Badge>}
-                    {isRunning && <Loader2 className="w-5 h-5 animate-spin text-blue-600" />}
-                    {!isCompleted && !isRunning && (
-                      <Button
-                        onClick={() => executeStep(step.id)}
-                        size="sm"
-                        variant="outline"
-                        className="text-xs"
-                      >
-                        시작
-                      </Button>
-                    )}
+                {/* Error 표시 */}
+                {stepStatus?.error && (
+                  <div
+                    style={{
+                      marginTop: '8px',
+                      padding: '8px',
+                      backgroundColor: '#fff3f3',
+                      borderLeft: '3px solid #f44336',
+                      borderRadius: '4px',
+                      fontSize: '11px',
+                      fontFamily: 'monospace',
+                      color: '#d32f2f',
+                    }}
+                  >
+                    {stepStatus.error}
                   </div>
-                </div>
-              </CardContent>
-            </Card>
+                )}
+              </div>
+
+              {/* 오른쪽: 버튼 */}
+              <div style={{ whiteSpace: 'nowrap' }}>
+                {isCompleted && (
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      padding: '4px 12px',
+                      backgroundColor: '#4CAF50',
+                      color: 'white',
+                      borderRadius: '4px',
+                      fontSize: '12px',
+                      fontWeight: 'bold',
+                    }}
+                  >
+                    완료
+                  </span>
+                )}
+                {isFailed && (
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      padding: '4px 12px',
+                      backgroundColor: '#f44336',
+                      color: 'white',
+                      borderRadius: '4px',
+                      fontSize: '12px',
+                      fontWeight: 'bold',
+                    }}
+                  >
+                    실패
+                  </span>
+                )}
+                {isRunning && (
+                  <span style={{ fontSize: '12px', color: '#007AFF' }}>실행 중...</span>
+                )}
+                {!isCompleted && !isRunning && (
+                  <button
+                    onClick={() => executeStep(step.id)}
+                    style={{
+                      padding: '6px 12px',
+                      fontSize: '12px',
+                      fontWeight: 'bold',
+                      backgroundColor: '#007AFF',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    시작
+                  </button>
+                )}
+              </div>
+            </div>
           );
         })}
       </div>
