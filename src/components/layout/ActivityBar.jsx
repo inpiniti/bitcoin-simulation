@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils"
 import { useStore } from "@/store/useStore"
-import { Play, Table2, LineChart, Search, Loader2, MessageSquare, BookOpen, Newspaper, Bot, Activity, PieChart, Zap, Book, Brain, Workflow } from "lucide-react"
+import { Play, Table2, LineChart, Search, Loader2, MessageSquare, BookOpen, Newspaper, Bot, Activity, PieChart, Zap, Book, Brain, Workflow, GitBranch } from "lucide-react"
 import {
     Tooltip,
     TooltipContent,
@@ -21,6 +21,7 @@ const VIEW_MODES = [
     { key: 'earnings', label: '실적 임팩트 분석', icon: Zap },
     { key: 'deepLearning', label: '딥러닝 Studio', icon: Brain },
     { key: 'automation', label: '자동 매매 설정', icon: Workflow },
+    { key: 'pipeline', label: 'SP500 파이프라인', icon: GitBranch },
 ]
 
 

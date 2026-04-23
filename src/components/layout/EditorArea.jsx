@@ -31,6 +31,7 @@ const DeepLearningPanel = lazy(() => import("../DeepLearningPanel").then(m => ({
 const DocsPanel = lazy(() => import("../docs/DocsPanel").then(m => ({ default: m.DocsPanel })))
 const IntroScreen = lazy(() => import("../IntroScreen").then(m => ({ default: m.IntroScreen })))
 const AutomationSettingsPanel = lazy(() => import("../automation/AutomationSettingsPanel").then(m => ({ default: m.AutomationSettingsPanel })))
+const PipelinePanel = lazy(() => import("../PipelinePanel").then(m => ({ default: m.default })))
 
 
 // 페이지당 거래 수
@@ -92,7 +93,7 @@ export function EditorArea() {
 
     const renderContent = () => {
         // 탭이 하나도 없으면 소개 화면 표시 (단, 티커와 무관한 독립 패널 모드는 제외)
-        const independentModes = ['docs', 'portfolio', 'analyze', 'deepLearning', 'automation', 'news']
+        const independentModes = ['docs', 'portfolio', 'analyze', 'deepLearning', 'automation', 'news', 'pipeline']
         if ((!activeTickers || activeTickers.length === 0) && !independentModes.includes(viewMode)) {
             return <IntroScreen />
         }
@@ -145,6 +146,11 @@ export function EditorArea() {
         // Automation Settings Mode
         if (viewMode === 'automation') {
             return <AutomationSettingsPanel />
+        }
+
+        // Pipeline Mode
+        if (viewMode === 'pipeline') {
+            return <PipelinePanel />
         }
 
         // Chart View Mode
