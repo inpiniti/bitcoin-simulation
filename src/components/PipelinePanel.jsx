@@ -29,21 +29,26 @@ export default function PipelinePanel() {
   useEffect(() => {
     const loadModels = async () => {
       try {
-        // Supabase REST API 직접 호출 (이미 사용 중인 것과 동일)
-        const supabaseUrl = 'https://younginpiniti-bitcoin-ai-backend.supabase.co';
-        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlvdW5naW5waW5pdGktYml0Y29pbi1haS1iYWNrZW5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTI0Njc1NzksImV4cCI6MTczNDQyMzU3OX0.wyqFyp0qPq3NqPHhKcY2WyDpM0e1LFp99Hm5pI1pVVs';
+        const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+        const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
         const res = await fetch(
-          `${supabaseUrl}/rest/v1/ml_models?select=id,name`,
+          `${SUPABASE_URL}/rest/v1/ml_models?select=*&order=created_at.desc`,
           {
             headers: {
-              'apikey': supabaseKey,
-              'Authorization': `Bearer ${supabaseKey}`,
+              'apikey': SUPABASE_KEY,
+              'Authorization': `Bearer ${SUPABASE_KEY}`,
             },
           }
         );
 
+        if (!res.ok) {
+          console.error('모델 조회 실패:', res.status);
+          return;
+        }
+
         const models = await res.json();
+        console.log('[Pipeline] 전체 모델 수:', models.length);
 
         // 모델 이름으로 타입 구분
         const xgb = models.filter(m =>
@@ -57,7 +62,7 @@ export default function PipelinePanel() {
         setRlModels(rl);
         console.log('[Pipeline] XGBoost 모델:', xgb.length, '개, RL 모델:', rl.length, '개');
       } catch (error) {
-        console.error('모델 조회 실패:', error);
+        console.error('[Pipeline] 모델 조회 실패:', error);
       }
     };
     loadModels();
