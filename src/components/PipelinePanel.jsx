@@ -111,31 +111,21 @@ export default function PipelinePanel() {
       });
       const data = await res.json();
 
-      if (res.ok) {
-        setPipelineStatus((prev) => ({
-          ...prev,
-          steps: {
-            ...prev.steps,
-            [stepId]: {
-              status: 'completed',
-              result: data.result,
-              error: null,
-            },
+      // res.ok 확인 + 응답 본문의 status 필드도 확인
+      // (서버가 200으로 실패를 반환할 수 있음)
+      const isSuccess = res.ok && data.status !== 'failed' && data.status !== 'error';
+
+      setPipelineStatus((prev) => ({
+        ...prev,
+        steps: {
+          ...prev.steps,
+          [stepId]: {
+            status: isSuccess ? 'completed' : 'failed',
+            result: data.result,
+            error: data.error || data.detail || (isSuccess ? null : data.message || '알 수 없는 오류'),
           },
-        }));
-      } else {
-        setPipelineStatus((prev) => ({
-          ...prev,
-          steps: {
-            ...prev.steps,
-            [stepId]: {
-              status: 'failed',
-              result: null,
-              error: data.detail,
-            },
-          },
-        }));
-      }
+        },
+      }));
     } catch (error) {
       setPipelineStatus((prev) => ({
         ...prev,
