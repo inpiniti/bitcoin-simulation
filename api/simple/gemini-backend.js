@@ -44,22 +44,31 @@ export default async function handler(req) {
     const orderedKeys = [...apiKeys.slice(idx), ...apiKeys.slice(0, idx)];
 
     const MODELS = [
+        'gemini-2.0-flash-lite',
+        'gemini-2.0-flash',
         'gemini-flash-lite-latest',
         'gemini-flash-latest',
-        'gemini-3.1-flash-lite-preview',
-        'gemini-3-flash-preview',
-        'gemini-3.1-pro-preview',
-        'gemini-2.0-flash',
     ];
+
+    const PER_REQUEST_TIMEOUT_MS = 8000; // 키×모델당 최대 8초 대기
 
     for (const apiKey of orderedKeys) {
         for (const model of MODELS) {
             const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-            const apiResponse = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: bodyText,
-            });
+
+            let apiResponse;
+            try {
+                apiResponse = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: bodyText,
+                    signal: AbortSignal.timeout(PER_REQUEST_TIMEOUT_MS),
+                });
+            } catch (e) {
+                // timeout 또는 네트워크 에러 → 다음 모델 시도
+                console.log(`[Gemini Proxy] timeout/network key[...${apiKey.slice(-6)}] ${model}`);
+                continue;
+            }
 
             if (!apiResponse.ok) {
                 const status = apiResponse.status;
