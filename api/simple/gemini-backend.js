@@ -1,5 +1,7 @@
 /**
- * 백엔드용 Gemini 프리 통합 프록시 (비스트리밍, JSON 응답 반환)
+ * 백엔드용 Gemini 프록시 — 단순 단일 relay
+ * 키 로테이션/재시도는 백엔드(bitcoin-ai-backend)에서 담당.
+ * 여기서는 키 1개, 모델 1개만 시도하고 결과를 즉시 반환한다.
  */
 export const config = { runtime: 'edge' };
 
@@ -39,47 +41,22 @@ export default async function handler(req) {
         return new Response('Invalid Body', { status: 400 });
     }
 
-    // 로테이션
-    const idx = Math.floor(Math.random() * apiKeys.length);
-    const orderedKeys = [...apiKeys.slice(idx), ...apiKeys.slice(0, idx)];
+    // 키 1개 랜덤 선택 — 재시도/로테이션은 백엔드가 담당
+    const apiKey = apiKeys[Math.floor(Math.random() * apiKeys.length)];
+    const model = 'gemini-2.0-flash-lite';
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
-    const MODELS = [
-        'gemini-2.0-flash-lite',
-        'gemini-2.0-flash',
-        'gemini-flash-lite-latest',
-        'gemini-flash-latest',
-    ];
+    try {
+        const apiResponse = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: bodyText,
+            signal: AbortSignal.timeout(20000), // Vercel 25초 한도 안에 여유 있게
+        });
 
-    const PER_REQUEST_TIMEOUT_MS = 8000; // 키×모델당 최대 8초 대기
+        console.log(`[Gemini Proxy] key[...${apiKey.slice(-6)}] ${model} → ${apiResponse.status}`);
 
-    for (const apiKey of orderedKeys) {
-        for (const model of MODELS) {
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-
-            let apiResponse;
-            try {
-                apiResponse = await fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: bodyText,
-                    signal: AbortSignal.timeout(PER_REQUEST_TIMEOUT_MS),
-                });
-            } catch (e) {
-                // timeout 또는 네트워크 에러 → 다음 모델 시도
-                console.log(`[Gemini Proxy] timeout/network key[...${apiKey.slice(-6)}] ${model}`);
-                continue;
-            }
-
-            if (!apiResponse.ok) {
-                const status = apiResponse.status;
-                console.log(`[Gemini Proxy] key[...${apiKey.slice(-6)}] ${model} → ${status}`);
-                // 429(할당량) or 403(권한) → 다음 키로 건너뜀 (모델 계속 시도할 필요 없음)
-                if (status === 429 || status === 403) break;
-                // 404(모델 없음) 등 기타 에러 → 같은 키, 다음 모델 시도
-                continue;
-            }
-
-            console.log(`[Gemini Proxy] OK key [...${apiKey.slice(-6)}] model: ${model}`);
+        if (apiResponse.ok) {
             return new Response(apiResponse.body, {
                 status: 200,
                 headers: {
@@ -88,10 +65,25 @@ export default async function handler(req) {
                 },
             });
         }
-    }
 
-    return new Response(JSON.stringify({ error: '모든 Gemini 키가 429 에러 상태입니다.' }), { 
-        status: 429,
-        headers: { 'Content-Type': 'application/json' }
-    });
+        // 실패 시 상태코드 그대로 반환 → 백엔드가 다른 키로 재시도
+        const errText = await apiResponse.text();
+        return new Response(errText, {
+            status: apiResponse.status,
+            headers: {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*',
+            },
+        });
+
+    } catch (e) {
+        console.log(`[Gemini Proxy] timeout key[...${apiKey.slice(-6)}] ${model}: ${e.message}`);
+        return new Response(JSON.stringify({ error: 'timeout' }), {
+            status: 504,
+            headers: {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*',
+            },
+        });
+    }
 }
