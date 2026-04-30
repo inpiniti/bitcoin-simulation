@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -E \".py$\")",
+      "Bash(npm ls *)",
+      "Bash(node -e \"try { require\\('babel-parser'\\).parse\\(require\\('fs'\\).readFileSync\\('./app/schedule-detail.jsx', 'utf8'\\), { sourceType: 'module', plugins: ['jsx'] }\\); console.log\\('✓ JSX syntax OK'\\); } catch \\(e\\) { console.log\\('✗ Error:', e.message\\); }\")"
+    ]
+  }
+}
