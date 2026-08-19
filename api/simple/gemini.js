@@ -100,6 +100,8 @@ export default async function handler(req) {
         ...apiKeys.slice(0, startIdx),
     ];
 
+    // 마지막 업스트림 오류(상태·본문 앞부분) — 전부 실패했을 때 503 본문에 실어 원인을 알 수 있게 한다.
+    let lastError = '';
     for (const apiKey of orderedKeys) {
         for (const model of MODELS) {
             const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`;
@@ -116,7 +118,9 @@ export default async function handler(req) {
 
             if (!apiResponse.ok) {
                 const status = apiResponse.status;
-                console.log(`[Gemini Edge] key[...${apiKey.slice(-6)}] ${model} → ${status}`);
+                const errBody = (await apiResponse.text().catch(() => '')).slice(0, 500);
+                lastError = `${status} ${errBody}`;
+                console.log(`[Gemini Edge] key[...${apiKey.slice(-6)}] ${model} → ${status} ${errBody}`);
                 // 429(할당량) or 403(권한) → 다음 키로 건너뜀
                 if (status === 429 || status === 403) break;
                 // 404(모델 없음) → 같은 키, 다음 모델 시도
