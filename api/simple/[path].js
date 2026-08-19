@@ -614,10 +614,12 @@ async function handleArticle(req, res) {
     const scope = ['.article-body', '.caas-body', 'article', '[data-testid="article-body"]']
         .map(sel => $(sel).first())
         .find(el => el.length && el.find('p').length >= 2) || $.root();
+    // Yahoo 페이지 공통 보일러플레이트(광고 고지·재게재 안내 등) — 본문 글자수만 잡아먹으므로 제외.
+    const BOILERPLATE = /Yahoo Finance is not a broker-dealer|links to Coinbase|This article first appeared on|Read the original article|Click here to|Sign up for|Subscribe to|Follow us on|Disclaimer:|Terms and Privacy Policy|Please enable Javascript|The views and opinions expressed/i;
     const paragraphs = [];
     scope.find('p').each((_, el) => {
         const t = $(el).text().replace(/\s+/g, ' ').trim();
-        if (t.length >= 30) paragraphs.push(t);
+        if (t.length >= 30 && !BOILERPLATE.test(t)) paragraphs.push(t);
     });
     const title = ($('meta[property="og:title"]').attr('content') || $('title').text() || '').trim();
     const joined = paragraphs.join('\n');
