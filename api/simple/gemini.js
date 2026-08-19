@@ -5,8 +5,8 @@
  */
 export const config = { runtime: 'edge' };
 
-// 2026-08-19 단일 모델 고정(gemini-3.5-flash-lite) — 폴백 모델 목록 제거.
-const MODELS = ["gemini-3.5-flash-lite"];
+// 2026-08-19 3.5-flash-lite 우선, 무료 한도(키별 500 RPD) 소진 시 3.1-flash-lite로 폴백 — 순서가 우선순위.
+const MODELS = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite"];
 
 /** 환경변수에서 API 키 목록을 파싱 (콤마 구분) */
 function parseApiKeys() {
@@ -102,8 +102,10 @@ export default async function handler(req) {
 
     // 마지막 업스트림 오류(상태·본문 앞부분) — 전부 실패했을 때 503 본문에 실어 원인을 알 수 있게 한다.
     let lastError = '';
-    for (const apiKey of orderedKeys) {
-        for (const model of MODELS) {
+    // 모델 우선 순회 — 3.5를 모든 키에서 소진한 뒤에만 3.1로 내려간다. 상태 저장 없이 매 요청 같은 순서로 시도하므로
+    // 한도가 리셋되면(무료 등급 RPD, 태평양 자정) 다음 요청부터 자동으로 3.5로 복귀한다.
+    for (const model of MODELS) {
+        for (const apiKey of orderedKeys) {
             const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`;
             const apiResponse = await fetch(url, {
                 method: 'POST',
@@ -121,10 +123,10 @@ export default async function handler(req) {
                 const errBody = (await apiResponse.text().catch(() => '')).slice(0, 500);
                 lastError = `${status} ${errBody}`;
                 console.log(`[Gemini Edge] key[...${apiKey.slice(-6)}] ${model} → ${status} ${errBody}`);
-                // 429(할당량) or 403(권한) → 다음 키로 건너뜀
-                if (status === 429 || status === 403) break;
-                // 404(모델 없음) → 같은 키, 다음 모델 시도
-                continue;
+                // 429(할당량) or 403(권한) → 같은 모델, 다음 키
+                if (status === 429 || status === 403) continue;
+                // 그 외(404 모델 없음, 400 요청 오류 등) → 키를 바꿔도 같으므로 다음 모델로
+                break;
             }
 
             console.log(`[Gemini Edge] OK key[...${apiKey.slice(-6)}] model: ${model}`);
