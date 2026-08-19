@@ -9,6 +9,7 @@
  * /api/simple/cron → 크론 작업 (티커 그룹 로딩)
  * /api/simple/send → 이메일 발송
  * /api/simple/discussion → 종목 토론 통합 조회
+ * /api/simple/article → Yahoo Finance 기사 본문 텍스트 추출(financial-app 기업 탭용)
  */
 
 import * as cheerio from 'cheerio';
@@ -33,7 +34,7 @@ export default async function handler(req, res) {
     }
 
     // URL에서 서비스명 추출 (Vercel rewrite 및 직접 호출 대응)
-    const allowedServices = ['dataroma', 'forecast', 'gemini', 'hf', 'whale', 'cron', 'discussion', 'insertdataset', 'selectdataset', 'tradingview', 'reschedule'];
+    const allowedServices = ['dataroma', 'forecast', 'gemini', 'hf', 'whale', 'cron', 'discussion', 'insertdataset', 'selectdataset', 'tradingview', 'reschedule', 'article'];
     const url = new URL(req.url, `http://${req.headers.host}`);
     const parts = url.pathname.toLowerCase().split('/').filter(Boolean);
 
@@ -70,6 +71,8 @@ export default async function handler(req, res) {
                 return await handleTradingView(req, res);
             case 'reschedule':
                 return await handleReschedule(req, res);
+            case 'article':
+                return await handleArticle(req, res);
 
             default:
                 return res.status(404).json({ error: `Unknown service: ${service}` });
@@ -573,6 +576,60 @@ async function handleSelectDataSet(req, res) {
     } catch (e) {
         return res.status(500).json({ error: e.message });
     }
+}
+
+/**
+ * Yahoo Finance 기사 본문 추출 — GET /api/simple/article?url=<finance.yahoo.com 링크>&max=3000
+ * finance.yahoo.com 도메인만 허용(오픈 프록시 방지). 서버 렌더링된 기사 본문(<p>)을 텍스트로 이어 붙여 앞 max자만 돌려준다.
+ * /m/ 링크는 외부 매체 리다이렉트라 본문이 요약 몇 줄뿐일 수 있다 — 그래도 있는 만큼 반환.
+ * CDN 1시간 캐시(같은 기사를 여러 사용자가 열어도 원문 fetch는 1회). financial-app 기업 탭(companyBrief)이 쓴다.
+ */
+async function handleArticle(req, res) {
+    if (req.method !== 'GET') return res.status(405).json({ error: 'Method Not Allowed' });
+    const raw = typeof req.query.url === 'string' ? req.query.url : '';
+    let target;
+    try {
+        target = new URL(raw);
+    } catch {
+        return res.status(400).json({ error: 'url required' });
+    }
+    if (target.protocol !== 'https:' || !/(^|\.)finance\.yahoo\.com$/.test(target.hostname)) {
+        return res.status(400).json({ error: 'only finance.yahoo.com is allowed' });
+    }
+    const max = Math.min(Math.max(Number(req.query.max) || 3000, 200), 12000);
+
+    const upstream = await fetch(target.toString(), {
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+            'Accept-Language': 'en-US,en;q=0.9',
+        },
+        redirect: 'follow',
+        signal: AbortSignal.timeout(15000),
+    });
+    if (!upstream.ok) return res.status(upstream.status).json({ error: `upstream ${upstream.status}` });
+
+    const html = await upstream.text();
+    const $ = cheerio.load(html);
+    // 기사 본문 후보 컨테이너 — 없으면 문서 전체 <p>로 폴백(광고·내비 문구가 섞일 수 있어 max로 자른다).
+    const scope = ['.article-body', '.caas-body', 'article', '[data-testid="article-body"]']
+        .map(sel => $(sel).first())
+        .find(el => el.length && el.find('p').length >= 2) || $.root();
+    const paragraphs = [];
+    scope.find('p').each((_, el) => {
+        const t = $(el).text().replace(/\s+/g, ' ').trim();
+        if (t.length >= 30) paragraphs.push(t);
+    });
+    const title = ($('meta[property="og:title"]').attr('content') || $('title').text() || '').trim();
+    const joined = paragraphs.join('\n');
+
+    res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate=86400');
+    return res.status(200).json({
+        url: upstream.url || target.toString(),
+        title,
+        text: joined.slice(0, max),
+        paragraphs: paragraphs.length,
+        truncated: joined.length > max,
+    });
 }
 
 
