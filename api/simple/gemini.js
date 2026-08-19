@@ -5,13 +5,8 @@
  */
 export const config = { runtime: 'edge' };
 
-const MODELS = [
-    'gemini-flash-lite-latest',
-    'gemini-flash-latest',
-    'gemini-3.1-flash-lite-preview',
-    'gemini-3-flash-preview',
-    'gemini-3.1-pro-preview',
-];
+// 2026-08-19 단일 모델 고정(gemini-3.5-flash-lite) — 폴백 모델 목록 제거.
+const MODELS = ["gemini-3.5-flash-lite"];
 
 /** 환경변수에서 API 키 목록을 파싱 (콤마 구분) */
 function parseApiKeys() {
@@ -81,14 +76,22 @@ export default async function handler(req) {
     }
 
     let contents;
+    let tools;
+    let systemInstruction;
+    let genConfig = { maxOutputTokens: 2048, temperature: 0.7 };
     try {
         const body = await req.json();
         contents = body.contents || [];
+        // 호출 측이 넘기면 그대로 전달 — tools(예: [{ google_search: {} }] 검색 그라운딩),
+        // systemInstruction, generationConfig(responseMimeType 등). 없으면 기존 기본값.
+        tools = Array.isArray(body.tools) ? body.tools : undefined;
+        systemInstruction = body.systemInstruction;
+        if (body.generationConfig && typeof body.generationConfig === 'object') {
+            genConfig = { ...genConfig, ...body.generationConfig };
+        }
     } catch {
         return new Response('Invalid JSON', { status: 400 });
     }
-
-    const genConfig = { maxOutputTokens: 2048, temperature: 0.7 };
 
     // 랜덤 키부터 시작해서 순서대로 폴백 (키 로테이션)
     const startIdx = Math.floor(Math.random() * apiKeys.length);
@@ -103,7 +106,12 @@ export default async function handler(req) {
             const apiResponse = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ contents, generationConfig: genConfig }),
+                body: JSON.stringify({
+                    contents,
+                    generationConfig: genConfig,
+                    ...(tools ? { tools } : {}),
+                    ...(systemInstruction ? { systemInstruction } : {}),
+                }),
             });
 
             if (!apiResponse.ok) {

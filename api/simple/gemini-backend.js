@@ -43,7 +43,7 @@ export default async function handler(req) {
 
     // 키 1개 랜덤 선택 — 재시도/로테이션은 백엔드가 담당
     const apiKey = apiKeys[Math.floor(Math.random() * apiKeys.length)];
-    const model = 'gemini-3.1-flash-lite';
+    const model = 'gemini-3.5-flash-lite';
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
     try {
