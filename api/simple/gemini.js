@@ -135,5 +135,8 @@ export default async function handler(req) {
         }
     }
 
-    return new Response('Gemini API 할당량 초과 또는 사용 가능한 모델 없음.', { status: 503 });
+    return new Response(`Gemini API 호출 실패 (${lastError || "사용 가능한 키/모델 없음"})`, {
+        status: 503,
+        headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Access-Control-Allow-Origin': '*' },
+    });
 }
