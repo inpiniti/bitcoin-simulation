@@ -19,6 +19,19 @@ function pickRandom(arr) {
     return arr[Math.floor(Math.random() * arr.length)];
 }
 
+/**
+ * 함수 호출(function calling) 마커 — 응답은 plain text 스트림이라 텍스트가 아닌 파트를 실어 보낼 자리가 없다.
+ * 그래서 functionCall 파트는 **파트 객체 전부**를 JSON으로 감싸 이 마커 사이에 끼워 넣는다.
+ *
+ * ⚠ 파트 전부여야 한다 — Gemini 3.x는 다음 턴에 functionCall 파트를 돌려보낼 때 `thoughtSignature`가
+ *   함께 있어야 한다("Function call is missing a thought_signature", 400). functionCall만 뽑아 보내면
+ *   후속 요청이 통째로 실패한다(2026-08-21 실측).
+ * 호출 측(financial-app `features/help/helpChat.ts`)이 이 마커를 잘라 도구를 실행하고 파트를 그대로 되돌린다.
+ * tools를 안 보내는 기존 호출(기업 탭 AI 요약)에는 functionCall 파트가 아예 없어 영향이 없다.
+ */
+const FN_OPEN = '[[FN_CALL]]';
+const FN_CLOSE = '[[/FN_CALL]]';
+
 /** SSE 응답 body → plain text ReadableStream 변환 */
 function sseToTextStream(body) {
     return new ReadableStream({
@@ -39,8 +52,19 @@ function sseToTextStream(body) {
                         if (!raw || raw === '[DONE]') continue;
                         try {
                             const json = JSON.parse(raw);
-                            const text = json.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-                            if (text) controller.enqueue(new TextEncoder().encode(text));
+                            // 파트를 **전부** 훑는다(옛 코드는 parts[0]만 봐서 두 번째 파트부터 조용히 버려졌다).
+                            // 생각(thought) 파트는 내부 요약이라 사용자에게 흘리지 않는다.
+                            for (const part of json.candidates?.[0]?.content?.parts ?? []) {
+                                if (part?.thought === true) continue;
+                                if (part?.functionCall) {
+                                    const marker = `${FN_OPEN}${JSON.stringify(part)}${FN_CLOSE}`;
+                                    controller.enqueue(new TextEncoder().encode(marker));
+                                    continue;
+                                }
+                                if (typeof part?.text === 'string' && part.text) {
+                                    controller.enqueue(new TextEncoder().encode(part.text));
+                                }
+                            }
                         } catch { /* skip malformed */ }
                     }
                 }
