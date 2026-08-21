@@ -10,6 +10,7 @@
  * /api/simple/send → 이메일 발송
  * /api/simple/discussion → 종목 토론 통합 조회
  * /api/simple/article → Yahoo Finance 기사 본문 텍스트 추출(financial-app 기업 탭용)
+ * /api/simple/search → 웹 검색(Google Programmable Search, financial-app 도움말 챗봇용)
  */
 
 import * as cheerio from 'cheerio';
@@ -34,7 +35,7 @@ export default async function handler(req, res) {
     }
 
     // URL에서 서비스명 추출 (Vercel rewrite 및 직접 호출 대응)
-    const allowedServices = ['dataroma', 'forecast', 'gemini', 'hf', 'whale', 'cron', 'discussion', 'insertdataset', 'selectdataset', 'tradingview', 'reschedule', 'article'];
+    const allowedServices = ['dataroma', 'forecast', 'gemini', 'hf', 'whale', 'cron', 'discussion', 'insertdataset', 'selectdataset', 'tradingview', 'reschedule', 'article', 'search'];
     const url = new URL(req.url, `http://${req.headers.host}`);
     const parts = url.pathname.toLowerCase().split('/').filter(Boolean);
 
@@ -73,6 +74,8 @@ export default async function handler(req, res) {
                 return await handleReschedule(req, res);
             case 'article':
                 return await handleArticle(req, res);
+            case 'search':
+                return await handleSearch(req, res);
 
             default:
                 return res.status(404).json({ error: `Unknown service: ${service}` });
@@ -631,6 +634,71 @@ async function handleArticle(req, res) {
         text: joined.slice(0, max),
         paragraphs: paragraphs.length,
         truncated: joined.length > max,
+    });
+}
+
+/**
+ * 웹 검색 — GET /api/simple/search?q=<질의>&max=5
+ * Tavily(https://tavily.com) 경유. 키는 서버 환경변수 TAVILY_API_KEY에만 둔다(앱에는 없다).
+ *
+ * 왜 Tavily인가(financial-app 도움말 챗봇, 2026-08-21 실측):
+ *   무키 일반 검색이 전부 막혔다 — DuckDuckGo·SearXNG는 봇 차단, Bing RSS는 질의와 무관한 결과,
+ *   Gemini google_search 그라운딩은 429. Tavily는 무료 월 1,000회에 **본문 요약(content)까지** 준다
+ *   → 임의 URL을 가져오는 페처(오픈 프록시가 되는 그것)를 따로 만들 필요가 없다.
+ *
+ * 응답은 앱이 그대로 쓰기 좋게 정규화한다: { query, answer, results: [{title, url, content, published}] }.
+ * 키 미설정(503)·한도 초과(429)는 사람이 읽을 수 있는 message로 돌려준다 — 챗봇이 그대로 안내한다.
+ */
+async function handleSearch(req, res) {
+    if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
+    const q = (req.method === 'POST' ? req.body?.q : req.query.q) ?? '';
+    const query = String(q).trim();
+    if (!query) return res.status(400).json({ error: 'q required' });
+
+    const apiKey = process.env.TAVILY_API_KEY || '';
+    if (!apiKey) {
+        return res.status(503).json({
+            error: 'search_not_configured',
+            message: '검색 키가 아직 설정되지 않았어요. (서버 환경변수 TAVILY_API_KEY)',
+        });
+    }
+
+    const max = Math.min(Math.max(Number(req.query.max ?? req.body?.max) || 5, 1), 10);
+    const upstream = await fetch('https://api.tavily.com/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify({
+            query,
+            max_results: max,
+            search_depth: 'basic',   // advanced는 크레딧을 2배 쓴다 — 무료 한도(월 1,000)를 아낀다.
+            include_answer: true,    // 짧은 요약 — 챗봇이 결과를 다시 요약하는 왕복을 줄인다.
+        }),
+        signal: AbortSignal.timeout(20000),
+    });
+
+    if (!upstream.ok) {
+        const body = (await upstream.text().catch(() => '')).slice(0, 300);
+        const message = upstream.status === 429
+            ? '이번 달 검색 한도를 다 썼어요.'
+            : upstream.status === 401 || upstream.status === 403
+                ? '검색 키가 거절됐어요. 키를 확인해 주세요.'
+                : `검색 서버 오류(${upstream.status})예요.`;
+        console.log(`[Simple API] search → ${upstream.status} ${body}`);
+        return res.status(upstream.status).json({ error: 'search_failed', status: upstream.status, message });
+    }
+
+    const json = await upstream.json();
+    res.setHeader('Cache-Control', 's-maxage=600, stale-while-revalidate=3600');
+    return res.status(200).json({
+        query,
+        answer: typeof json.answer === 'string' ? json.answer : '',
+        results: (Array.isArray(json.results) ? json.results : []).map(r => ({
+            title: r.title ?? '',
+            url: r.url ?? '',
+            // content는 Tavily가 뽑아 준 본문 발췌다 — 길면 프롬프트를 먹으므로 잘라 보낸다.
+            content: typeof r.content === 'string' ? r.content.slice(0, 1200) : '',
+            published: r.published_date ?? '',
+        })),
     });
 }
 
