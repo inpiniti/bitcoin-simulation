@@ -5,8 +5,30 @@
  */
 export const config = { runtime: 'edge' };
 
-// 2026-08-19 3.5-flash-lite 우선, 무료 한도(키별 500 RPD) 소진 시 3.1-flash-lite로 폴백 — 순서가 우선순위.
-const MODELS = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite"];
+/**
+ * 성능순 모델 우선순위 (Fallback 체인)
+ * 1. 고성능 Flash 라인 (키별 20 RPD) : 3.8 → 3.7 → 3.6 → 3.5 → 3 → 2.5 Flash
+ * 2. 대용량 Lite 라인 (키별 500 RPD) : 3.5 Flash Lite → 3.1 Flash Lite
+ * 3. 최하위 백업 Lite (키별 20 RPD)  : 2.5 Flash Lite
+ *
+ * 상태 저장 없이 매 요청 최상위 모델부터 시도하며,
+ * 일일 할당량(RPD) 소진으로 429가 발생하면 다음 키 및 다음 모델로 자동 폴백됩니다.
+ * 태평양 자정에 구글 할당량이 리셋되면 다시 최상위 모델(3.8 Flash)로 자동 복귀합니다.
+ */
+const MODELS = [
+    // ── 1계층: 고성능 Flash 모델 (키당 일 20회) ──
+    'gemini-3.8-flash',      // 20 RPD (최상위 플래그십)
+    'gemini-3.7-flash',      // 20 RPD
+    'gemini-3.6-flash',      // 20 RPD
+    'gemini-3.5-flash',      // 20 RPD
+    'gemini-3-flash',        // 20 RPD
+    'gemini-2.5-flash',      // 20 RPD
+    // ── 2계층: 대용량 Flash Lite 모델 (키당 일 500회) ──
+    'gemini-3.5-flash-lite', // 500 RPD (경량 최고 성능)
+    'gemini-3.1-flash-lite', // 500 RPD (넉넉한 할당량 백업)
+    // ── 3계층: 최종 백업 Lite 모델 (키당 일 20회) ──
+    'gemini-2.5-flash-lite', // 20 RPD
+];
 
 /** 환경변수에서 API 키 목록을 파싱 (콤마 구분) */
 function parseApiKeys() {
@@ -17,6 +39,32 @@ function parseApiKeys() {
 /** 배열에서 랜덤 요소 반환 */
 function pickRandom(arr) {
     return arr[Math.floor(Math.random() * arr.length)];
+}
+
+/**
+ * 소진(429) 및 오류 상태 인메모리 캐시 (Key+Model -> 만료 타임스탬프 ms)
+ * Vercel Edge 인스턴스가 살아있는 동안 유지되며,
+ * 이미 소진된 모델/키는 API 호출(fetch) 자체를 건너뛰어(0ms) 다음 모델로 즉시 직행합니다.
+ */
+const cooldownMap = new Map();
+
+/** 특정 키+모델이 쿨다운(스킵 대상) 상태인지 확인 */
+function isCoolingDown(apiKey, model) {
+    const key = `${apiKey.slice(-8)}:${model}`;
+    const expireAt = cooldownMap.get(key);
+    if (!expireAt) return false;
+    if (Date.now() > expireAt) {
+        cooldownMap.delete(key);
+        return false;
+    }
+    return true;
+}
+
+/** 쿨다운 등록 (만료 시간 설정) */
+function setCooldown(apiKey, model, durationMs, reason) {
+    const key = `${apiKey.slice(-8)}:${model}`;
+    cooldownMap.set(key, Date.now() + durationMs);
+    console.log(`[Gemini Edge] Cooldown set key[...${apiKey.slice(-6)}] ${model} (${reason}): ${Math.round(durationMs / 1000)}s`);
 }
 
 /**
@@ -126,10 +174,15 @@ export default async function handler(req) {
 
     // 마지막 업스트림 오류(상태·본문 앞부분) — 전부 실패했을 때 503 본문에 실어 원인을 알 수 있게 한다.
     let lastError = '';
-    // 모델 우선 순회 — 3.5를 모든 키에서 소진한 뒤에만 3.1로 내려간다. 상태 저장 없이 매 요청 같은 순서로 시도하므로
-    // 한도가 리셋되면(무료 등급 RPD, 태평양 자정) 다음 요청부터 자동으로 3.5로 복귀한다.
+    // 모델 우선 순회 — 상위 성능 모델부터 시도하며, 소진(429) 시 다음 순위 모델로 내려갑니다.
+    // 이미 소진된 모델/키는 cooldownMap에 의해 API 호출 없이 즉시 스킵됩니다.
     for (const model of MODELS) {
         for (const apiKey of orderedKeys) {
+            // 이미 일일 소진(RPD) 또는 분당 제한(RPM)에 걸린 키+모델은 fetch 없이 0ms 즉시 통과
+            if (isCoolingDown(apiKey, model)) {
+                continue;
+            }
+
             const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`;
             const apiResponse = await fetch(url, {
                 method: 'POST',
@@ -147,9 +200,35 @@ export default async function handler(req) {
                 const errBody = (await apiResponse.text().catch(() => '')).slice(0, 500);
                 lastError = `${status} ${errBody}`;
                 console.log(`[Gemini Edge] key[...${apiKey.slice(-6)}] ${model} → ${status} ${errBody}`);
-                // 429(할당량) or 403(권한) → 같은 모델, 다음 키
-                if (status === 429 || status === 403) continue;
-                // 그 외(404 모델 없음, 400 요청 오류 등) → 키를 바꿔도 같으므로 다음 모델로
+
+                // 429(할당량 초과)
+                if (status === 429) {
+                    const isDaily = errBody.includes('PerDay') || errBody.includes('per day') || errBody.includes('quota_limit_value');
+                    if (isDaily) {
+                        // 하루 한도(RPD) 소진 → 6시간 동안 호출 차단 (다음 요청은 이 모델/키를 0ms 즉시 스킵)
+                        setCooldown(apiKey, model, 6 * 60 * 60 * 1000, 'Daily RPD Quota Exceeded');
+                    } else {
+                        // 분당 제한(RPM/TPM) → 60초 쿨다운
+                        setCooldown(apiKey, model, 60 * 1000, 'RPM/TPM Rate Limit');
+                    }
+                    continue; // 같은 모델의 다음 키 시도
+                }
+
+                // 403(권한 오류 / 키 문제) → 1시간 쿨다운
+                if (status === 403) {
+                    setCooldown(apiKey, model, 60 * 60 * 1000, 'Forbidden (403)');
+                    continue;
+                }
+
+                // 404(모델 미지원 / 오타 등) → 24시간 동안 모든 키에서 해당 모델 호출 건너뜀
+                if (status === 404) {
+                    for (const k of apiKeys) {
+                        setCooldown(k, model, 24 * 60 * 60 * 1000, 'Model Not Found (404)');
+                    }
+                    break;
+                }
+
+                // 그 외(400 요청 오류 등) → 키를 바꿔도 같으므로 다음 모델로
                 break;
             }
 
