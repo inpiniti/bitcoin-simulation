@@ -16,18 +16,9 @@ export const config = { runtime: 'edge', maxDuration: 30 };
  * 태평양 자정에 구글 할당량이 리셋되면 다시 최상위 모델(3.8 Flash)로 자동 복귀합니다.
  */
 const MODELS = [
-    // ── 1계층: 고성능 Flash 모델 (키당 일 20회) ──
-    'gemini-3.8-flash',      // 20 RPD (최상위 플래그십)
-    'gemini-3.7-flash',      // 20 RPD
-    'gemini-3.6-flash',      // 20 RPD
-    'gemini-3.5-flash',      // 20 RPD
-    'gemini-3-flash',        // 20 RPD
-    'gemini-2.5-flash',      // 20 RPD
-    // ── 2계층: 대용량 Flash Lite 모델 (키당 일 500회) ──
+    // 500 RPD 대용량 Flash Lite 모델만 사용 (403 낭비 없음)
     'gemini-3.5-flash-lite', // 500 RPD (경량 최고 성능)
     'gemini-3.1-flash-lite', // 500 RPD (넉넉한 할당량 백업)
-    // ── 3계층: 최종 백업 Lite 모델 (키당 일 20회) ──
-    'gemini-2.5-flash-lite', // 20 RPD
 ];
 
 /** 환경변수에서 API 키 목록을 파싱 (콤마 구분) */
