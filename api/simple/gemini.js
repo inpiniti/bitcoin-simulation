@@ -3,7 +3,7 @@
  * Edge Runtime은 true streaming(ReadableStream)을 지원합니다.
  * /api/simple/gemini 요청을 처리합니다.
  */
-export const config = { runtime: 'edge' };
+export const config = { runtime: 'edge', maxDuration: 30 };
 
 /**
  * 성능순 모델 우선순위 (Fallback 체인)
