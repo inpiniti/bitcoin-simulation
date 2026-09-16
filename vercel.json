@@ -51,6 +51,14 @@
         {
             "source": "/api/kakao-callback",
             "destination": "/api/kakao-callback"
+        },
+        {
+            "source": "/v1/chat/completions",
+            "destination": "/api/v1/chat/completions"
+        },
+        {
+            "source": "/v1/models",
+            "destination": "/api/v1/models"
         }
     ]
-}
+}
